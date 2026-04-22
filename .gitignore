@@ -41,3 +41,8 @@ firebase-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# tooling caches / agent working dirs
+.claude/
+.firebase/
+.playwright-mcp/
