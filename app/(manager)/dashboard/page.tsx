@@ -34,6 +34,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -228,7 +239,6 @@ function GroupCard({
   }
 
   const handleDelete = async () => {
-    if (!confirm(`Supprimer le groupe "${group.name}" ? Cette action est irréversible et supprimera tous les athlètes et campagnes associés.`)) return
     setDeleting(true)
     const result = await deleteGroup(group.id)
     setDeleting(false)
@@ -240,39 +250,41 @@ function GroupCard({
     }
   }
 
+  const panelId = `group-panel-${group.id}`
+
   return (
     <Card>
-      <CardHeader
-        className="cursor-pointer"
-        onClick={onToggle}
-      >
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Users className="h-5 w-5 text-blue-600" />
-            <div>
+          {/* Keyboard-accessible expand/collapse toggle. The previous
+              clickable-div pattern was invisible to screen readers and
+              couldn't be reached with the keyboard. */}
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={isExpanded}
+            aria-controls={panelId}
+            className="flex flex-1 items-center gap-3 text-left"
+          >
+            <Users className="h-5 w-5 shrink-0 text-blue-600" />
+            <div className="min-w-0">
               <CardTitle className="text-lg">{group.name}</CardTitle>
               <CardDescription>
                 Créé le {new Date(group.createdAt).toLocaleDateString("fr-FR")}
               </CardDescription>
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-1">
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
               <DialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <Button variant="ghost" size="sm" aria-label="Modifier le groupe">
                   <Pencil className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </DialogTrigger>
-              <DialogContent onClick={(e) => e.stopPropagation()}>
+              <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Modifier le groupe</DialogTitle>
-                  <DialogDescription>
-                    Modifiez le nom du groupe.
-                  </DialogDescription>
+                  <DialogDescription>Modifiez le nom du groupe.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleEdit}>
                   <div className="space-y-4 py-4">
@@ -295,32 +307,46 @@ function GroupCard({
                 </form>
               </DialogContent>
             </Dialog>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleDelete()
-              }}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <Loader2 className="h-4 w-4 animate-spin text-red-500" />
-              ) : (
-                <Trash2 className="h-4 w-4 text-red-500" />
-              )}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={deleting}
+                  aria-label="Supprimer le groupe"
+                >
+                  {deleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Supprimer le groupe « {group.name} » ?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Cette action est irréversible. Tous les athlètes, campagnes
+                    et réponses associés à ce groupe seront définitivement supprimés.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete}>Supprimer</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             {isExpanded ? (
-              <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              <ChevronUp className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
             ) : (
-              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              <ChevronDown className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
             )}
           </div>
         </div>
       </CardHeader>
 
       {isExpanded && (
-        <CardContent>
+        <CardContent id={panelId}>
           <Tabs defaultValue="athletes" className="w-full">
             <TabsList>
               <TabsTrigger value="athletes">Athlètes</TabsTrigger>
@@ -378,7 +404,6 @@ function AthletesTab({ group, onRefresh }: { group: Group; onRefresh: () => void
   }
 
   const handleRemoveAthlete = async (athleteId: string, name: string) => {
-    if (!confirm(`Retirer ${name} du groupe ?`)) return
     const result = await removeAthlete(group.id, athleteId)
     if (result.error) {
       toast.error(result.error)
@@ -395,7 +420,12 @@ function AthletesTab({ group, onRefresh }: { group: Group; onRefresh: () => void
         <Label className="text-sm font-medium">Lien d&apos;invitation</Label>
         <div className="flex gap-2">
           <Input value={inviteLink} readOnly className="min-w-0 text-xs font-mono" />
-          <Button variant="outline" size="sm" onClick={copyInviteLink}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={copyInviteLink}
+            aria-label="Copier le lien d'invitation"
+          >
             <Copy className="h-4 w-4" />
           </Button>
           <Button
@@ -403,6 +433,7 @@ function AthletesTab({ group, onRefresh }: { group: Group; onRefresh: () => void
             size="sm"
             onClick={handleRegenerate}
             disabled={regenerating}
+            aria-label="Régénérer le lien d'invitation"
           >
             {regenerating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -453,15 +484,41 @@ function AthletesTab({ group, onRefresh }: { group: Group; onRefresh: () => void
                   )}
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  handleRemoveAthlete(athlete.id, `${athlete.firstName} ${athlete.lastName}`)
-                }
-              >
-                <Trash2 className="h-4 w-4 text-red-500" />
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Retirer ${athlete.firstName} ${athlete.lastName} du groupe`}
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Retirer {athlete.firstName} {athlete.lastName} ?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      L&apos;athlète sera retiré du groupe. Ses réponses aux campagnes
+                      existantes resteront enregistrées.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() =>
+                        handleRemoveAthlete(
+                          athlete.id,
+                          `${athlete.firstName} ${athlete.lastName}`
+                        )
+                      }
+                    >
+                      Retirer
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           ))}
         </div>
@@ -657,7 +714,6 @@ function CampaignCard({
   }, [groupId, campaign.id])
 
   const handleClose = async () => {
-    if (!confirm("Fermer cette campagne ? Les athlètes ne pourront plus répondre.")) return
     setClosing(true)
     const result = await closeCampaign(groupId, campaign.id)
     setClosing(false)
@@ -695,7 +751,6 @@ function CampaignCard({
   }
 
   const handleReject = async () => {
-    if (!confirm("Rejeter ce planning ? L'optimisation sera supprimée.")) return
     setRejecting(true)
     const result = await rejectPlanning(groupId, campaign.id)
     setRejecting(false)
@@ -709,13 +764,13 @@ function CampaignCard({
 
   const statusBadge = () => {
     if (campaign.planningStatus === "validated") {
-      return <Badge className="bg-green-600 text-white">Valide</Badge>
+      return <Badge className="bg-green-600 text-white">Validé</Badge>
     }
     if (campaign.planningStatus === "rejected") {
       return <Badge variant="destructive">Rejeté</Badge>
     }
     if (campaign.status === "closed") {
-      return <Badge variant="secondary">Fermee</Badge>
+      return <Badge variant="secondary">Fermée</Badge>
     }
     return <Badge>Active</Badge>
   }
@@ -758,25 +813,43 @@ function CampaignCard({
             {/* Action Buttons */}
             <div className="flex gap-2">
               {campaign.status === "active" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleClose}
-                  disabled={closing}
-                >
-                  {closing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Lock className="h-4 w-4" />
-                  )}
-                  <span className="ml-1 hidden sm:inline">Fermer</span>
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={closing}
+                      aria-label="Fermer la campagne"
+                    >
+                      {closing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Lock className="h-4 w-4" />
+                      )}
+                      <span className="ml-1 hidden sm:inline">Fermer</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Fermer cette campagne ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Les athlètes ne pourront plus répondre. Vous pourrez
+                        ensuite lancer l&apos;optimisation.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClose}>Fermer</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
               {campaign.status === "closed" && !campaign.optimizationResult && (
                 <Button
                   size="sm"
                   onClick={handleOptimize}
                   disabled={optimizing}
+                  aria-label="Lancer l'optimisation"
                 >
                   {optimizing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -792,7 +865,7 @@ function CampaignCard({
                   size="sm"
                   onClick={() => setShowResult(!showResult)}
                 >
-                  {showResult ? "Masquer" : "Voir le resultat"}
+                  {showResult ? "Masquer" : "Voir le résultat"}
                 </Button>
               )}
             </div>

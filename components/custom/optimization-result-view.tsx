@@ -4,6 +4,17 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { CheckCircle, XCircle, Clock, Users, User, Loader2 } from "lucide-react"
 import type { OptimizationResult, AthleteSlotInfo, IndividualSlot } from "@/lib/types/planning"
 
@@ -212,18 +223,31 @@ export function OptimizationResultView({
             )}
             Valider le planning
           </Button>
-          <Button
-            variant="destructive"
-            onClick={onReject}
-            disabled={isValidating || isRejecting}
-          >
-            {isRejecting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <XCircle className="h-4 w-4 mr-2" />
-            )}
-            Rejeter
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" disabled={isValidating || isRejecting}>
+                {isRejecting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <XCircle className="h-4 w-4 mr-2" />
+                )}
+                Rejeter
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Rejeter ce planning ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  L&apos;optimisation sera supprimée et vous pourrez la
+                  relancer. Aucun email ne sera envoyé aux athlètes.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction onClick={onReject}>Rejeter</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )}
 
