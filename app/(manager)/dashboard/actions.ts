@@ -114,22 +114,19 @@ export async function deleteGroup(groupId: string) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
+  const parsedId = firestoreId.safeParse(groupId)
+  if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
+
   const groupRef = adminDb
     .collection("managers").doc(manager.uid)
-    .collection("groups").doc(groupId)
+    .collection("groups").doc(parsedId.data)
 
-  // Delete sub-collections: athletes, campaigns (and their responses)
-  const athletesSnap = await groupRef.collection("athletes").get()
-  for (const doc of athletesSnap.docs) await doc.ref.delete()
-
-  const campaignsSnap = await groupRef.collection("campaigns").get()
-  for (const campDoc of campaignsSnap.docs) {
-    const responsesSnap = await campDoc.ref.collection("responses").get()
-    for (const respDoc of responsesSnap.docs) await respDoc.ref.delete()
-    await campDoc.ref.delete()
-  }
-
-  await groupRef.delete()
+  // Recursively delete the group and every sub-collection (athletes,
+  // campaigns, each campaign's responses AND travelTimes cache). The Admin
+  // SDK handles batching, retries, and concurrency under the hood. The
+  // previous implementation iterated sequentially, didn't recurse into
+  // travelTimes, and left orphans on partial failure.
+  await adminDb.recursiveDelete(groupRef)
 
   revalidatePath("/dashboard")
   return { success: true }
@@ -435,10 +432,18 @@ export async function validatePlanning(groupId: string, campaignId: string) {
     const athletesSnapshot = await basePath.collection("athletes").get()
     const athleteMap = new Map(athletesSnapshot.docs.map((d) => [d.id, d.data()]))
 
-    // Send email to available athletes
+    // Build the full list of email tasks then `Promise.allSettled` them in a
+    // single fan-out. Sequential fire-and-forget (previous code) could be
+    // cut short by the serverless function terminating before the last
+    // Resend calls resolved; awaiting each one sequentially would balloon
+    // the response time linearly with group size.
+    const tasks: Array<Promise<unknown>> = []
+
+    // Collective slot
     for (const athlete of optimResult.bestSlot.availableAthletes) {
       const info = athleteMap.get(athlete.athleteId)
-      if (info?.email) {
+      if (!info?.email) continue
+      tasks.push(
         sendPlanningNotification(info.email, info.firstName || "Athlete", {
           slotType: "collectif",
           day: optimResult.bestSlot.day,
@@ -449,13 +454,14 @@ export async function validatePlanning(groupId: string, campaignId: string) {
           trainingLocation: campaign.trainingLocation.formatted,
           planningLink: `${appUrl}/campaign/${campaignId}`,
         })
-      }
+      )
     }
 
-    // Send email to athletes with individual slots
+    // Individual slots
     for (const indiv of optimResult.individualSlots || []) {
       const info = athleteMap.get(indiv.athleteId)
-      if (info?.email) {
+      if (!info?.email) continue
+      tasks.push(
         sendPlanningNotification(info.email, info.firstName || "Athlete", {
           slotType: "individuel",
           day: indiv.day,
@@ -466,26 +472,28 @@ export async function validatePlanning(groupId: string, campaignId: string) {
           trainingLocation: campaign.trainingLocation.formatted,
           planningLink: `${appUrl}/campaign/${campaignId}`,
         })
-      }
+      )
     }
 
-    // Send "no slot" email to truly excluded athletes
+    // No-slot emails for athletes with neither a collective nor an individual slot
     for (const excluded of optimResult.bestSlot.unavailableAthletes) {
       const hasIndividual = optimResult.individualSlots?.some(
         (i: { athleteId: string }) => i.athleteId === excluded.athleteId
       )
-      if (!hasIndividual) {
-        const info = athleteMap.get(excluded.athleteId)
-        if (info?.email) {
-          sendPlanningNotification(info.email, info.firstName || "Athlete", {
-            slotType: "aucun",
-            trainingLocation: campaign.trainingLocation.formatted,
-            reason: excluded.reason,
-            planningLink: `${appUrl}/campaign/${campaignId}`,
-          })
-        }
-      }
+      if (hasIndividual) continue
+      const info = athleteMap.get(excluded.athleteId)
+      if (!info?.email) continue
+      tasks.push(
+        sendPlanningNotification(info.email, info.firstName || "Athlete", {
+          slotType: "aucun",
+          trainingLocation: campaign.trainingLocation.formatted,
+          reason: excluded.reason,
+          planningLink: `${appUrl}/campaign/${campaignId}`,
+        })
+      )
     }
+
+    await Promise.allSettled(tasks)
   }
 
   revalidatePath("/dashboard")
