@@ -295,81 +295,121 @@ export async function closeCampaign(groupId: string, campaignId: string) {
   return { success: true }
 }
 
+// How long an in-progress optimization can hold the lock before another
+// invocation is allowed to take it over (in case the previous run crashed).
+const OPTIMIZATION_STALE_LOCK_MS = 10 * 60 * 1000
+
 export async function runOptimization(groupId: string, campaignId: string) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
-  const basePath = adminDb
-    .collection("managers").doc(manager.uid)
-    .collection("groups").doc(groupId)
-
-  // Get campaign
-  const campaignDoc = await basePath.collection("campaigns").doc(campaignId).get()
-  if (!campaignDoc.exists) return { error: "Campagne introuvable." }
-  const campaign = campaignDoc.data()!
-
-  // Get responses
-  const responsesSnapshot = await basePath
-    .collection("campaigns").doc(campaignId)
-    .collection("responses")
-    .get()
-
-  if (responsesSnapshot.empty) return { error: "Aucune reponse recue." }
-
-  // Get athletes info
-  const athletesSnapshot = await basePath.collection("athletes").get()
-  const athleteMap = new Map(athletesSnapshot.docs.map((d) => [d.id, d.data()]))
-
-  // Build athlete data for optimizer. Abort the whole run on any decryption
-  // failure — silently coercing to (0, 0) would produce nonsense travel times
-  // and silently-wrong optimization results. Surface the failure to the manager.
-  const corruptedAthleteIds: string[] = []
-  const athleteDataList = responsesSnapshot.docs.map((doc) => {
-    const response = doc.data()
-    const athleteInfo = athleteMap.get(doc.id)
-
-    let homeAddress = { formatted: "", lat: 0, lng: 0 }
-    let schoolAddress = null
-
-    try {
-      if (response.homeAddress) homeAddress = decryptAddress(response.homeAddress)
-      if (response.schoolAddress) schoolAddress = decryptAddress(response.schoolAddress)
-    } catch {
-      corruptedAthleteIds.push(doc.id)
-    }
-
-    return {
-      athleteId: doc.id,
-      firstName: athleteInfo?.firstName || "Inconnu",
-      lastName: athleteInfo?.lastName || "",
-      schedule: response.schedule || {},
-      homeAddress,
-      schoolAddress,
-    }
-  })
-
-  if (corruptedAthleteIds.length > 0) {
-    return {
-      error: `Impossible de déchiffrer les adresses de ${corruptedAthleteIds.length} athlète(s). Profil corrompu ou clé de chiffrement changée.`,
-    }
+  const parsedGroupId = firestoreId.safeParse(groupId)
+  const parsedCampaignId = firestoreId.safeParse(campaignId)
+  if (!parsedGroupId.success || !parsedCampaignId.success) {
+    return { error: "Identifiant invalide." }
   }
 
-  const result = await optimizeSlots(athleteDataList, {
-    timeRangeStart: campaign.timeRangeStart || "08:00",
-    timeRangeEnd: campaign.timeRangeEnd || "20:00",
-    trainingLocation: campaign.trainingLocation,
-    managerUid: manager.uid,
-    groupId,
-    campaignId,
-  })
+  const basePath = adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedGroupId.data)
+  const campaignRef = basePath.collection("campaigns").doc(parsedCampaignId.data)
 
-  await basePath.collection("campaigns").doc(campaignId).update({
-    optimizationResult: JSON.parse(JSON.stringify(result)),
-    planningStatus: "pending",
+  // --- Phase 1: acquire the optimization lock atomically. A double-click
+  // (or two manager sessions hitting the button at the same time) would
+  // otherwise launch two optimizers, race on the Firestore write, and
+  // double-send planning emails once validated.
+  type LockOutcome =
+    | { ok: true; campaign: FirebaseFirestore.DocumentData }
+    | { ok: false; reason: string }
+  const lock: LockOutcome = await adminDb.runTransaction<LockOutcome>(async (tx) => {
+    const snap = await tx.get(campaignRef)
+    if (!snap.exists) return { ok: false, reason: "Campagne introuvable." }
+    const data = snap.data()!
+    const status = data.optimizationStatus as string | undefined
+    const startedAtMs = (data.optimizationStartedAt as FirebaseFirestore.Timestamp | undefined)?.toMillis() ?? 0
+    if (status === "running" && Date.now() - startedAtMs < OPTIMIZATION_STALE_LOCK_MS) {
+      return { ok: false, reason: "Une optimisation est déjà en cours pour cette campagne." }
+    }
+    tx.update(campaignRef, {
+      optimizationStatus: "running",
+      optimizationStartedAt: new Date(),
+    })
+    return { ok: true, campaign: data }
   })
+  if (!lock.ok) return { error: lock.reason }
 
-  revalidatePath("/dashboard")
-  return { data: result }
+  // --- Phase 2: long-running work outside the transaction. Wrap in try so
+  // we always release the lock (to "failed" or "completed") even on error.
+  try {
+    const responsesSnapshot = await campaignRef.collection("responses").get()
+    if (responsesSnapshot.empty) {
+      await campaignRef.update({ optimizationStatus: "idle" })
+      return { error: "Aucune réponse reçue." }
+    }
+
+    const athletesSnapshot = await basePath.collection("athletes").get()
+    const athleteMap = new Map(athletesSnapshot.docs.map((d) => [d.id, d.data()]))
+
+    const corruptedAthleteIds: string[] = []
+    const athleteDataList = responsesSnapshot.docs.map((doc) => {
+      const response = doc.data()
+      const athleteInfo = athleteMap.get(doc.id)
+
+      let homeAddress = { formatted: "", lat: 0, lng: 0 }
+      let schoolAddress = null
+
+      try {
+        if (response.homeAddress) homeAddress = decryptAddress(response.homeAddress)
+        if (response.schoolAddress) schoolAddress = decryptAddress(response.schoolAddress)
+      } catch {
+        corruptedAthleteIds.push(doc.id)
+      }
+
+      return {
+        athleteId: doc.id,
+        firstName: athleteInfo?.firstName || "Inconnu",
+        lastName: athleteInfo?.lastName || "",
+        schedule: response.schedule || {},
+        homeAddress,
+        schoolAddress,
+      }
+    })
+
+    if (corruptedAthleteIds.length > 0) {
+      await campaignRef.update({ optimizationStatus: "idle" })
+      return {
+        error: `Impossible de déchiffrer les adresses de ${corruptedAthleteIds.length} athlète(s). Profil corrompu ou clé de chiffrement changée.`,
+      }
+    }
+
+    const result = await optimizeSlots(athleteDataList, {
+      timeRangeStart: lock.campaign.timeRangeStart || "08:00",
+      timeRangeEnd: lock.campaign.timeRangeEnd || "20:00",
+      trainingLocation: lock.campaign.trainingLocation,
+      managerUid: manager.uid,
+      groupId: parsedGroupId.data,
+      campaignId: parsedCampaignId.data,
+    })
+
+    await campaignRef.update({
+      optimizationResult: JSON.parse(JSON.stringify(result)),
+      planningStatus: "pending",
+      optimizationStatus: "completed",
+    })
+
+    revalidatePath("/dashboard")
+    return { data: result }
+  } catch (error) {
+    await campaignRef
+      .update({
+        optimizationStatus: "failed",
+        optimizationError: error instanceof Error ? error.message : "Erreur inconnue",
+      })
+      .catch(() => {}) // don't mask the original error if we can't release the lock
+    return {
+      error: error instanceof Error ? error.message : "Erreur lors de l'optimisation.",
+    }
+  }
 }
 
 export async function validatePlanning(groupId: string, campaignId: string) {

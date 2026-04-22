@@ -1,4 +1,6 @@
-import type { WeeklySchedule, DayKey } from "@/lib/types/schedule"
+import type { DayKey } from "@/lib/types/schedule"
+import { dayKeys, dayLabels } from "@/lib/types/schedule"
+import type { WeeklySchedule } from "@/lib/types/schedule"
 import type { SlotResult, AthleteSlotInfo, IndividualSlot, OptimizationResult } from "@/lib/types/planning"
 import type { AddressWithCoords } from "@/lib/types/address"
 import { getDepartureInfo } from "./departure"
@@ -22,6 +24,11 @@ interface CampaignConfig {
   campaignId: string
 }
 
+// Business parameters — colocated so they're easy to tune.
+const SLOT_DURATION_MINUTES = 90
+const SLOT_STEP_MINUTES = 15
+const MAPS_FAILURE_ABORT_RATIO = 0.5
+
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number)
   return h * 60 + m
@@ -33,7 +40,7 @@ function minutesToTime(minutes: number): string {
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
 }
 
-function generateTimeSlots(start: string, end: string, stepMinutes: number = 15): string[] {
+function generateTimeSlots(start: string, end: string, stepMinutes = SLOT_STEP_MINUTES): string[] {
   const slots: string[] = []
   const startMin = timeToMinutes(start)
   const endMin = timeToMinutes(end)
@@ -43,12 +50,50 @@ function generateTimeSlots(start: string, end: string, stepMinutes: number = 15)
   return slots
 }
 
-const DAY_LABELS: Record<DayKey, string> = {
-  lundi: "Lundi",
-  mardi: "Mardi",
-  mercredi: "Mercredi",
-  jeudi: "Jeudi",
-  vendredi: "Vendredi",
+/**
+ * Enumerates every (origin, day) pair the optimizer could ask the travel
+ * service about, in one pass. Previously the optimizer issued these fetches
+ * sequentially from inside a triple loop (O(days × slots × athletes)), which
+ * blew past serverless timeouts as soon as the group grew past ~10 athletes.
+ *
+ * We pre-warm the Firestore travel cache with a single parallel fan-out, then
+ * the main loop only hits the cache.
+ */
+function enumerateUniqueTravelPairs(
+  athletes: AthleteData[]
+): Array<{ origin: AddressWithCoords; day: DayKey }> {
+  const seen = new Set<string>()
+  const pairs: Array<{ origin: AddressWithCoords; day: DayKey }> = []
+
+  for (const day of dayKeys) {
+    for (const athlete of athletes) {
+      // Home is always a possible departure point on any day.
+      const homeKey = `${day}|${athlete.homeAddress.lat},${athlete.homeAddress.lng}`
+      if (!seen.has(homeKey)) {
+        seen.add(homeKey)
+        pairs.push({ origin: athlete.homeAddress, day })
+      }
+
+      // School becomes a possible departure point if the athlete has a class
+      // on that day and we know their school address.
+      const daySchedule = athlete.schedule[day] || []
+      if (daySchedule.length > 0 && athlete.schoolAddress) {
+        const schoolKey = `${day}|${athlete.schoolAddress.lat},${athlete.schoolAddress.lng}`
+        if (!seen.has(schoolKey)) {
+          seen.add(schoolKey)
+          pairs.push({ origin: athlete.schoolAddress, day })
+        }
+      }
+    }
+  }
+  return pairs
+}
+
+export class MapsUnavailableError extends Error {
+  constructor() {
+    super("Google Maps a échoué sur la majorité des trajets. Optimisation annulée.")
+    this.name = "MapsUnavailableError"
+  }
 }
 
 export async function optimizeSlots(
@@ -56,13 +101,35 @@ export async function optimizeSlots(
   config: CampaignConfig
 ): Promise<OptimizationResult> {
   const timeSlots = generateTimeSlots(config.timeRangeStart, config.timeRangeEnd)
-  const days: DayKey[] = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"]
+  const days = dayKeys
+
+  // Pre-warm the travel-time cache in parallel. Every inner call then hits
+  // the cache and runs synchronously.
+  const pairs = enumerateUniqueTravelPairs(athletes)
+  if (pairs.length > 0) {
+    const warmupResults = await Promise.all(
+      pairs.map(({ origin, day }) =>
+        getTravelTime(
+          origin,
+          config.trainingLocation,
+          day,
+          config.managerUid,
+          config.groupId,
+          config.campaignId
+        )
+      )
+    )
+    const failures = warmupResults.filter((r) => r === null).length
+    if (failures / warmupResults.length > MAPS_FAILURE_ABORT_RATIO) {
+      throw new MapsUnavailableError()
+    }
+  }
 
   const results: SlotResult[] = []
 
   for (const day of days) {
     for (const slotStart of timeSlots) {
-      const slotEnd = minutesToTime(timeToMinutes(slotStart) + 90)
+      const slotEnd = minutesToTime(timeToMinutes(slotStart) + SLOT_DURATION_MINUTES)
       if (timeToMinutes(slotEnd) > timeToMinutes(config.timeRangeEnd)) continue
 
       const availableAthletes: AthleteSlotInfo[] = []
@@ -70,12 +137,7 @@ export async function optimizeSlots(
 
       for (const athlete of athletes) {
         const daySchedule = athlete.schedule[day] || []
-        const departure = getDepartureInfo(
-          daySchedule,
-          slotStart,
-          athlete.homeAddress,
-          athlete.schoolAddress
-        )
+        const departure = getDepartureInfo(daySchedule, slotStart, athlete.homeAddress, athlete.schoolAddress)
 
         if (departure.conflict) {
           unavailableAthletes.push({
@@ -88,6 +150,8 @@ export async function optimizeSlots(
           continue
         }
 
+        // Cache hit expected (warmed above). If it's a miss here the fetch
+        // will still run but this path is rare.
         const travel = await getTravelTime(
           departure.address,
           config.trainingLocation,
@@ -98,9 +162,7 @@ export async function optimizeSlots(
         )
 
         if (travel) {
-          const availableFromMinutes = departure.availableFromTime
-            ? timeToMinutes(departure.availableFromTime)
-            : 0
+          const availableFromMinutes = departure.availableFromTime ? timeToMinutes(departure.availableFromTime) : 0
           const arrivalMinutes = availableFromMinutes + travel.durationMinutes
           const slotStartMinutes = timeToMinutes(slotStart)
 
@@ -142,7 +204,7 @@ export async function optimizeSlots(
           : 0
 
       results.push({
-        day: DAY_LABELS[day],
+        day: dayLabels[day],
         startTime: slotStart,
         endTime: slotEnd,
         availableAthletes,
@@ -167,10 +229,11 @@ export async function optimizeSlots(
       let bestIndividual: IndividualSlot | null = null
 
       for (const result of results) {
-        const athleteInSlot = result.availableAthletes.find(
-          (a) => a.athleteId === excluded.athleteId
-        )
-        if (athleteInSlot && (!bestIndividual || (athleteInSlot.travelMinutes || Infinity) < bestIndividual.travelMinutes)) {
+        const athleteInSlot = result.availableAthletes.find((a) => a.athleteId === excluded.athleteId)
+        if (
+          athleteInSlot &&
+          (!bestIndividual || (athleteInSlot.travelMinutes || Infinity) < bestIndividual.travelMinutes)
+        ) {
           bestIndividual = {
             athleteId: excluded.athleteId,
             firstName: excluded.firstName,
