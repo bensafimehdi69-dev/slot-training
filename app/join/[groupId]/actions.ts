@@ -4,6 +4,7 @@ import { z } from "zod"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { createSessionCookie } from "@/lib/firebase/auth"
 import { writeAthleteProfile } from "@/lib/server/profile-service"
+import { readInviteIndex } from "@/lib/server/indexes"
 import { addressSchema } from "@/lib/types/address"
 
 const firestoreId = z.string().min(1).max(128).regex(/^[^/]+$/, "Identifiant invalide.")
@@ -45,35 +46,29 @@ export async function validateInviteToken(groupId: string, token: string) {
     return { error: "Lien d'invitation invalide." }
   }
 
-  // TODO(sprint-2.5-commit-2): replace the O(N managers) scan with a read
-  // from inviteIndex/{token} → {managerUid, groupId, expiresAt}.
-  const managersSnapshot = await adminDb.collection("managers").get()
-
-  for (const managerDoc of managersSnapshot.docs) {
-    const groupDoc = await managerDoc.ref
-      .collection("groups")
-      .doc(parsedGroupId.data)
-      .get()
-    if (!groupDoc.exists) continue
-
-    const data = groupDoc.data()!
-    // Single generic error message across all failure modes — no oracle that
-    // distinguishes "groupId doesn't exist" from "token doesn't match".
-    if (data.inviteToken !== parsedToken.data) {
-      return { error: "Lien d'invitation invalide." }
-    }
-    if (data.inviteTokenExpiresAt?.toDate() < new Date()) {
-      return { error: "Ce lien d'invitation a expiré." }
-    }
-    return {
-      data: {
-        groupName: data.name as string,
-        managerUid: managerDoc.id,
-      },
-    }
+  // O(1) lookup via the reverse index instead of scanning every manager.
+  const index = await readInviteIndex(parsedToken.data)
+  // Single generic error across all failure modes — never an oracle that
+  // distinguishes "token exists, wrong group" from "token unknown".
+  if (!index || index.groupId !== parsedGroupId.data) {
+    return { error: "Lien d'invitation invalide." }
+  }
+  if (index.expiresAt < new Date()) {
+    return { error: "Ce lien d'invitation a expiré." }
   }
 
-  return { error: "Lien d'invitation invalide." }
+  const groupDoc = await adminDb
+    .collection("managers").doc(index.managerUid)
+    .collection("groups").doc(parsedGroupId.data)
+    .get()
+  if (!groupDoc.exists) return { error: "Lien d'invitation invalide." }
+
+  return {
+    data: {
+      groupName: groupDoc.data()!.name as string,
+      managerUid: index.managerUid,
+    },
+  }
 }
 
 export async function sendMagicLink(email: unknown) {

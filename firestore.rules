@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// All writes in the app go through the Admin SDK, which bypasses these
+// rules. They exist as defense-in-depth for any direct client read/write
+// via the Firebase Auth session, and as documentation of the intended
+// access model. Any time the client paths change, mirror them here.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Managers: only the owner can read/write their own tree.
+    match /managers/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      match /groups/{groupId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+
+        match /athletes/{athleteId} {
+          allow read, write: if request.auth != null && request.auth.uid == uid;
+        }
+
+        match /campaigns/{campaignId} {
+          allow read, write: if request.auth != null && request.auth.uid == uid;
+
+          // Responses: the manager can read all responses in their own
+          // campaigns; an athlete may only write their own response
+          // document (docId == their uid). Previously any authenticated
+          // user could create or overwrite any response document.
+          match /responses/{responseId} {
+            allow read: if request.auth != null && request.auth.uid == uid;
+            allow write: if request.auth != null && request.auth.uid == responseId;
+          }
+
+          match /travelTimes/{cacheId} {
+            allow read, write: if request.auth != null && request.auth.uid == uid;
+          }
+        }
+      }
+    }
+
+    // Athletes: only the athlete can read/write their own encrypted profile.
+    match /athletes/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Reverse indexes: server-only (Admin SDK). Deny every client read or
+    // write — exposing these would let anyone enumerate invite tokens or
+    // campaign ids.
+    match /inviteIndex/{token} {
+      allow read, write: if false;
+    }
+    match /campaignIndex/{campaignId} {
+      allow read, write: if false;
+    }
+  }
+}

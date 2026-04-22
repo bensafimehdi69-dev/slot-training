@@ -7,6 +7,12 @@ import { adminDb } from "@/lib/firebase/admin"
 import { decryptAddress } from "@/lib/utils/encryption"
 import { optimizeSlots } from "@/lib/utils/optimizer"
 import { sendCampaignNotification, sendPlanningNotification } from "@/lib/utils/email"
+import {
+  writeInviteIndex,
+  deleteInviteIndex,
+  writeCampaignIndex,
+  deleteIndexesForGroup,
+} from "@/lib/server/indexes"
 import { revalidatePath } from "next/cache"
 import type { Group, GroupAthlete } from "@/lib/types/group"
 import type { Campaign } from "@/lib/types/campaign"
@@ -87,6 +93,14 @@ export async function createGroup(formData: FormData) {
       inviteTokenExpiresAt,
     })
 
+  // Reverse index so /invite/[token] and validateInviteToken can do an O(1)
+  // lookup instead of scanning every manager.
+  await writeInviteIndex(inviteToken, {
+    managerUid: manager.uid,
+    groupId: ref.id,
+    expiresAt: inviteTokenExpiresAt,
+  })
+
   revalidatePath("/dashboard")
   return { data: { id: ref.id } }
 }
@@ -121,11 +135,13 @@ export async function deleteGroup(groupId: string) {
     .collection("managers").doc(manager.uid)
     .collection("groups").doc(parsedId.data)
 
+  // Clean the top-level reverse indexes BEFORE recursiveDelete — those
+  // collections are outside the group sub-tree and would otherwise be
+  // orphaned, still pointing at paths that no longer exist.
+  await deleteIndexesForGroup(manager.uid, parsedId.data)
+
   // Recursively delete the group and every sub-collection (athletes,
-  // campaigns, each campaign's responses AND travelTimes cache). The Admin
-  // SDK handles batching, retries, and concurrency under the hood. The
-  // previous implementation iterated sequentially, didn't recurse into
-  // travelTimes, and left orphans on partial failure.
+  // campaigns, each campaign's responses AND travelTimes cache).
   await adminDb.recursiveDelete(groupRef)
 
   revalidatePath("/dashboard")
@@ -136,13 +152,32 @@ export async function regenerateInviteToken(groupId: string) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
+  const parsedId = firestoreId.safeParse(groupId)
+  if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
+
+  const groupRef = adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedId.data)
+
+  // Read the old token so we can retire its index entry. If the group is
+  // missing we bail before minting a new token.
+  const groupSnap = await groupRef.get()
+  if (!groupSnap.exists) return { error: "Groupe introuvable." }
+  const oldToken = groupSnap.data()?.inviteToken as string | undefined
+
   const inviteToken = randomUUID()
   const inviteTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
-  await adminDb
-    .collection("managers").doc(manager.uid)
-    .collection("groups").doc(groupId)
-    .update({ inviteToken, inviteTokenExpiresAt })
+  await groupRef.update({ inviteToken, inviteTokenExpiresAt })
+
+  if (oldToken && oldToken !== inviteToken) {
+    await deleteInviteIndex(oldToken)
+  }
+  await writeInviteIndex(inviteToken, {
+    managerUid: manager.uid,
+    groupId: parsedId.data,
+    expiresAt: inviteTokenExpiresAt,
+  })
 
   revalidatePath("/dashboard")
   return { success: true }
@@ -249,6 +284,13 @@ export async function createCampaign(groupId: string, formData: FormData) {
       planningStatus: "pending",
       planningStatusUpdatedAt: null,
     })
+
+  // Reverse index so athlete-facing lookups can resolve campaignId → path
+  // in one read instead of scanning every manager.
+  await writeCampaignIndex(campaignRef.id, {
+    managerUid: manager.uid,
+    groupId: parsedId.data,
+  })
 
   // Send emails to all athletes in the group. Awaited in parallel so the
   // serverless function doesn't terminate before the Resend calls resolve —

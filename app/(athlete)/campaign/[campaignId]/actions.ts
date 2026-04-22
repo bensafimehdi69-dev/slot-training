@@ -5,6 +5,7 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { getSession } from "@/lib/firebase/auth"
 import { encryptAddress, decryptAddress } from "@/lib/utils/encryption"
 import { readAthleteProfile } from "@/lib/server/profile-service"
+import { readCampaignIndex } from "@/lib/server/indexes"
 import { sendDeletionConfirmation } from "@/lib/utils/email"
 import { addressSchema } from "@/lib/types/address"
 import { dayKeys } from "@/lib/types/schedule"
@@ -68,51 +69,36 @@ export async function getCampaignForAthlete(
     const parsedId = firestoreId.safeParse(campaignId)
     if (!parsedId.success) return { error: "Identifiant de campagne invalide." }
 
-    // TODO(sprint-2.5-commit-2): replace this O(N managers) scan with a
-    // read from the campaignIndex/{campaignId} reverse-index doc.
-    const managersSnapshot = await adminDb.collection("managers").get()
+    // O(1) reverse-index lookup instead of scanning every manager.
+    const index = await readCampaignIndex(parsedId.data)
+    if (!index) return { error: "Campagne introuvable." }
 
-    let campaignData: Campaign | null = null
-    let managerUid = ""
-    let groupId = ""
-    let campaignRef: FirebaseFirestore.DocumentReference | null = null
+    const campaignRef = adminDb
+      .collection("managers").doc(index.managerUid)
+      .collection("groups").doc(index.groupId)
+      .collection("campaigns").doc(parsedId.data)
 
-    for (const managerDoc of managersSnapshot.docs) {
-      const groupsSnapshot = await managerDoc.ref.collection("groups").get()
-      for (const groupDoc of groupsSnapshot.docs) {
-        const campDoc = await groupDoc.ref
-          .collection("campaigns")
-          .doc(parsedId.data)
-          .get()
-        if (campDoc.exists) {
-          const data = campDoc.data()!
-          campaignData = {
-            id: campDoc.id,
-            startDate: data.startDate,
-            endDate: data.endDate,
-            timeRangeStart: data.timeRangeStart,
-            timeRangeEnd: data.timeRangeEnd,
-            trainingLocation: data.trainingLocation,
-            status: data.status,
-            deadline: data.deadline?.toDate() || new Date(),
-            createdAt: data.createdAt?.toDate() || new Date(),
-            optimizationResult: data.optimizationResult
-              ? deserializeOptimizationResult(data.optimizationResult)
-              : null,
-            planningStatus: data.planningStatus || "pending",
-            planningStatusUpdatedAt: data.planningStatusUpdatedAt?.toDate() || null,
-          }
-          managerUid = managerDoc.id
-          groupId = groupDoc.id
-          campaignRef = campDoc.ref
-          break
-        }
-      }
-      if (campaignData) break
-    }
+    const campDoc = await campaignRef.get()
+    if (!campDoc.exists) return { error: "Campagne introuvable." }
 
-    if (!campaignData || !campaignRef) {
-      return { error: "Campagne introuvable." }
+    const managerUid = index.managerUid
+    const groupId = index.groupId
+    const data = campDoc.data()!
+    const campaignData: Campaign = {
+      id: campDoc.id,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      timeRangeStart: data.timeRangeStart,
+      timeRangeEnd: data.timeRangeEnd,
+      trainingLocation: data.trainingLocation,
+      status: data.status,
+      deadline: data.deadline?.toDate() || new Date(),
+      createdAt: data.createdAt?.toDate() || new Date(),
+      optimizationResult: data.optimizationResult
+        ? deserializeOptimizationResult(data.optimizationResult)
+        : null,
+      planningStatus: data.planningStatus || "pending",
+      planningStatusUpdatedAt: data.planningStatusUpdatedAt?.toDate() || null,
     }
 
     // Get athlete info from the group
@@ -201,33 +187,21 @@ export async function submitCampaignResponse(
     }
     const body = parsed.data
 
-    // Find the campaign AND its parent group so we can authorize. We can't
-    // simply write the response — without the ownership check any authenticated
-    // user could inject data into an arbitrary campaign's responses subcollection
-    // (a manager of one club is authenticated too; without this guard they
-    // could pollute another club's optimizer input).
-    const managersSnapshot = await adminDb.collection("managers").get()
-    let campaignRef: FirebaseFirestore.DocumentReference | null = null
-    let managerUid = ""
-    let groupId = ""
-    let campaignStatus = ""
+    // O(1) reverse-index lookup + ownership check. Without the ownership
+    // guard any authenticated user could inject data into an arbitrary
+    // campaign's responses subcollection.
+    const index = await readCampaignIndex(parsedId.data)
+    if (!index) return { error: "Campagne introuvable." }
 
-    for (const managerDoc of managersSnapshot.docs) {
-      const groupsSnapshot = await managerDoc.ref.collection("groups").get()
-      for (const groupDoc of groupsSnapshot.docs) {
-        const campDoc = await groupDoc.ref.collection("campaigns").doc(parsedId.data).get()
-        if (campDoc.exists) {
-          campaignRef = campDoc.ref
-          managerUid = managerDoc.id
-          groupId = groupDoc.id
-          campaignStatus = campDoc.data()!.status
-          break
-        }
-      }
-      if (campaignRef) break
-    }
-
-    if (!campaignRef) return { error: "Campagne introuvable." }
+    const campaignRef = adminDb
+      .collection("managers").doc(index.managerUid)
+      .collection("groups").doc(index.groupId)
+      .collection("campaigns").doc(parsedId.data)
+    const campDoc = await campaignRef.get()
+    if (!campDoc.exists) return { error: "Campagne introuvable." }
+    const campaignStatus = campDoc.data()!.status as string
+    const managerUid = index.managerUid
+    const groupId = index.groupId
 
     // Ownership check: the authenticated user must be an athlete in the
     // campaign's group. Return the same generic error as "campaign not found"
@@ -273,36 +247,22 @@ export async function deleteAthleteData(
     const parsedId = firestoreId.safeParse(campaignId)
     if (!parsedId.success) return { error: "Identifiant de campagne invalide." }
 
-    // Find the campaign + enforce ownership: the caller must be a member of
-    // the group. Without this check a logged-in user could trigger deletion
-    // side-effects (auth account removal, profile removal) by calling
-    // deleteAthleteData with any valid campaignId they guess.
-    const managersSnapshot = await adminDb.collection("managers").get()
-    let managerUid = ""
-    let groupId = ""
-    let campaignRef: FirebaseFirestore.DocumentReference | null = null
-    let athleteFirstName = ""
+    // O(1) reverse-index lookup + ownership check. Without the ownership
+    // guard a logged-in user could trigger GDPR delete side-effects (Firebase
+    // Auth removal, profile removal) by guessing any valid campaignId.
+    const index = await readCampaignIndex(parsedId.data)
+    if (!index) return { error: "Campagne introuvable." }
 
-    for (const managerDoc of managersSnapshot.docs) {
-      const groupsSnapshot = await managerDoc.ref.collection("groups").get()
-      for (const groupDoc of groupsSnapshot.docs) {
-        const campDoc = await groupDoc.ref.collection("campaigns").doc(parsedId.data).get()
-        if (campDoc.exists) {
-          const athleteDoc = await groupDoc.ref.collection("athletes").doc(uid).get()
-          if (!athleteDoc.exists) continue // campaign exists but user is not in this group
-          managerUid = managerDoc.id
-          groupId = groupDoc.id
-          campaignRef = campDoc.ref
-          athleteFirstName = athleteDoc.data()!.firstName || ""
-          break
-        }
-      }
-      if (campaignRef) break
-    }
+    const groupRef = adminDb
+      .collection("managers").doc(index.managerUid)
+      .collection("groups").doc(index.groupId)
+    const athleteDoc = await groupRef.collection("athletes").doc(uid).get()
+    if (!athleteDoc.exists) return { error: "Campagne introuvable." }
 
-    if (!campaignRef || !managerUid || !groupId) {
-      return { error: "Campagne introuvable." }
-    }
+    const managerUid = index.managerUid
+    const groupId = index.groupId
+    const campaignRef = groupRef.collection("campaigns").doc(parsedId.data)
+    const athleteFirstName = (athleteDoc.data()!.firstName as string | undefined) || ""
 
     // 1. Delete the athlete's response in the campaign (if any)
     await campaignRef.collection("responses").doc(uid).delete().catch(() => {})
