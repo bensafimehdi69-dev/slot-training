@@ -1,28 +1,41 @@
 "use server"
 
+import { z } from "zod"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { createSessionCookie, clearSession } from "@/lib/firebase/auth"
 import { redirect } from "next/navigation"
 
-export async function registerManager(formData: FormData) {
-  const name = formData.get("name") as string
-  const email = formData.get("email") as string
-  const password = formData.get("password") as string
+const registerSchema = z.object({
+  name: z.string().trim().min(1, "Le nom est requis.").max(80),
+  email: z.string().trim().toLowerCase().email("Email invalide.").max(254),
+  password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères.").max(256),
+})
 
-  if (!name || !email || !password) {
-    return { error: "Tous les champs sont requis." }
+export async function registerManager(formData: FormData) {
+  const parsed = registerSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+    password: formData.get("password"),
+  })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Champs invalides." }
   }
-  if (password.length < 6) {
-    return { error: "Le mot de passe doit contenir au moins 6 caractères." }
-  }
+  const { name, email, password } = parsed.data
 
   try {
     const userRecord = await adminAuth.createUser({ email, password, displayName: name })
-    await adminDb.collection("managers").doc(userRecord.uid).set({
-      name,
-      email,
-      createdAt: new Date(),
-    })
+    try {
+      await adminDb.collection("managers").doc(userRecord.uid).set({
+        name,
+        email,
+        createdAt: new Date(),
+      })
+    } catch (firestoreError) {
+      // Roll back the auth user if the Firestore write fails — otherwise we
+      // leave an orphaned account that can log in but has no manager profile.
+      await adminAuth.deleteUser(userRecord.uid).catch(() => {})
+      throw firestoreError
+    }
     return { success: true }
   } catch (error: unknown) {
     const firebaseError = error as { code?: string }
@@ -33,9 +46,17 @@ export async function registerManager(formData: FormData) {
   }
 }
 
+const idTokenSchema = z.string().min(20).max(8192)
+
 export async function loginWithToken(idToken: string) {
-  await createSessionCookie(idToken)
-  redirect("/dashboard")
+  const parsed = idTokenSchema.safeParse(idToken)
+  if (!parsed.success) return { error: "Jeton d'authentification invalide." }
+  try {
+    await createSessionCookie(parsed.data)
+    return { success: true }
+  } catch {
+    return { error: "Session invalide, veuillez vous reconnecter." }
+  }
 }
 
 export async function logout() {

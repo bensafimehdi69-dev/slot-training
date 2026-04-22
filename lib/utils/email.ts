@@ -1,7 +1,24 @@
 import { Resend } from "resend"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM_EMAIL = "Slot Training <noreply@slot-training.app>"
+const FROM_EMAIL = "Slot Training <onboarding@resend.dev>"
+
+/**
+ * Minimal HTML escape for user-supplied strings interpolated into email
+ * templates. Prevents tag injection (e.g. a malicious trainingLocation name
+ * containing `<img onerror=...>` or an athlete firstName with `<a href>`).
+ * URLs that come from our own code (e.g. responseLink) are not escaped — they
+ * must already be safe strings.
+ */
+function esc(value: string | undefined | null): string {
+  if (value === undefined || value === null) return ""
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
 
 export async function sendCampaignNotification(
   to: string,
@@ -20,19 +37,21 @@ export async function sendCampaignNotification(
       to,
       subject: `Nouvelle campagne d'entraînement - ${campaignData.startDate} au ${campaignData.endDate}`,
       html: `
-        <h2>Bonjour ${athleteFirstName},</h2>
+        <h2>Bonjour ${esc(athleteFirstName)},</h2>
         <p>Une nouvelle campagne d'entraînement a été créée :</p>
         <ul>
-          <li><strong>Lieu :</strong> ${campaignData.trainingLocation}</li>
-          <li><strong>Période :</strong> ${campaignData.startDate} au ${campaignData.endDate}</li>
-          <li><strong>Date limite de réponse :</strong> ${campaignData.deadline}</li>
+          <li><strong>Lieu :</strong> ${esc(campaignData.trainingLocation)}</li>
+          <li><strong>Période :</strong> ${esc(campaignData.startDate)} au ${esc(campaignData.endDate)}</li>
+          <li><strong>Date limite de réponse :</strong> ${esc(campaignData.deadline)}</li>
         </ul>
-        <p><a href="${campaignData.responseLink}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Répondre à la campagne</a></p>
+        <p><a href="${esc(campaignData.responseLink)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Répondre à la campagne</a></p>
         <p>Merci de répondre avant la date limite.</p>
       `,
     })
   } catch (error) {
-    console.error("[EMAIL] Failed to send campaign notification:", error)
+    // Log only the error message, never the full object — it may contain
+    // tokens, recipient PII, or Resend payloads we don't want in aggregated logs.
+    console.error("[EMAIL] sendCampaignNotification failed:", error instanceof Error ? error.message : "unknown")
   }
 }
 
@@ -55,17 +74,17 @@ export async function sendPlanningNotification(
     let content = ""
     if (planningData.slotType === "collectif" || planningData.slotType === "individuel") {
       content = `
-        <p>Votre créneau (${planningData.slotType}) :</p>
+        <p>Votre créneau (${esc(planningData.slotType)}) :</p>
         <ul>
-          <li><strong>Jour :</strong> ${planningData.day}</li>
-          <li><strong>Horaire :</strong> ${planningData.startTime} - ${planningData.endTime}</li>
-          ${planningData.departureTime ? `<li><strong>Heure de départ :</strong> ${planningData.departureTime}</li>` : ""}
-          ${planningData.travelEstimate ? `<li><strong>Trajet estimé :</strong> ${planningData.travelEstimate}</li>` : ""}
-          <li><strong>Lieu :</strong> ${planningData.trainingLocation}</li>
+          <li><strong>Jour :</strong> ${esc(planningData.day)}</li>
+          <li><strong>Horaire :</strong> ${esc(planningData.startTime)} - ${esc(planningData.endTime)}</li>
+          ${planningData.departureTime ? `<li><strong>Heure de départ :</strong> ${esc(planningData.departureTime)}</li>` : ""}
+          ${planningData.travelEstimate ? `<li><strong>Trajet estimé :</strong> ${esc(planningData.travelEstimate)}</li>` : ""}
+          <li><strong>Lieu :</strong> ${esc(planningData.trainingLocation)}</li>
         </ul>
       `
     } else {
-      content = `<p>Malheureusement, aucun créneau compatible n'a pu être trouvé.</p><p>Raison : ${planningData.reason || "Aucun créneau sans conflit de cours."}</p>`
+      content = `<p>Malheureusement, aucun créneau compatible n'a pu être trouvé.</p><p>Raison : ${esc(planningData.reason) || "Aucun créneau sans conflit de cours."}</p>`
     }
 
     await resend.emails.send({
@@ -73,14 +92,14 @@ export async function sendPlanningNotification(
       to,
       subject: "Votre planning d'entraînement est disponible",
       html: `
-        <h2>Bonjour ${athleteFirstName},</h2>
+        <h2>Bonjour ${esc(athleteFirstName)},</h2>
         <p>Le planning de votre période d'entraînement a été validé.</p>
         ${content}
-        <p><a href="${planningData.planningLink}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Voir mon planning</a></p>
+        <p><a href="${esc(planningData.planningLink)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Voir mon planning</a></p>
       `,
     })
   } catch (error) {
-    console.error("[EMAIL] Failed to send planning notification:", error)
+    console.error("[EMAIL] sendPlanningNotification failed:", error instanceof Error ? error.message : "unknown")
   }
 }
 
@@ -91,7 +110,7 @@ export async function sendDeletionConfirmation(to: string, firstName: string) {
       to,
       subject: "Confirmation de suppression de vos données",
       html: `
-        <h2>Bonjour ${firstName},</h2>
+        <h2>Bonjour ${esc(firstName)},</h2>
         <p>Conformément à votre demande, toutes vos données personnelles ont été supprimées :</p>
         <ul>
           <li>Adresses (domicile, études, club)</li>
@@ -103,6 +122,6 @@ export async function sendDeletionConfirmation(to: string, firstName: string) {
       `,
     })
   } catch (error) {
-    console.error("[EMAIL] Failed to send deletion confirmation:", error)
+    console.error("[EMAIL] sendDeletionConfirmation failed:", error instanceof Error ? error.message : "unknown")
   }
 }

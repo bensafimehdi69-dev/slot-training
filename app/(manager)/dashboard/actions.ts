@@ -1,6 +1,7 @@
 "use server"
 
 import { randomUUID } from "crypto"
+import { z } from "zod"
 import { requireManager } from "@/lib/firebase/auth"
 import { adminDb } from "@/lib/firebase/admin"
 import { decryptAddress } from "@/lib/utils/encryption"
@@ -9,6 +10,40 @@ import { sendCampaignNotification, sendPlanningNotification } from "@/lib/utils/
 import { revalidatePath } from "next/cache"
 import type { Group, GroupAthlete } from "@/lib/types/group"
 import type { Campaign } from "@/lib/types/campaign"
+
+// Firestore doc IDs are strings of ≤1500 bytes with a limited charset. We
+// intentionally keep this permissive but bounded — just enough to reject
+// empty strings, absurdly long input, and path-traversal attempts.
+const firestoreId = z.string().min(1).max(128).regex(/^[^/]+$/, "Identifiant invalide.")
+
+const groupNameSchema = z.string().trim().min(1, "Le nom du groupe est requis.").max(80)
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide.")
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horaire invalide.")
+
+const campaignSchema = z
+  .object({
+    startDate: isoDate,
+    endDate: isoDate,
+    timeRangeStart: hhmm.default("08:00"),
+    timeRangeEnd: hhmm.default("20:00"),
+    trainingLocationFormatted: z.string().trim().min(1, "Le lieu est requis.").max(500),
+    trainingLocationLat: z.coerce.number().finite().min(-90).max(90),
+    trainingLocationLng: z.coerce.number().finite().min(-180).max(180),
+    deadline: z.string().min(1, "La date limite est requise."),
+  })
+  .refine(({ startDate, endDate }) => endDate >= startDate, {
+    message: "La date de fin doit être postérieure à la date de début.",
+    path: ["endDate"],
+  })
+  .refine(({ timeRangeStart, timeRangeEnd }) => timeRangeEnd > timeRangeStart, {
+    message: "L'heure de fin doit être postérieure à l'heure de début.",
+    path: ["timeRangeEnd"],
+  })
+  .refine(({ deadline }) => !Number.isNaN(new Date(deadline).getTime()), {
+    message: "Date limite invalide.",
+    path: ["deadline"],
+  })
 
 // ============ GROUP ACTIONS ============
 
@@ -36,8 +71,8 @@ export async function createGroup(formData: FormData) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
-  const name = formData.get("name") as string
-  if (!name?.trim()) return { error: "Le nom du groupe est requis." }
+  const parsed = groupNameSchema.safeParse(formData.get("name"))
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Nom invalide." }
 
   const inviteToken = randomUUID()
   const inviteTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
@@ -46,7 +81,7 @@ export async function createGroup(formData: FormData) {
     .collection("managers").doc(manager.uid)
     .collection("groups")
     .add({
-      name: name.trim(),
+      name: parsed.data,
       createdAt: new Date(),
       inviteToken,
       inviteTokenExpiresAt,
@@ -60,13 +95,16 @@ export async function updateGroup(groupId: string, formData: FormData) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
-  const name = formData.get("name") as string
-  if (!name?.trim()) return { error: "Le nom du groupe est requis." }
+  const parsedId = firestoreId.safeParse(groupId)
+  if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
+
+  const parsedName = groupNameSchema.safeParse(formData.get("name"))
+  if (!parsedName.success) return { error: parsedName.error.issues[0]?.message ?? "Nom invalide." }
 
   await adminDb
     .collection("managers").doc(manager.uid)
-    .collection("groups").doc(groupId)
-    .update({ name: name.trim() })
+    .collection("groups").doc(parsedId.data)
+    .update({ name: parsedName.data })
 
   revalidatePath("/dashboard")
   return { success: true }
@@ -175,61 +213,69 @@ export async function createCampaign(groupId: string, formData: FormData) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
-  const startDate = formData.get("startDate") as string
-  const endDate = formData.get("endDate") as string
-  const timeRangeStart = (formData.get("timeRangeStart") as string) || "08:00"
-  const timeRangeEnd = (formData.get("timeRangeEnd") as string) || "20:00"
-  const trainingLocationFormatted = formData.get("trainingLocationFormatted") as string
-  const trainingLocationLat = parseFloat(formData.get("trainingLocationLat") as string)
-  const trainingLocationLng = parseFloat(formData.get("trainingLocationLng") as string)
-  const deadline = formData.get("deadline") as string
+  const parsedId = firestoreId.safeParse(groupId)
+  if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
 
-  if (!startDate || !endDate || !trainingLocationFormatted || !deadline) {
-    return { error: "Tous les champs sont requis." }
+  const parsed = campaignSchema.safeParse({
+    startDate: formData.get("startDate"),
+    endDate: formData.get("endDate"),
+    timeRangeStart: formData.get("timeRangeStart") || undefined,
+    timeRangeEnd: formData.get("timeRangeEnd") || undefined,
+    trainingLocationFormatted: formData.get("trainingLocationFormatted"),
+    trainingLocationLat: formData.get("trainingLocationLat"),
+    trainingLocationLng: formData.get("trainingLocationLng"),
+    deadline: formData.get("deadline"),
+  })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Champs invalides." }
   }
+  const input = parsed.data
 
   const campaignRef = await adminDb
     .collection("managers").doc(manager.uid)
-    .collection("groups").doc(groupId)
+    .collection("groups").doc(parsedId.data)
     .collection("campaigns")
     .add({
-      startDate,
-      endDate,
-      timeRangeStart,
-      timeRangeEnd,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      timeRangeStart: input.timeRangeStart,
+      timeRangeEnd: input.timeRangeEnd,
       trainingLocation: {
-        formatted: trainingLocationFormatted,
-        lat: trainingLocationLat,
-        lng: trainingLocationLng,
+        formatted: input.trainingLocationFormatted,
+        lat: input.trainingLocationLat,
+        lng: input.trainingLocationLng,
       },
       status: "active",
-      deadline: new Date(deadline),
+      deadline: new Date(input.deadline),
       createdAt: new Date(),
       optimizationResult: null,
       planningStatus: "pending",
       planningStatusUpdatedAt: null,
     })
 
-  // Send emails to all athletes in the group
+  // Send emails to all athletes in the group. Awaited in parallel so the
+  // serverless function doesn't terminate before the Resend calls resolve —
+  // fire-and-forget would drop messages silently.
   const athletesSnapshot = await adminDb
     .collection("managers").doc(manager.uid)
-    .collection("groups").doc(groupId)
+    .collection("groups").doc(parsedId.data)
     .collection("athletes")
     .get()
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-  for (const athleteDoc of athletesSnapshot.docs) {
-    const athlete = athleteDoc.data()
-    if (athlete.email) {
-      sendCampaignNotification(athlete.email, athlete.firstName || "Athlete", {
-        trainingLocation: trainingLocationFormatted,
-        startDate,
-        endDate,
-        deadline,
+  await Promise.allSettled(
+    athletesSnapshot.docs.map((athleteDoc) => {
+      const athlete = athleteDoc.data()
+      if (!athlete.email) return Promise.resolve()
+      return sendCampaignNotification(athlete.email, athlete.firstName || "Athlete", {
+        trainingLocation: input.trainingLocationFormatted,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        deadline: input.deadline,
         responseLink: `${appUrl}/campaign/${campaignRef.id}`,
       })
-    }
-  }
+    })
+  )
 
   revalidatePath("/dashboard")
   return { data: { id: campaignRef.id } }

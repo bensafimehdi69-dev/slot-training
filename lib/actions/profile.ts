@@ -1,12 +1,29 @@
 "use server"
 
+import { z } from "zod"
 import { getSession } from "@/lib/firebase/auth"
 import {
   writeAthleteProfile,
   readAthleteProfile,
   type AthleteProfileInput,
 } from "@/lib/server/profile-service"
+import { addressSchema } from "@/lib/types/address"
 import type { AthleteProfile } from "@/lib/types/profile"
+
+// Constraints grid: 7 days × 16 time slots of booleans. A malicious client
+// could otherwise ship a 1000×1000 array that stalls the optimizer.
+const CONSTRAINTS_GRID_DAYS = 7
+const CONSTRAINTS_GRID_SLOTS = 16
+const constraintsGridSchema = z
+  .array(z.array(z.boolean()).length(CONSTRAINTS_GRID_SLOTS))
+  .length(CONSTRAINTS_GRID_DAYS)
+
+const profileInputSchema = z.object({
+  homeAddress: addressSchema.nullable(),
+  schoolAddress: addressSchema.nullable(),
+  clubAddress: addressSchema.nullable(),
+  constraintsGrid: constraintsGridSchema,
+})
 
 /**
  * Public server action: saves the profile of the CURRENTLY AUTHENTICATED
@@ -21,7 +38,12 @@ export async function saveAthleteProfile(data: AthleteProfileInput) {
   const session = await getSession()
   if (!session) return { error: "Non authentifié." }
 
-  await writeAthleteProfile(session.uid, data)
+  const parsed = profileInputSchema.safeParse(data)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Données de profil invalides." }
+  }
+
+  await writeAthleteProfile(session.uid, parsed.data)
   return { success: true }
 }
 

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { auth } from "@/lib/firebase/client"
-import { registerManager, loginWithToken } from "../actions"
+import { registerManager } from "../actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -32,7 +32,13 @@ export default function RegisterPage() {
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password)
       const idToken = await credential.user.getIdToken()
-      await loginWithToken(idToken)
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      })
+      if (!res.ok) throw new Error("Session creation failed")
+      window.location.href = "/dashboard"
     } catch {
       toast.error("Compte créé. Veuillez vous connecter.")
       setLoading(false)
@@ -57,7 +63,7 @@ export default function RegisterPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Mot de passe</Label>
-            <Input id="password" name="password" type="password" minLength={6} required />
+            <Input id="password" name="password" type="password" minLength={8} required />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Création..." : "Créer mon compte"}
