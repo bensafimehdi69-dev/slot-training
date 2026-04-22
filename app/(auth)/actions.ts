@@ -2,7 +2,7 @@
 
 import { z } from "zod"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
-import { createSessionCookie, clearSession } from "@/lib/firebase/auth"
+import { clearSession } from "@/lib/firebase/auth"
 import { checkRateLimit, formatRetryAfter, getClientIp } from "@/lib/server/rate-limit"
 import { redirect } from "next/navigation"
 
@@ -59,18 +59,11 @@ export async function registerManager(formData: FormData) {
   }
 }
 
-const idTokenSchema = z.string().min(20).max(8192)
-
-export async function loginWithToken(idToken: string) {
-  const parsed = idTokenSchema.safeParse(idToken)
-  if (!parsed.success) return { error: "Jeton d'authentification invalide." }
-  try {
-    await createSessionCookie(parsed.data)
-    return { success: true }
-  } catch {
-    return { error: "Session invalide, veuillez vous reconnecter." }
-  }
-}
+// Session creation goes through the `POST /api/auth/login` route — keeping
+// a single code path avoids the cookie-flag drift the review flagged
+// between the server action and the API route. Client callers hit that
+// route with the Firebase idToken after signInWithEmailAndPassword /
+// signInWithEmailLink on the client SDK.
 
 export async function logout() {
   await clearSession()
