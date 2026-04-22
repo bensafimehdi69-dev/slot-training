@@ -12,7 +12,7 @@ export function AppHeader() {
           <Timer className="h-6 w-6 text-blue-600" />
           Slot Training
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link href="/login">
             <Button variant="ghost">Connexion</Button>
           </Link>
