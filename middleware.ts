@@ -3,8 +3,17 @@ import { NextRequest, NextResponse } from "next/server"
 const protectedRoutes = ["/dashboard"]
 const authRoutes = ["/login", "/register", "/forgot-password"]
 
+/**
+ * UX-only redirect based on cookie PRESENCE — this middleware is NOT a security
+ * boundary. The Next.js Edge runtime cannot load `firebase-admin`, so we cannot
+ * verify the session cookie here. Real authentication/authorization is enforced
+ * in server components and server actions via `getSession()` / `requireManager()`.
+ *
+ * Do not add additional security checks to this file — move them to the server
+ * component or action that actually reads the data.
+ */
 export function middleware(request: NextRequest) {
-  const sessionCookie = request.cookies.get("session")?.value
+  const sessionCookie = request.cookies.get("__session")?.value
   const { pathname } = request.nextUrl
 
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {

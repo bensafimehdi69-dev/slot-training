@@ -1,17 +1,14 @@
 import { redirect } from "next/navigation"
-import { getSession } from "@/lib/firebase/auth"
-import { adminDb } from "@/lib/firebase/admin"
+import { requireManager } from "@/lib/firebase/auth"
 import Link from "next/link"
-import { Timer, LogOut } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { logout } from "@/app/(auth)/actions"
+import { Timer } from "lucide-react"
+import { LogoutButton } from "@/components/custom/logout-button"
 
 export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession()
-  if (!session) redirect("/login")
+  const manager = await requireManager()
+  if (!manager) redirect("/login")
 
-  const managerDoc = await adminDb.collection("managers").doc(session.uid).get()
-  const managerName = managerDoc.data()?.name || "Manager"
+  const managerName = manager.name
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -21,14 +18,9 @@ export default async function ManagerLayout({ children }: { children: React.Reac
             <Timer className="h-6 w-6 text-blue-600" />
             Slot Training
           </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Bonjour, {managerName}</span>
-            <form action={logout}>
-              <Button variant="ghost" size="sm" type="submit">
-                <LogOut className="h-4 w-4 mr-2" />
-                Deconnexion
-              </Button>
-            </form>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <span className="hidden text-sm text-muted-foreground sm:inline">Bonjour, {managerName}</span>
+            <LogoutButton />
           </div>
         </div>
       </header>

@@ -1,7 +1,7 @@
 "use server"
 
 import { randomUUID } from "crypto"
-import { getSession } from "@/lib/firebase/auth"
+import { requireManager } from "@/lib/firebase/auth"
 import { adminDb } from "@/lib/firebase/admin"
 import { decryptAddress } from "@/lib/utils/encryption"
 import { optimizeSlots } from "@/lib/utils/optimizer"
@@ -13,11 +13,11 @@ import type { Campaign } from "@/lib/types/campaign"
 // ============ GROUP ACTIONS ============
 
 export async function getGroups() {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   const snapshot = await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups")
     .orderBy("createdAt", "desc")
     .get()
@@ -33,8 +33,8 @@ export async function getGroups() {
 }
 
 export async function createGroup(formData: FormData) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   const name = formData.get("name") as string
   if (!name?.trim()) return { error: "Le nom du groupe est requis." }
@@ -43,7 +43,7 @@ export async function createGroup(formData: FormData) {
   const inviteTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
 
   const ref = await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups")
     .add({
       name: name.trim(),
@@ -56,15 +56,56 @@ export async function createGroup(formData: FormData) {
   return { data: { id: ref.id } }
 }
 
+export async function updateGroup(groupId: string, formData: FormData) {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const name = formData.get("name") as string
+  if (!name?.trim()) return { error: "Le nom du groupe est requis." }
+
+  await adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(groupId)
+    .update({ name: name.trim() })
+
+  revalidatePath("/dashboard")
+  return { success: true }
+}
+
+export async function deleteGroup(groupId: string) {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const groupRef = adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(groupId)
+
+  // Delete sub-collections: athletes, campaigns (and their responses)
+  const athletesSnap = await groupRef.collection("athletes").get()
+  for (const doc of athletesSnap.docs) await doc.ref.delete()
+
+  const campaignsSnap = await groupRef.collection("campaigns").get()
+  for (const campDoc of campaignsSnap.docs) {
+    const responsesSnap = await campDoc.ref.collection("responses").get()
+    for (const respDoc of responsesSnap.docs) await respDoc.ref.delete()
+    await campDoc.ref.delete()
+  }
+
+  await groupRef.delete()
+
+  revalidatePath("/dashboard")
+  return { success: true }
+}
+
 export async function regenerateInviteToken(groupId: string) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   const inviteToken = randomUUID()
   const inviteTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
   await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
     .update({ inviteToken, inviteTokenExpiresAt })
 
@@ -73,11 +114,11 @@ export async function regenerateInviteToken(groupId: string) {
 }
 
 export async function getGroupAthletes(groupId: string) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   const snapshot = await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
     .collection("athletes")
     .orderBy("createdAt", "desc")
@@ -93,11 +134,11 @@ export async function getGroupAthletes(groupId: string) {
 }
 
 export async function removeAthlete(groupId: string, athleteId: string) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
     .collection("athletes").doc(athleteId)
     .delete()
@@ -109,11 +150,11 @@ export async function removeAthlete(groupId: string, athleteId: string) {
 // ============ CAMPAIGN ACTIONS ============
 
 export async function getCampaigns(groupId: string) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   const snapshot = await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
     .collection("campaigns")
     .orderBy("createdAt", "desc")
@@ -131,8 +172,8 @@ export async function getCampaigns(groupId: string) {
 }
 
 export async function createCampaign(groupId: string, formData: FormData) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   const startDate = formData.get("startDate") as string
   const endDate = formData.get("endDate") as string
@@ -148,7 +189,7 @@ export async function createCampaign(groupId: string, formData: FormData) {
   }
 
   const campaignRef = await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
     .collection("campaigns")
     .add({
@@ -171,7 +212,7 @@ export async function createCampaign(groupId: string, formData: FormData) {
 
   // Send emails to all athletes in the group
   const athletesSnapshot = await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
     .collection("athletes")
     .get()
@@ -195,11 +236,11 @@ export async function createCampaign(groupId: string, formData: FormData) {
 }
 
 export async function closeCampaign(groupId: string, campaignId: string) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
     .collection("campaigns").doc(campaignId)
     .update({ status: "closed" })
@@ -209,11 +250,11 @@ export async function closeCampaign(groupId: string, campaignId: string) {
 }
 
 export async function runOptimization(groupId: string, campaignId: string) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   const basePath = adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
 
   // Get campaign
@@ -233,7 +274,10 @@ export async function runOptimization(groupId: string, campaignId: string) {
   const athletesSnapshot = await basePath.collection("athletes").get()
   const athleteMap = new Map(athletesSnapshot.docs.map((d) => [d.id, d.data()]))
 
-  // Build athlete data for optimizer
+  // Build athlete data for optimizer. Abort the whole run on any decryption
+  // failure — silently coercing to (0, 0) would produce nonsense travel times
+  // and silently-wrong optimization results. Surface the failure to the manager.
+  const corruptedAthleteIds: string[] = []
   const athleteDataList = responsesSnapshot.docs.map((doc) => {
     const response = doc.data()
     const athleteInfo = athleteMap.get(doc.id)
@@ -245,7 +289,7 @@ export async function runOptimization(groupId: string, campaignId: string) {
       if (response.homeAddress) homeAddress = decryptAddress(response.homeAddress)
       if (response.schoolAddress) schoolAddress = decryptAddress(response.schoolAddress)
     } catch {
-      // Use defaults if decryption fails
+      corruptedAthleteIds.push(doc.id)
     }
 
     return {
@@ -258,11 +302,17 @@ export async function runOptimization(groupId: string, campaignId: string) {
     }
   })
 
+  if (corruptedAthleteIds.length > 0) {
+    return {
+      error: `Impossible de déchiffrer les adresses de ${corruptedAthleteIds.length} athlète(s). Profil corrompu ou clé de chiffrement changée.`,
+    }
+  }
+
   const result = await optimizeSlots(athleteDataList, {
     timeRangeStart: campaign.timeRangeStart || "08:00",
     timeRangeEnd: campaign.timeRangeEnd || "20:00",
     trainingLocation: campaign.trainingLocation,
-    managerUid: session.uid,
+    managerUid: manager.uid,
     groupId,
     campaignId,
   })
@@ -277,11 +327,11 @@ export async function runOptimization(groupId: string, campaignId: string) {
 }
 
 export async function validatePlanning(groupId: string, campaignId: string) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   const basePath = adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
 
   await basePath.collection("campaigns").doc(campaignId).update({
@@ -357,11 +407,11 @@ export async function validatePlanning(groupId: string, campaignId: string) {
 }
 
 export async function rejectPlanning(groupId: string, campaignId: string) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
     .collection("campaigns").doc(campaignId)
     .update({
@@ -375,11 +425,11 @@ export async function rejectPlanning(groupId: string, campaignId: string) {
 }
 
 export async function getResponseCount(groupId: string, campaignId: string) {
-  const session = await getSession()
-  if (!session) return { error: "Non authentifie" }
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
 
   const snapshot = await adminDb
-    .collection("managers").doc(session.uid)
+    .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
     .collection("campaigns").doc(campaignId)
     .collection("responses")

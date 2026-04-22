@@ -1,41 +1,36 @@
 "use server"
 
-import { adminDb } from "@/lib/firebase/admin"
-import { encryptAddress, decryptAddress } from "@/lib/utils/encryption"
-import type { AthleteProfile, ConstraintsGrid } from "@/lib/types/profile"
-import type { AddressWithCoords } from "@/lib/types/address"
+import { getSession } from "@/lib/firebase/auth"
+import {
+  writeAthleteProfile,
+  readAthleteProfile,
+  type AthleteProfileInput,
+} from "@/lib/server/profile-service"
+import type { AthleteProfile } from "@/lib/types/profile"
 
-export async function saveAthleteProfile(
-  uid: string,
-  data: {
-    homeAddress: AddressWithCoords | null
-    schoolAddress: AddressWithCoords | null
-    clubAddress: AddressWithCoords | null
-    constraintsGrid: ConstraintsGrid
-  }
-) {
-  const profileData: Record<string, unknown> = {
-    updatedAt: new Date(),
-    constraintsGrid: data.constraintsGrid,
-  }
+/**
+ * Public server action: saves the profile of the CURRENTLY AUTHENTICATED
+ * athlete. The uid is derived from the verified session cookie — never
+ * accept a uid argument from the caller (IDOR risk on a "use server" action).
+ *
+ * For trusted server-to-server callers (e.g. onboarding flow that just
+ * verified an ID token), use `writeAthleteProfile` from
+ * `lib/server/profile-service` directly with the verified uid.
+ */
+export async function saveAthleteProfile(data: AthleteProfileInput) {
+  const session = await getSession()
+  if (!session) return { error: "Non authentifié." }
 
-  if (data.homeAddress) profileData.homeAddress = encryptAddress(data.homeAddress)
-  if (data.schoolAddress) profileData.schoolAddress = encryptAddress(data.schoolAddress)
-  if (data.clubAddress) profileData.clubAddress = encryptAddress(data.clubAddress)
-
-  await adminDb.collection("athletes").doc(uid).set(profileData, { merge: true })
+  await writeAthleteProfile(session.uid, data)
+  return { success: true }
 }
 
-export async function getAthleteProfile(uid: string): Promise<AthleteProfile | null> {
-  const doc = await adminDb.collection("athletes").doc(uid).get()
-  if (!doc.exists) return null
-
-  const data = doc.data()!
-  return {
-    homeAddress: data.homeAddress ? decryptAddress(data.homeAddress) : null,
-    schoolAddress: data.schoolAddress ? decryptAddress(data.schoolAddress) : null,
-    clubAddress: data.clubAddress ? decryptAddress(data.clubAddress) : null,
-    constraintsGrid: data.constraintsGrid || Array(7).fill(null).map(() => Array(15).fill(true)),
-    updatedAt: data.updatedAt?.toDate() || new Date(),
-  }
+/**
+ * Public server action: returns the profile of the CURRENTLY AUTHENTICATED
+ * athlete. Same rule: uid is derived from the session, never from the caller.
+ */
+export async function getAthleteProfile(): Promise<AthleteProfile | null> {
+  const session = await getSession()
+  if (!session) return null
+  return readAthleteProfile(session.uid)
 }
