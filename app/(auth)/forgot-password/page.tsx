@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" required />
+            <Input id="email" name="email" type="email" autoComplete="email" required />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Envoi..." : "Envoyer le lien"}

@@ -59,10 +59,10 @@ function AthleteRow({ athlete }: { athlete: AthleteSlotInfo }) {
 
 function IndividualSlotCard({ slot }: { slot: IndividualSlot }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border p-3 bg-blue-50/50">
+    <div className="flex flex-col gap-2 rounded-lg border p-3 bg-blue-50/50 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
-        <User className="h-4 w-4 text-blue-600" />
-        <div>
+        <User className="h-4 w-4 shrink-0 text-blue-600" />
+        <div className="min-w-0">
           <p className="text-sm font-medium">
             {slot.firstName} {slot.lastName}
           </p>
@@ -78,7 +78,7 @@ function IndividualSlotCard({ slot }: { slot: IndividualSlot }) {
         <TravelBadge minutes={slot.travelMinutes} />
         {slot.departureTime && (
           <span className="text-xs text-muted-foreground">
-            Depart : {slot.departureTime}
+            Départ : {slot.departureTime}
           </span>
         )}
       </div>
@@ -122,7 +122,7 @@ export function OptimizationResultView({
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="h-4 w-4 text-blue-600" />
-            Meilleur creneau collectif
+            Meilleur créneau collectif
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -154,7 +154,7 @@ export function OptimizationResultView({
       {/* Athletes Table */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Detail par athlete</CardTitle>
+          <CardTitle className="text-base">Détail par athlète</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -165,7 +165,7 @@ export function OptimizationResultView({
                   <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Statut</th>
                   <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Raison</th>
                   <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Trajet</th>
-                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Depart</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Départ</th>
                 </tr>
               </thead>
               <tbody>
@@ -184,7 +184,7 @@ export function OptimizationResultView({
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <User className="h-4 w-4 text-blue-600" />
-              Creneaux individuels ({result.individualSlots.length})
+              Créneaux individuels ({result.individualSlots.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -230,14 +230,14 @@ export function OptimizationResultView({
       {planningStatus === "validated" && (
         <Badge className="bg-green-600 text-white">
           <CheckCircle className="h-3 w-3 mr-1" />
-          Planning valide
+          Planning validé
         </Badge>
       )}
 
       {planningStatus === "rejected" && (
         <Badge variant="destructive">
           <XCircle className="h-3 w-3 mr-1" />
-          Planning rejete
+          Planning rejeté
         </Badge>
       )}
     </div>

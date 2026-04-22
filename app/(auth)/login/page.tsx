@@ -1,18 +1,21 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { auth } from "@/lib/firebase/client"
-import { loginWithToken } from "../actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 
 export default function LoginPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -25,9 +28,24 @@ export default function LoginPage() {
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password)
       const idToken = await credential.user.getIdToken()
-      await loginWithToken(idToken)
-    } catch {
-      toast.error("Email ou mot de passe incorrect.")
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      })
+      if (!res.ok) throw new Error("Session creation failed")
+      // Client-side navigation + refresh so the manager layout reads the
+      // freshly-set session cookie on the server. window.location.href
+      // forces a full reload, loses React state, and flashes the shell.
+      router.push("/dashboard")
+      router.refresh()
+    } catch (error: unknown) {
+      const err = error as { code?: string }
+      toast.error(
+        err.code === "auth/invalid-credential"
+          ? "Email ou mot de passe incorrect."
+          : "Une erreur est survenue."
+      )
       setLoading(false)
     }
   }
@@ -42,11 +60,35 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" required />
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Mot de passe</Label>
-            <Input id="password" name="password" type="password" required />
+            <div className="relative">
+              <Input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Connexion..." : "Se connecter"}
