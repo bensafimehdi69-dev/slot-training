@@ -5,6 +5,7 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { createSessionCookie } from "@/lib/firebase/auth"
 import { writeAthleteProfile } from "@/lib/server/profile-service"
 import { readInviteIndex } from "@/lib/server/indexes"
+import { checkRateLimit, formatRetryAfter, getClientIp } from "@/lib/server/rate-limit"
 import { addressSchema } from "@/lib/types/address"
 
 const firestoreId = z.string().min(1).max(128).regex(/^[^/]+$/, "Identifiant invalide.")
@@ -74,6 +75,28 @@ export async function validateInviteToken(groupId: string, token: string) {
 export async function sendMagicLink(email: unknown) {
   const parsed = emailSchema.safeParse(email)
   if (!parsed.success) return { error: "Email invalide." }
+
+  // Double rate limit: per-email (so one attacker can't spam a single
+  // inbox) AND per-IP (so one attacker can't spam many inboxes). Both
+  // windows must allow the request. Resend is the main concern — rate
+  // violations there can get our sender domain blacklisted.
+  const ip = await getClientIp()
+  const emailRl = await checkRateLimit({
+    key: `magic-link:email:${parsed.data}`,
+    max: 3,
+    windowMs: 60 * 60 * 1000, // 3 per hour per email
+  })
+  if (!emailRl.allowed) {
+    return { error: `Trop d'envois pour cet email. Réessayez dans ${formatRetryAfter(emailRl.retryAfterMs)}.` }
+  }
+  const ipRl = await checkRateLimit({
+    key: `magic-link:ip:${ip}`,
+    max: 10,
+    windowMs: 60 * 60 * 1000, // 10 per hour per IP
+  })
+  if (!ipRl.allowed) {
+    return { error: `Trop de tentatives. Réessayez dans ${formatRetryAfter(ipRl.retryAfterMs)}.` }
+  }
 
   const actionCodeSettings = {
     url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/join/verify`,

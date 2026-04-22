@@ -3,6 +3,7 @@
 import { z } from "zod"
 import { adminAuth } from "@/lib/firebase/admin"
 import { createSessionCookie } from "@/lib/firebase/auth"
+import { checkRateLimit, formatRetryAfter, getClientIp } from "@/lib/server/rate-limit"
 
 const emailSchema = z.string().trim().toLowerCase().email().max(254)
 const idTokenSchema = z.string().min(20).max(8192)
@@ -19,6 +20,26 @@ function esc(value: string): string {
 export async function sendAthleteMagicLink(email: unknown) {
   const parsed = emailSchema.safeParse(email)
   if (!parsed.success) return { error: "Email invalide." }
+
+  // Same double-bucket pattern as the join magic link — protects Resend
+  // reputation and prevents email bombing.
+  const ip = await getClientIp()
+  const emailRl = await checkRateLimit({
+    key: `athlete-magic:email:${parsed.data}`,
+    max: 3,
+    windowMs: 60 * 60 * 1000,
+  })
+  if (!emailRl.allowed) {
+    return { error: `Trop d'envois pour cet email. Réessayez dans ${formatRetryAfter(emailRl.retryAfterMs)}.` }
+  }
+  const ipRl = await checkRateLimit({
+    key: `athlete-magic:ip:${ip}`,
+    max: 10,
+    windowMs: 60 * 60 * 1000,
+  })
+  if (!ipRl.allowed) {
+    return { error: `Trop de tentatives. Réessayez dans ${formatRetryAfter(ipRl.retryAfterMs)}.` }
+  }
 
   const actionCodeSettings = {
     url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/athlete-login`,

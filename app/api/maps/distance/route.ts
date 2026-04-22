@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getSession } from "@/lib/firebase/auth"
+import { checkRateLimit, formatRetryAfter } from "@/lib/server/rate-limit"
 
 // Accept either a bare "lat,lng" string (Google Distance Matrix format) or an
 // array of up to 25 such strings. We deliberately bound both length and count
@@ -32,6 +33,21 @@ export async function POST(request: NextRequest) {
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 })
+  }
+
+  // Per-user rate limit — a compromised session shouldn't be able to burn
+  // the Maps quota either. 60 req / 10 min is generous for legitimate
+  // client-side autocomplete usage and well under Google's quota ceiling.
+  const rl = await checkRateLimit({
+    key: `maps-distance:uid:${session.uid}`,
+    max: 60,
+    windowMs: 10 * 60 * 1000,
+  })
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Trop de requêtes. Réessayez dans ${formatRetryAfter(rl.retryAfterMs)}.` },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+    )
   }
 
   let body: unknown

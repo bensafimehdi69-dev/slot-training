@@ -3,6 +3,7 @@
 import { z } from "zod"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { createSessionCookie, clearSession } from "@/lib/firebase/auth"
+import { checkRateLimit, formatRetryAfter, getClientIp } from "@/lib/server/rate-limit"
 import { redirect } from "next/navigation"
 
 const registerSchema = z.object({
@@ -21,6 +22,18 @@ export async function registerManager(formData: FormData) {
     return { error: parsed.error.issues[0]?.message ?? "Champs invalides." }
   }
   const { name, email, password } = parsed.data
+
+  // Rate limit: 5 attempts per IP per 15 minutes. Prevents account-creation
+  // spam and email enumeration by repeated `auth/email-already-exists` probes.
+  const ip = await getClientIp()
+  const rl = await checkRateLimit({
+    key: `register:ip:${ip}`,
+    max: 5,
+    windowMs: 15 * 60 * 1000,
+  })
+  if (!rl.allowed) {
+    return { error: `Trop de tentatives. Réessayez dans ${formatRetryAfter(rl.retryAfterMs)}.` }
+  }
 
   try {
     const userRecord = await adminAuth.createUser({ email, password, displayName: name })
