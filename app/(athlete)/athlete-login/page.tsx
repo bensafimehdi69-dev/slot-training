@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { isSignInWithEmailLink, signInWithEmailLink } from "firebase/auth"
 import { auth } from "@/lib/firebase/client"
 import { createAthleteSession, sendAthleteMagicLink } from "./actions"
@@ -32,7 +33,10 @@ export default function AthleteLoginPage() {
   const [linkSent, setLinkSent] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [signedInNoRedirect, setSignedInNoRedirect] = useState(false)
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
+
+  const searchParams = useSearchParams()
+  const rawRedirect = searchParams.get("redirect")
+  const redirectUrl = isSafeRedirect(rawRedirect) ? rawRedirect : null
 
   // Check if arriving from a magic link
   useEffect(() => {
@@ -73,15 +77,6 @@ export default function AthleteLoginPage() {
     }
 
     checkMagicLink()
-  }, [])
-
-  // Check for redirect param
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const redirect = params.get("redirect")
-    if (isSafeRedirect(redirect)) {
-      setRedirectUrl(redirect)
-    }
   }, [])
 
   async function handleSendLink() {
