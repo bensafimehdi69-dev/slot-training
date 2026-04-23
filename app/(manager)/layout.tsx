@@ -1,14 +1,23 @@
 import { redirect } from "next/navigation"
-import { requireManager } from "@/lib/firebase/auth"
+import { getSession } from "@/lib/firebase/auth"
+import { adminDb } from "@/lib/firebase/admin"
 import Link from "next/link"
 import { Timer } from "lucide-react"
 import { LogoutButton } from "@/components/custom/logout-button"
 
 export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
-  const manager = await requireManager()
-  if (!manager) redirect("/login")
+  // Distinguish "no session" (send to /login) from "session but not a manager"
+  // (send to landing). Sending non-managers to /login would create a redirect
+  // loop, because the middleware bounces authenticated users from /login back
+  // to /dashboard.
+  const session = await getSession()
+  if (!session) redirect("/login")
 
-  const managerName = manager.name
+  const managerDoc = await adminDb.collection("managers").doc(session.uid).get()
+  if (!managerDoc.exists) redirect("/")
+
+  const managerData = managerDoc.data()
+  const managerName = typeof managerData?.name === "string" ? managerData.name : "Manager"
 
   return (
     <div className="min-h-screen bg-gray-50">
