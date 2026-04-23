@@ -17,11 +17,21 @@ import { Label } from "@/components/ui/label"
 import { Timer, Mail, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
+// Same-origin relative path only: starts with `/`, is not `//...` or `/\...`
+// (would be interpreted as protocol-relative and could redirect off-site).
+function isSafeRedirect(value: string | null): value is string {
+  if (!value) return false
+  if (!value.startsWith("/")) return false
+  if (value.startsWith("//") || value.startsWith("/\\")) return false
+  return true
+}
+
 export default function AthleteLoginPage() {
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [linkSent, setLinkSent] = useState(false)
   const [verifying, setVerifying] = useState(false)
+  const [signedInNoRedirect, setSignedInNoRedirect] = useState(false)
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
 
   // Check if arriving from a magic link
@@ -50,10 +60,11 @@ export default function AthleteLoginPage() {
           localStorage.removeItem("athlete_login_email")
           localStorage.removeItem("athlete_login_redirect")
 
-          // Redirect to stored URL or default
-          if (storedRedirect) {
+          if (isSafeRedirect(storedRedirect)) {
             window.location.href = storedRedirect
+            return
           }
+          setSignedInNoRedirect(true)
         } catch {
           toast.error("La vérification a échoué. Le lien est peut-être expiré.")
         }
@@ -68,7 +79,7 @@ export default function AthleteLoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const redirect = params.get("redirect")
-    if (redirect) {
+    if (isSafeRedirect(redirect)) {
       setRedirectUrl(redirect)
     }
   }, [])
@@ -108,6 +119,21 @@ export default function AthleteLoginPage() {
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
           <p className="text-muted-foreground">Connexion en cours...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (signedInNoRedirect) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle>Connecté</CardTitle>
+            <CardDescription>
+              Ouvrez le lien de la campagne reçu par email pour accéder à votre planning.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     )
   }
