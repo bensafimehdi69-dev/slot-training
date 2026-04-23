@@ -135,6 +135,10 @@ export function CampaignsTab({ group, onRefresh: _onRefresh }: CampaignsTabProps
                     <Input id="endDate" name="endDate" type="date" required />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="deadline">Date limite de réponse</Label>
+                  <Input id="deadline" name="deadline" type="date" required />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Heure début plage</Label>
@@ -169,10 +173,6 @@ export function CampaignsTab({ group, onRefresh: _onRefresh }: CampaignsTabProps
                   onChange={setTrainingLocation}
                   required
                 />
-                <div className="space-y-2">
-                  <Label htmlFor="deadline">Date limite de réponse</Label>
-                  <Input id="deadline" name="deadline" type="date" required />
-                </div>
               </div>
               <DialogFooter>
                 <Button type="submit" disabled={creating}>
