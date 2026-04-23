@@ -192,7 +192,7 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
             </TabsContent>
 
             <TabsContent value="campaigns" className="mt-4">
-              <CampaignsTab group={group} onRefresh={onRefresh} />
+              <CampaignsTab group={group} />
             </TabsContent>
           </Tabs>
         </CardContent>

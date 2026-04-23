@@ -16,7 +16,6 @@
     "clsx": "^2.1.1",
     "firebase": "^12.10.0",
     "firebase-admin": "^13.7.0",
-    "firebase-admin-a14c8a5423a75469": "npm:firebase-admin@^13.7.0",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",

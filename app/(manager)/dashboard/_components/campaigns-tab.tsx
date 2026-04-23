@@ -31,10 +31,9 @@ import type { AddressWithCoords } from "@/lib/types/address"
 
 interface CampaignsTabProps {
   group: Group
-  onRefresh: () => void
 }
 
-export function CampaignsTab({ group, onRefresh: _onRefresh }: CampaignsTabProps) {
+export function CampaignsTab({ group }: CampaignsTabProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)

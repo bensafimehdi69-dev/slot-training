@@ -3,7 +3,7 @@
 import { z } from "zod"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { getSession } from "@/lib/firebase/auth"
-import { encryptAddress, decryptAddress } from "@/lib/utils/encryption"
+import { encryptAddress } from "@/lib/utils/encryption"
 import { readAthleteProfile } from "@/lib/server/profile-service"
 import { readCampaignIndex } from "@/lib/server/indexes"
 import { sendDeletionConfirmation } from "@/lib/utils/email"
