@@ -99,7 +99,24 @@ export function CampaignsTab({ group, onRefresh: _onRefresh }: CampaignsTabProps
               Nouvelle campagne
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent
+            className="max-w-md"
+            // Google Places Autocomplete appends its dropdown (.pac-container) to
+            // <body>, i.e. outside this modal's DOM subtree. Radix treats those
+            // clicks as "pointer-down outside" and closes the dialog before the
+            // `place_changed` handler can fire — so clicking a suggestion just
+            // dismisses the form without populating the address. Preventing the
+            // default close for pac-container clicks keeps the dialog open and
+            // lets Google handle the selection normally.
+            onPointerDownOutside={(e) => {
+              const target = e.target as Element | null
+              if (target?.closest(".pac-container")) e.preventDefault()
+            }}
+            onInteractOutside={(e) => {
+              const target = e.target as Element | null
+              if (target?.closest(".pac-container")) e.preventDefault()
+            }}
+          >
             <DialogHeader>
               <DialogTitle>Créer une campagne</DialogTitle>
               <DialogDescription>

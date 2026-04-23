@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   APIProvider,
   Map,
   AdvancedMarker,
   useMapsLibrary,
   useMap,
-  type MapMouseEvent,
 } from "@vis.gl/react-google-maps"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Loader2, MapPin } from "lucide-react"
 import type { AddressWithCoords } from "@/lib/types/address"
 
 interface AddressAutocompleteMapProps {
@@ -20,6 +20,23 @@ interface AddressAutocompleteMapProps {
   required?: boolean
 }
 
+/**
+ * Address picker with live autocomplete + map preview.
+ *
+ * We avoid both broken Google widgets:
+ *  - `google.maps.places.Autocomplete` (legacy) is disabled for new
+ *    customers post-March 2025: suggestions render but `place_changed`
+ *    never fires.
+ *  - `PlaceAutocompleteElement` (new Web Component) throws
+ *    `PLACES_GET_PLACE: NOT_FOUND` on `fetchFields`.
+ *
+ * Instead we call the programmatic Places API (New)
+ * `AutocompleteSuggestion.fetchAutocompleteSuggestions` to get live
+ * suggestions, render our own shadcn-styled dropdown, then resolve the
+ * chosen suggestion to lat/lng via the Geocoding API (known working).
+ * Session tokens pair the autocomplete + resolution calls so Google
+ * bills them as one request.
+ */
 export function AddressAutocompleteMap({
   label,
   value,
@@ -30,173 +47,213 @@ export function AddressAutocompleteMap({
 
   return (
     <APIProvider apiKey={apiKey}>
-      <div className="space-y-3">
-        <Label>
-          {label}
-          {required && " *"}
-        </Label>
-        <PlacesAutocompleteInput value={value} onChange={onChange} />
-        <MapWithClick value={value} onChange={onChange} />
-      </div>
+      <AutocompletePicker
+        label={label}
+        value={value}
+        onChange={onChange}
+        required={required}
+      />
     </APIProvider>
   )
 }
 
-function MapWithClick({
+interface Suggestion {
+  placeId: string
+  mainText: string
+  secondaryText: string
+  fullText: string
+}
+
+function AutocompletePicker({
+  label,
   value,
   onChange,
-}: {
-  value: AddressWithCoords | null
-  onChange: (address: AddressWithCoords | null) => void
-}) {
+  required,
+}: AddressAutocompleteMapProps) {
+  const places = useMapsLibrary("places")
   const geocoding = useMapsLibrary("geocoding")
-  const map = useMap()
+  const [inputValue, setInputValue] = useState(value?.formatted || "")
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [resolving, setResolving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sessionTokenRef = useRef<any>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  const defaultCenter = value && value.lat !== 0
-    ? { lat: value.lat, lng: value.lng }
-    : { lat: 24.7136, lng: 46.6753 } // Default to Saudi Arabia
+  // Sync input when value changes externally.
+  useEffect(() => {
+    setInputValue(value?.formatted || "")
+  }, [value?.formatted])
 
-  const handleMapClick = useCallback(
-    (e: MapMouseEvent) => {
-      const detail = e.detail
-      if (!detail.latLng) return
-      const lat = detail.latLng.lat
-      const lng = detail.latLng.lng
+  // Close dropdown when clicking outside.
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
 
-      // Reverse geocode to get address
-      if (geocoding) {
-        const geocoder = new geocoding.Geocoder()
-        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-          if (status === "OK" && results && results[0]) {
-            onChange({
-              formatted: results[0].formatted_address,
-              lat,
-              lng,
-            })
-          } else {
-            onChange({
-              formatted: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-              lat,
-              lng,
-            })
+  // Debounced fetch of suggestions as the user types.
+  useEffect(() => {
+    if (!places) return
+    const query = inputValue.trim()
+    if (!query || query === value?.formatted) {
+      setSuggestions([])
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { AutocompleteSessionToken, AutocompleteSuggestion } = places as any
+        if (!AutocompleteSessionToken || !AutocompleteSuggestion) {
+          setError("API Places (New) indisponible. Vérifiez la configuration.")
+          return
+        }
+        if (!sessionTokenRef.current) {
+          sessionTokenRef.current = new AutocompleteSessionToken()
+        }
+        const { suggestions: results } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: query,
+          sessionToken: sessionTokenRef.current,
+        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mapped: Suggestion[] = (results || []).map((s: any) => {
+          const p = s.placePrediction
+          return {
+            placeId: p?.placeId ?? "",
+            mainText: p?.mainText?.text ?? p?.text?.text ?? "",
+            secondaryText: p?.secondaryText?.text ?? "",
+            fullText: p?.text?.text ?? "",
           }
         })
-      } else {
-        onChange({
-          formatted: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-          lat,
-          lng,
-        })
+        setSuggestions(mapped)
+        setShowDropdown(mapped.length > 0)
+        setError(null)
+      } catch (err) {
+        console.error("[Address] autocomplete failed:", err instanceof Error ? err.message : "unknown")
       }
-    },
-    [geocoding, onChange]
-  )
+    }, 300)
 
-  // Re-center map when value changes
-  useEffect(() => {
-    if (map && value && value.lat !== 0) {
-      map.panTo({ lat: value.lat, lng: value.lng })
+    return () => clearTimeout(timer)
+  }, [places, inputValue, value?.formatted])
+
+  const resolveSuggestion = async (suggestion: Suggestion) => {
+    if (!geocoding) return
+    setResolving(true)
+    setError(null)
+    setShowDropdown(false)
+    try {
+      const geocoder = new geocoding.Geocoder()
+      const response = await geocoder.geocode({ address: suggestion.fullText })
+      const first = response.results?.[0]
+      if (!first?.geometry?.location) {
+        setError("Impossible de localiser cette adresse.")
+        return
+      }
+      const lat = first.geometry.location.lat()
+      const lng = first.geometry.location.lng()
+      const formatted = first.formatted_address || suggestion.fullText
+      setInputValue(formatted)
+      onChange({ formatted, lat, lng })
+      // A new session starts after each confirmed selection (Google billing convention).
+      sessionTokenRef.current = null
+    } catch (err) {
+      console.error("[Address] geocoding failed:", err instanceof Error ? err.message : "unknown")
+      setError("Erreur lors de la localisation. Réessayez.")
+    } finally {
+      setResolving(false)
     }
-  }, [map, value])
+  }
+
+  const handleInputChange = (next: string) => {
+    setInputValue(next)
+    setError(null)
+    if (value && next !== value.formatted) {
+      // Invalidate the confirmed address if the user starts editing.
+      onChange(null)
+    }
+  }
 
   return (
-    <div className="h-[240px] w-full overflow-hidden rounded-lg border">
-      <Map
-        defaultCenter={defaultCenter}
-        defaultZoom={value && value.lat !== 0 ? 15 : 5}
-        mapId="slot-training-map"
-        gestureHandling="cooperative"
-        disableDefaultUI
-        onClick={handleMapClick}
-      >
-        {value && value.lat !== 0 && (
-          <AdvancedMarker
-            position={{ lat: value.lat, lng: value.lng }}
-            draggable
-            onDragEnd={(e: google.maps.MapMouseEvent) => {
-              if (!e.latLng) return
-              const lat = e.latLng.lat()
-              const lng = e.latLng.lng()
+    <div className="space-y-3">
+      <Label htmlFor="address-input">
+        {label}
+        {required && " *"}
+      </Label>
 
-              if (geocoding) {
-                const geocoder = new geocoding.Geocoder()
-                geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-                  if (status === "OK" && results && results[0]) {
-                    onChange({
-                      formatted: results[0].formatted_address,
-                      lat,
-                      lng,
-                    })
-                  } else {
-                    onChange({ ...value, lat, lng })
-                  }
-                })
-              } else {
-                onChange({ ...value, lat, lng })
-              }
-            }}
+      <div ref={containerRef} className="relative">
+        <div className="relative">
+          <Input
+            id="address-input"
+            value={inputValue}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+            placeholder="Ex: Stade King Abdullah, Jeddah"
+            disabled={resolving}
+            autoComplete="off"
           />
+          {resolving && (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          )}
+        </div>
+
+        {showDropdown && suggestions.length > 0 && (
+          <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md">
+            {suggestions.map((s) => (
+              <button
+                key={s.placeId || s.fullText}
+                type="button"
+                onClick={() => resolveSuggestion(s)}
+                className="flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-accent"
+              >
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{s.mainText || s.fullText}</p>
+                  {s.secondaryText && (
+                    <p className="truncate text-xs text-muted-foreground">{s.secondaryText}</p>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
         )}
-      </Map>
+      </div>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <MapPreview value={value} />
     </div>
   )
 }
 
-function PlacesAutocompleteInput({
-  value,
-  onChange,
-}: {
-  value: AddressWithCoords | null
-  onChange: (address: AddressWithCoords | null) => void
-}) {
-  const [inputValue, setInputValue] = useState(value?.formatted || "")
-  const inputRef = useRef<HTMLInputElement>(null)
-  const places = useMapsLibrary("places")
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
-
-  // Sync input when value changes externally (map click, drag)
-  useEffect(() => {
-    if (value?.formatted && value.formatted !== inputValue) {
-      setInputValue(value.formatted)
-    }
-  }, [value?.formatted]) // eslint-disable-line react-hooks/exhaustive-deps
+function MapPreview({ value }: { value: AddressWithCoords | null }) {
+  const map = useMap()
+  const hasLocation = value !== null && value.lat !== 0
 
   useEffect(() => {
-    if (!places || !inputRef.current) return
-
-    const autocomplete = new places.Autocomplete(inputRef.current, {
-      fields: ["formatted_address", "geometry", "name"],
-    })
-
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace()
-      if (place.geometry?.location) {
-        const displayName = place.name && place.formatted_address && !place.formatted_address.startsWith(place.name)
-          ? `${place.name}, ${place.formatted_address}`
-          : place.formatted_address || place.name || ""
-        const newAddress: AddressWithCoords = {
-          formatted: displayName,
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-        }
-        setInputValue(newAddress.formatted)
-        onChange(newAddress)
-      }
-    })
-
-    autocompleteRef.current = autocomplete
-
-    return () => {
-      google.maps.event.clearInstanceListeners(autocomplete)
+    if (map && hasLocation) {
+      map.panTo({ lat: value!.lat, lng: value!.lng })
+      map.setZoom(15)
     }
-  }, [places, onChange])
+  }, [map, value, hasLocation])
 
   return (
-    <Input
-      ref={inputRef}
-      value={inputValue}
-      onChange={(e) => setInputValue(e.target.value)}
-      placeholder="Rechercher une adresse..."
-    />
+    <div className="h-[240px] w-full overflow-hidden rounded-lg border">
+      <Map
+        defaultCenter={hasLocation ? { lat: value!.lat, lng: value!.lng } : { lat: 24.7136, lng: 46.6753 }}
+        defaultZoom={hasLocation ? 15 : 5}
+        mapId="slot-training-map"
+        gestureHandling="greedy"
+        zoomControl
+        clickableIcons={false}
+      >
+        {hasLocation && <AdvancedMarker position={{ lat: value!.lat, lng: value!.lng }} />}
+      </Map>
+    </div>
   )
 }
