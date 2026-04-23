@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
 import { isSignInWithEmailLink, signInWithEmailLink } from "firebase/auth"
 import { auth } from "@/lib/firebase/client"
 import { createAthleteSession, sendAthleteMagicLink } from "./actions"
@@ -34,9 +33,16 @@ export default function AthleteLoginPage() {
   const [verifying, setVerifying] = useState(false)
   const [signedInNoRedirect, setSignedInNoRedirect] = useState(false)
 
-  const searchParams = useSearchParams()
-  const rawRedirect = searchParams.get("redirect")
-  const redirectUrl = isSafeRedirect(rawRedirect) ? rawRedirect : null
+  // Read ?redirect=... once, lazily on first client render. Keeps the page
+  // statically prerenderable (useSearchParams would force a Suspense wrapper)
+  // and avoids the React 19 set-state-in-effect warning that comes from
+  // reading in useEffect.
+  const [redirectUrl] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    const params = new URLSearchParams(window.location.search)
+    const raw = params.get("redirect")
+    return isSafeRedirect(raw) ? raw : null
+  })
 
   // Check if arriving from a magic link
   useEffect(() => {
