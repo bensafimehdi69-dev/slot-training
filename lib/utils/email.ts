@@ -1,7 +1,21 @@
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM_EMAIL = "Slot Training <onboarding@resend.dev>"
+
+// Lazy singleton. Resend's constructor throws synchronously if the key is
+// missing, so instantiating at module scope breaks `next build`'s page-data
+// collection step in any environment where the env var isn't loaded (CI,
+// fresh clones, worktrees). Keep the handle behind a function and fail only
+// when we actually try to send.
+let resendClient: Resend | null = null
+function getResend(): Resend {
+  if (!resendClient) {
+    const key = process.env.RESEND_API_KEY
+    if (!key) throw new Error("RESEND_API_KEY is not set")
+    resendClient = new Resend(key)
+  }
+  return resendClient
+}
 
 /**
  * Minimal HTML escape for user-supplied strings interpolated into email
@@ -32,7 +46,7 @@ export async function sendCampaignNotification(
   }
 ) {
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: FROM_EMAIL,
       to,
       subject: `Nouvelle campagne d'entraînement - ${campaignData.startDate} au ${campaignData.endDate}`,
@@ -87,7 +101,7 @@ export async function sendPlanningNotification(
       content = `<p>Malheureusement, aucun créneau compatible n'a pu être trouvé.</p><p>Raison : ${esc(planningData.reason) || "Aucun créneau sans conflit de cours."}</p>`
     }
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: FROM_EMAIL,
       to,
       subject: "Votre planning d'entraînement est disponible",
@@ -105,7 +119,7 @@ export async function sendPlanningNotification(
 
 export async function sendDeletionConfirmation(to: string, firstName: string) {
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: FROM_EMAIL,
       to,
       subject: "Confirmation de suppression de vos données",
