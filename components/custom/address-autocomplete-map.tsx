@@ -226,13 +226,25 @@ function AutocompletePicker({
 
       {error && <p className="text-xs text-destructive">{error}</p>}
 
-      <MapPreview value={value} />
+      <MapPreview value={value} onChange={onChange} />
+
+      {value && (
+        <p className="text-xs text-muted-foreground">
+          Astuce : déplacez le marqueur ou cliquez sur la carte pour ajuster la position si l&apos;adresse n&apos;est pas exacte.
+        </p>
+      )}
     </div>
   )
 }
 
-function MapPreview({ value }: { value: AddressWithCoords | null }) {
+interface MapPreviewProps {
+  value: AddressWithCoords | null
+  onChange: (address: AddressWithCoords | null) => void
+}
+
+function MapPreview({ value, onChange }: MapPreviewProps) {
   const map = useMap()
+  const geocoding = useMapsLibrary("geocoding")
   const hasLocation = value !== null && value.lat !== 0
 
   useEffect(() => {
@@ -241,6 +253,22 @@ function MapPreview({ value }: { value: AddressWithCoords | null }) {
       map.setZoom(15)
     }
   }, [map, value, hasLocation])
+
+  // Reverse-geocode a manual marker move / click so the address text stays in
+  // sync with the pin. If geocoding fails (network, quota), fall back to raw
+  // coords so the form remains submittable.
+  async function setFromCoords(lat: number, lng: number) {
+    if (!geocoding) return
+    try {
+      const geocoder = new geocoding.Geocoder()
+      const response = await geocoder.geocode({ location: { lat, lng } })
+      const first = response.results?.[0]
+      const formatted = first?.formatted_address ?? `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+      onChange({ formatted, lat, lng })
+    } catch {
+      onChange({ formatted: `${lat.toFixed(6)}, ${lng.toFixed(6)}`, lat, lng })
+    }
+  }
 
   return (
     <div className="h-[240px] w-full overflow-hidden rounded-lg border">
@@ -251,8 +279,22 @@ function MapPreview({ value }: { value: AddressWithCoords | null }) {
         gestureHandling="greedy"
         zoomControl
         clickableIcons={false}
+        onClick={(event) => {
+          const latLng = event.detail.latLng
+          if (latLng) setFromCoords(latLng.lat, latLng.lng)
+        }}
       >
-        {hasLocation && <AdvancedMarker position={{ lat: value!.lat, lng: value!.lng }} />}
+        {hasLocation && (
+          <AdvancedMarker
+            position={{ lat: value!.lat, lng: value!.lng }}
+            draggable
+            onDragEnd={(event) => {
+              const lat = event.latLng?.lat()
+              const lng = event.latLng?.lng()
+              if (lat != null && lng != null) setFromCoords(lat, lng)
+            }}
+          />
+        )}
       </Map>
     </div>
   )
