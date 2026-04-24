@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 const protectedRoutes = ["/dashboard"]
-const protectedAthleteRoutes = ["/campaign"]
+const protectedAthleteRoutes = ["/campaign", "/home"]
 const authRoutes = ["/login", "/register", "/forgot-password"]
 
 /**

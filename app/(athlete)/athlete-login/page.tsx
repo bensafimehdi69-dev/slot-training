@@ -31,7 +31,6 @@ export default function AthleteLoginPage() {
   const [loading, setLoading] = useState(false)
   const [linkSent, setLinkSent] = useState(false)
   const [verifying, setVerifying] = useState(false)
-  const [signedInNoRedirect, setSignedInNoRedirect] = useState(false)
 
   // Read ?redirect=... once, lazily on first client render. Keeps the page
   // statically prerenderable (useSearchParams would force a Suspense wrapper)
@@ -70,11 +69,10 @@ export default function AthleteLoginPage() {
           localStorage.removeItem("athlete_login_email")
           localStorage.removeItem("athlete_login_redirect")
 
-          if (isSafeRedirect(storedRedirect)) {
-            window.location.href = storedRedirect
-            return
-          }
-          setSignedInNoRedirect(true)
+          window.location.href = isSafeRedirect(storedRedirect)
+            ? storedRedirect
+            : "/home"
+          return
         } catch {
           toast.error("La vérification a échoué. Le lien est peut-être expiré.")
         }
@@ -120,21 +118,6 @@ export default function AthleteLoginPage() {
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
           <p className="text-muted-foreground">Connexion en cours...</p>
         </div>
-      </div>
-    )
-  }
-
-  if (signedInNoRedirect) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <CardTitle>Connecté</CardTitle>
-            <CardDescription>
-              Ouvrez le lien de la campagne reçu par email pour accéder à votre planning.
-            </CardDescription>
-          </CardHeader>
-        </Card>
       </div>
     )
   }
