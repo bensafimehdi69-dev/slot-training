@@ -23,11 +23,19 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete-map"
+import { ConstraintsTapGrid } from "@/components/custom/constraints-tap-grid"
 import { getCampaigns, createCampaign } from "../actions"
 import { CampaignCard } from "./campaign-card"
 import type { Group } from "@/lib/types/group"
 import type { Campaign } from "@/lib/types/campaign"
 import type { AddressWithCoords } from "@/lib/types/address"
+import type { ConstraintsGrid } from "@/lib/types/profile"
+
+function createDefaultAvailableSlots(): ConstraintsGrid {
+  return Array(7)
+    .fill(null)
+    .map(() => Array(16).fill(true))
+}
 
 interface CampaignsTabProps {
   group: Group
@@ -41,6 +49,9 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
   const [timeRangeStart, setTimeRangeStart] = useState("08:00")
   const [timeRangeEnd, setTimeRangeEnd] = useState("20:00")
   const [trainingLocation, setTrainingLocation] = useState<AddressWithCoords | null>(null)
+  const [availableSlots, setAvailableSlots] = useState<ConstraintsGrid>(
+    createDefaultAvailableSlots()
+  )
 
   const loadCampaigns = useCallback(async () => {
     const result = await getCampaigns(group.id)
@@ -63,6 +74,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
     formData.set("trainingLocationFormatted", trainingLocation.formatted)
     formData.set("trainingLocationLat", String(trainingLocation.lat))
     formData.set("trainingLocationLng", String(trainingLocation.lng))
+    formData.set("availableSlots", JSON.stringify(availableSlots))
     const result = await createCampaign(group.id, formData)
     setCreating(false)
     if (result.error) {
@@ -71,6 +83,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
       toast.success("Campagne créée. Les athlètes ont été notifiés par email.")
       setCreateOpen(false)
       setTrainingLocation(null)
+      setAvailableSlots(createDefaultAvailableSlots())
       loadCampaigns()
     }
   }
@@ -172,6 +185,16 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
                   onChange={setTrainingLocation}
                   required
                 />
+                <div className="space-y-2">
+                  <Label>Créneaux disponibles entraîneur + salle</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Touchez les créneaux indisponibles (coach absent, salle fermée…). Seules les cases vertes seront proposées comme séances. Par défaut, tout est dispo.
+                  </p>
+                  <ConstraintsTapGrid
+                    value={availableSlots}
+                    onChange={setAvailableSlots}
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button type="submit" disabled={creating}>

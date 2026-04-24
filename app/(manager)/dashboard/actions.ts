@@ -27,6 +27,16 @@ const groupNameSchema = z.string().trim().min(1, "Le nom du groupe est requis.")
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide.")
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horaire invalide.")
 
+// Coach + facility availability grid. Match the athlete schema exactly so the
+// same UI component can render either side. 7 days × 16 hours of booleans;
+// `true` = coach and room are available, `false` = blocked (training cannot
+// happen here regardless of athlete availability).
+const AVAILABILITY_DAYS = 7
+const AVAILABILITY_HOURS = 16
+const availableSlotsSchema = z
+  .array(z.array(z.boolean()).length(AVAILABILITY_HOURS))
+  .length(AVAILABILITY_DAYS)
+
 const campaignSchema = z
   .object({
     startDate: isoDate,
@@ -37,6 +47,7 @@ const campaignSchema = z
     trainingLocationLat: z.coerce.number().finite().min(-90).max(90),
     trainingLocationLng: z.coerce.number().finite().min(-180).max(180),
     deadline: z.string().min(1, "La date limite est requise."),
+    availableSlots: availableSlotsSchema,
   })
   .refine(({ startDate, endDate }) => endDate >= startDate, {
     message: "La date de fin doit être postérieure à la date de début.",
@@ -237,6 +248,21 @@ export async function getCampaigns(groupId: string) {
   const campaigns: Campaign[] = snapshot.docs.map((doc) => {
     const data = doc.data()
     const rawResult = data.optimizationResult as Record<string, unknown> | null | undefined
+
+    // availableSlots is stored as a JSON string; legacy campaigns predating
+    // this field default to "all hours allowed" so optimisation still works.
+    let availableSlots: boolean[][] = Array(AVAILABILITY_DAYS)
+      .fill(null)
+      .map(() => Array(AVAILABILITY_HOURS).fill(true))
+    if (typeof data.availableSlots === "string") {
+      try {
+        const parsed = JSON.parse(data.availableSlots)
+        if (Array.isArray(parsed)) availableSlots = parsed as boolean[][]
+      } catch {
+        // Keep the default-true fallback.
+      }
+    }
+
     return {
       id: doc.id,
       startDate: data.startDate,
@@ -244,6 +270,7 @@ export async function getCampaigns(groupId: string) {
       timeRangeStart: data.timeRangeStart,
       timeRangeEnd: data.timeRangeEnd,
       trainingLocation: data.trainingLocation,
+      availableSlots,
       status: data.status,
       deadline: data.deadline?.toDate() ?? new Date(),
       createdAt: data.createdAt?.toDate() ?? new Date(),
@@ -272,6 +299,18 @@ export async function createCampaign(groupId: string, formData: FormData) {
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
 
+  // availableSlots arrives as a JSON-encoded 7×16 grid in the form payload.
+  // Reject early if it isn't valid JSON so Zod sees a clean array.
+  let availableSlotsRaw: unknown = undefined
+  const availableSlotsField = formData.get("availableSlots")
+  if (typeof availableSlotsField === "string" && availableSlotsField.length > 0) {
+    try {
+      availableSlotsRaw = JSON.parse(availableSlotsField)
+    } catch {
+      return { error: "Créneaux dispos invalides." }
+    }
+  }
+
   const parsed = campaignSchema.safeParse({
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
@@ -281,6 +320,7 @@ export async function createCampaign(groupId: string, formData: FormData) {
     trainingLocationLat: formData.get("trainingLocationLat"),
     trainingLocationLng: formData.get("trainingLocationLng"),
     deadline: formData.get("deadline"),
+    availableSlots: availableSlotsRaw,
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Champs invalides." }
@@ -307,6 +347,7 @@ export async function createCampaign(groupId: string, formData: FormData) {
       optimizationResult: null,
       planningStatus: "pending",
       planningStatusUpdatedAt: null,
+      availableSlots: JSON.stringify(input.availableSlots),
     })
 
   // Reverse index so athlete-facing lookups can resolve campaignId → path
@@ -445,10 +486,26 @@ export async function runOptimization(groupId: string, campaignId: string) {
       }
     }
 
+    // Decode the coach/facility availability grid. Stored as a JSON string in
+    // Firestore; legacy campaigns have nothing here, so default to "all hours
+    // allowed" (a 7×16 boolean[][] of true).
+    let availableSlots: boolean[][] = Array(AVAILABILITY_DAYS)
+      .fill(null)
+      .map(() => Array(AVAILABILITY_HOURS).fill(true))
+    if (typeof lock.campaign.availableSlots === "string") {
+      try {
+        const parsed = JSON.parse(lock.campaign.availableSlots)
+        if (Array.isArray(parsed)) availableSlots = parsed as boolean[][]
+      } catch {
+        // Keep default-permissive fallback rather than block the optimisation.
+      }
+    }
+
     const result = await optimizeSlots(athleteDataList, {
       timeRangeStart: lock.campaign.timeRangeStart || "08:00",
       timeRangeEnd: lock.campaign.timeRangeEnd || "20:00",
       trainingLocation: lock.campaign.trainingLocation,
+      availableSlots,
       managerUid: manager.uid,
       groupId: parsedGroupId.data,
       campaignId: parsedCampaignId.data,

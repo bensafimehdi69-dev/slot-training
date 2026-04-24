@@ -84,6 +84,19 @@ export async function getCampaignForAthlete(
     const managerUid = index.managerUid
     const groupId = index.groupId
     const data = campDoc.data()!
+    // availableSlots is a coach/facility concern; the athlete side just
+    // mirrors the field for typing. Default to all-true for legacy campaigns.
+    let availableSlots: boolean[][] = Array(7)
+      .fill(null)
+      .map(() => Array(16).fill(true))
+    if (typeof data.availableSlots === "string") {
+      try {
+        const parsed = JSON.parse(data.availableSlots)
+        if (Array.isArray(parsed)) availableSlots = parsed as boolean[][]
+      } catch {
+        // Keep default
+      }
+    }
     const campaignData: Campaign = {
       id: campDoc.id,
       startDate: data.startDate,
@@ -91,6 +104,7 @@ export async function getCampaignForAthlete(
       timeRangeStart: data.timeRangeStart,
       timeRangeEnd: data.timeRangeEnd,
       trainingLocation: data.trainingLocation,
+      availableSlots,
       status: data.status,
       deadline: data.deadline?.toDate() || new Date(),
       createdAt: data.createdAt?.toDate() || new Date(),

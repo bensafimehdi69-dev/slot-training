@@ -19,9 +19,37 @@ interface CampaignConfig {
   timeRangeStart: string
   timeRangeEnd: string
   trainingLocation: AddressWithCoords
+  // Coach + facility availability — 7 days × 16 hours of booleans matching
+  // the athlete schedule grid. true = a slot starting in this hour is allowed,
+  // false = the coach or the room is unavailable so the optimiser must skip it.
+  availableSlots: boolean[][]
   managerUid: string
   groupId: string
   campaignId: string
+}
+
+// Map a HH:MM start time to the hour bucket the availableSlots grid uses.
+// The grid covers 07:00..22:00 in 1-hour buckets (16 cells), matching the
+// athlete-side ConstraintsTapGrid. A slot starting at 08:30 falls in the
+// 08:00 bucket. Slots starting outside 07–22 are treated as unavailable.
+const AVAILABILITY_GRID_FIRST_HOUR = 7
+const AVAILABILITY_GRID_HOURS = 16
+const dayKeyToGridIndex: Record<DayKey, number> = {
+  lundi: 0,
+  mardi: 1,
+  mercredi: 2,
+  jeudi: 3,
+  vendredi: 4,
+}
+
+function isSlotAllowed(grid: boolean[][], day: DayKey, slotStart: string): boolean {
+  const dayIndex = dayKeyToGridIndex[day]
+  const row = grid[dayIndex]
+  if (!row) return true // grid malformed — be permissive rather than blocking everyone
+  const hour = Number(slotStart.split(":")[0])
+  const cellIndex = hour - AVAILABILITY_GRID_FIRST_HOUR
+  if (cellIndex < 0 || cellIndex >= AVAILABILITY_GRID_HOURS) return false
+  return row[cellIndex] !== false
 }
 
 // Business parameters — colocated so they're easy to tune.
@@ -131,6 +159,9 @@ export async function optimizeSlots(
     for (const slotStart of timeSlots) {
       const slotEnd = minutesToTime(timeToMinutes(slotStart) + SLOT_DURATION_MINUTES)
       if (timeToMinutes(slotEnd) > timeToMinutes(config.timeRangeEnd)) continue
+
+      // Hard filter: coach + facility must be available for this slot's hour.
+      if (!isSlotAllowed(config.availableSlots, day, slotStart)) continue
 
       const availableAthletes: AthleteSlotInfo[] = []
       const unavailableAthletes: AthleteSlotInfo[] = []
