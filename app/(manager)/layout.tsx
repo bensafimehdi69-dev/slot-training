@@ -14,7 +14,10 @@ export default async function ManagerLayout({ children }: { children: React.Reac
   if (!session) redirect("/login")
 
   const managerDoc = await adminDb.collection("managers").doc(session.uid).get()
-  if (!managerDoc.exists) redirect("/")
+  // Non-manager with a session is almost always an athlete — send them to /home
+  // instead of the landing. /home itself re-checks the profile and bounces to
+  // /athlete-login if onboarding is incomplete.
+  if (!managerDoc.exists) redirect("/home")
 
   const managerData = managerDoc.data()
   const managerName = typeof managerData?.name === "string" ? managerData.name : "Manager"
