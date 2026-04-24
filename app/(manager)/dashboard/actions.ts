@@ -230,13 +230,37 @@ export async function getCampaigns(groupId: string) {
     .orderBy("createdAt", "desc")
     .get()
 
-  const campaigns: Campaign[] = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-    createdAt: doc.data().createdAt?.toDate(),
-    deadline: doc.data().deadline?.toDate(),
-    planningStatusUpdatedAt: doc.data().planningStatusUpdatedAt?.toDate() || null,
-  })) as Campaign[]
+  // Explicit field picking — never spread doc.data(). Firestore Timestamps
+  // are class instances and Next.js 16 rejects them when a server component
+  // forwards an unconverted one to a client component. The \`optimizationStartedAt\`
+  // timestamp used to leak through the spread and crash the dashboard.
+  const campaigns: Campaign[] = snapshot.docs.map((doc) => {
+    const data = doc.data()
+    const rawResult = data.optimizationResult as Record<string, unknown> | null | undefined
+    return {
+      id: doc.id,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      timeRangeStart: data.timeRangeStart,
+      timeRangeEnd: data.timeRangeEnd,
+      trainingLocation: data.trainingLocation,
+      status: data.status,
+      deadline: data.deadline?.toDate() ?? new Date(),
+      createdAt: data.createdAt?.toDate() ?? new Date(),
+      optimizationResult: rawResult
+        ? ({
+            bestSlot: rawResult.bestSlot,
+            individualSlots: rawResult.individualSlots ?? [],
+            allSlots: rawResult.allSlots ?? [],
+            calculatedAt:
+              (rawResult.calculatedAt as { toDate?: () => Date } | undefined)?.toDate?.() ??
+              new Date(),
+          } as Campaign["optimizationResult"])
+        : null,
+      planningStatus: data.planningStatus ?? "pending",
+      planningStatusUpdatedAt: data.planningStatusUpdatedAt?.toDate() ?? null,
+    } as Campaign
+  })
 
   return { data: campaigns }
 }
