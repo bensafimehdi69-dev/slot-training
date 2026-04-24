@@ -17,6 +17,19 @@ function getResend(): Resend {
   return resendClient
 }
 
+// Resend's free tier only delivers to the account owner, so in dev we
+// also print the email to the terminal. A verified custom domain on
+// Resend lifts this restriction in prod.
+function logEmailInDev(to: string, subject: string, extras?: Record<string, string>) {
+  if (process.env.NODE_ENV === "production") return
+  console.log(`\n📧 [DEV] Email to ${to}`)
+  console.log(`  Subject: ${subject}`)
+  if (extras) {
+    for (const [k, v] of Object.entries(extras)) console.log(`  ${k}: ${v}`)
+  }
+  console.log("")
+}
+
 /**
  * Minimal HTML escape for user-supplied strings interpolated into email
  * templates. Prevents tag injection (e.g. a malicious trainingLocation name
@@ -45,11 +58,13 @@ export async function sendCampaignNotification(
     responseLink: string
   }
 ) {
+  const subject = `Nouvelle campagne d'entraînement - ${campaignData.startDate} au ${campaignData.endDate}`
+  logEmailInDev(to, subject, { "Response link": campaignData.responseLink })
   try {
     await getResend().emails.send({
       from: FROM_EMAIL,
       to,
-      subject: `Nouvelle campagne d'entraînement - ${campaignData.startDate} au ${campaignData.endDate}`,
+      subject,
       html: `
         <h2>Bonjour ${esc(athleteFirstName)},</h2>
         <p>Une nouvelle campagne d'entraînement a été créée :</p>
@@ -101,10 +116,17 @@ export async function sendPlanningNotification(
       content = `<p>Malheureusement, aucun créneau compatible n'a pu être trouvé.</p><p>Raison : ${esc(planningData.reason) || "Aucun créneau sans conflit de cours."}</p>`
     }
 
+    const subject = "Votre planning d'entraînement est disponible"
+    logEmailInDev(to, subject, {
+      "Slot": planningData.slotType,
+      "Day": planningData.day ?? "-",
+      "Time": `${planningData.startTime ?? ""}-${planningData.endTime ?? ""}`,
+      "Link": planningData.planningLink,
+    })
     await getResend().emails.send({
       from: FROM_EMAIL,
       to,
-      subject: "Votre planning d'entraînement est disponible",
+      subject,
       html: `
         <h2>Bonjour ${esc(athleteFirstName)},</h2>
         <p>Le planning de votre période d'entraînement a été validé.</p>
@@ -118,11 +140,13 @@ export async function sendPlanningNotification(
 }
 
 export async function sendDeletionConfirmation(to: string, firstName: string) {
+  const subject = "Confirmation de suppression de vos données"
+  logEmailInDev(to, subject, { "First name": firstName })
   try {
     await getResend().emails.send({
       from: FROM_EMAIL,
       to,
-      subject: "Confirmation de suppression de vos données",
+      subject,
       html: `
         <h2>Bonjour ${esc(firstName)},</h2>
         <p>Conformément à votre demande, toutes vos données personnelles ont été supprimées :</p>
