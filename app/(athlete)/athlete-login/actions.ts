@@ -49,6 +49,13 @@ export async function sendAthleteMagicLink(email: unknown) {
   try {
     const link = await adminAuth.generateSignInWithEmailLink(parsed.data, actionCodeSettings)
 
+    if (process.env.NODE_ENV !== "production") {
+      // Resend's free tier only delivers to the verified account owner, so in
+      // dev we also print the link to the terminal. Never log in prod — this
+      // link grants sign-in to anyone who sees it.
+      console.log(`\n🔑 [DEV] Athlete magic link for ${parsed.data}:\n${link}\n`)
+    }
+
     const { Resend } = await import("resend")
     const resend = new Resend(process.env.RESEND_API_KEY)
 
