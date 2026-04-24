@@ -276,6 +276,7 @@ export async function getCampaigns(groupId: string) {
       createdAt: data.createdAt?.toDate() ?? new Date(),
       optimizationResult: rawResult
         ? ({
+            dailyPlannings: rawResult.dailyPlannings ?? [],
             bestSlot: rawResult.bestSlot,
             individualSlots: rawResult.individualSlots ?? [],
             allSlots: rawResult.allSlots ?? [],

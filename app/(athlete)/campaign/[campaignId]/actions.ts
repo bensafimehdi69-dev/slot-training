@@ -365,6 +365,9 @@ function findAthleteSlot(
 function deserializeOptimizationResult(data: Record<string, unknown>): OptimizationResult {
   const raw = data as Record<string, unknown>
   return {
+    // Pre-Lot-3b campaigns optimised before this field existed; default to []
+    // so the UI keeps working on legacy data.
+    dailyPlannings: (raw.dailyPlannings || []) as OptimizationResult["dailyPlannings"],
     bestSlot: raw.bestSlot as OptimizationResult["bestSlot"],
     individualSlots: (raw.individualSlots || []) as OptimizationResult["individualSlots"],
     allSlots: (raw.allSlots || []) as OptimizationResult["allSlots"],
