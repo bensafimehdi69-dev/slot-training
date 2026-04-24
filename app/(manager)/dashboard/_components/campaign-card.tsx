@@ -150,6 +150,11 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
                   </span>
                 )}
               </div>
+              {campaign.status === "active" && responseCount !== null && responseCount > 0 && (
+                <p className="text-xs italic text-muted-foreground">
+                  Fermez la campagne pour lancer l&apos;optimisation.
+                </p>
+              )}
             </div>
 
             <div className="flex gap-2">

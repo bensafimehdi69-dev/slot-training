@@ -42,6 +42,7 @@ export function JoinForm({
   // Step 2: Account creation
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [passwordConfirm, setPasswordConfirm] = useState("")
   const [idToken, setIdToken] = useState("")
 
   // Step 3: Name
@@ -64,12 +65,16 @@ export function JoinForm({
   )
 
   async function handleCreateAccount(): Promise<void> {
-    if (!email || !password) {
+    if (!email || !password || !passwordConfirm) {
       toast.error("Veuillez remplir tous les champs.")
       return
     }
     if (password.length < 6) {
       toast.error("Le mot de passe doit contenir au moins 6 caractères.")
+      return
+    }
+    if (password !== passwordConfirm) {
+      toast.error("Les mots de passe ne correspondent pas.")
       return
     }
 
@@ -262,10 +267,26 @@ export function JoinForm({
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="passwordConfirm">Confirmer le mot de passe</Label>
+                <Input
+                  id="passwordConfirm"
+                  type="password"
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  placeholder="Retapez votre mot de passe"
+                  required
+                />
+                {passwordConfirm.length > 0 && password !== passwordConfirm && (
+                  <p className="text-xs text-red-600">
+                    Les mots de passe ne correspondent pas.
+                  </p>
+                )}
+              </div>
               <Button
                 className="w-full"
                 onClick={handleCreateAccount}
-                disabled={loading || !email || !password}
+                disabled={loading || !email || !password || !passwordConfirm || password !== passwordConfirm}
               >
                 {loading ? "Création du compte..." : "Créer mon compte"}
               </Button>

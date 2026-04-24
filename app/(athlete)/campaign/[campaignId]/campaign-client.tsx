@@ -184,7 +184,7 @@ export function CampaignClientPage({
             </div>
             <CardTitle>Campagne cloturee</CardTitle>
             <CardDescription>
-              Cette campagne n&apos;accepte plus de reponses.
+              Cette campagne n&apos;accepte plus de réponses.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -235,7 +235,7 @@ function PlanningView({
           </div>
           <CardTitle>Votre planning</CardTitle>
           <CardDescription>
-            Bonjour {athleteFirstName}, voici votre creneau pour la periode du{" "}
+            Bonjour {athleteFirstName}, voici votre créneau pour la période du{" "}
             {campaign.startDate} au {campaign.endDate}
           </CardDescription>
         </CardHeader>
@@ -300,7 +300,7 @@ function PlanningView({
                 <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">
-                    Lieu d&apos;entrainement
+                    Lieu d&apos;entraînement
                   </p>
                   <p>{trainingLocation.formatted}</p>
                 </div>
@@ -319,7 +319,7 @@ function PlanningView({
                 </div>
                 <p className="mb-3 text-xs text-muted-foreground">
                   Un creneau individuel vous a ete attribue car le creneau
-                  collectif ne correspondait pas a vos disponibilites.
+                  collectif ne correspondait pas à vos disponibilités.
                 </p>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
@@ -372,7 +372,7 @@ function PlanningView({
                 <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">
-                    Lieu d&apos;entrainement
+                    Lieu d&apos;entraînement
                   </p>
                   <p>{trainingLocation.formatted}</p>
                 </div>
@@ -467,7 +467,7 @@ function CampaignForm({
       return
     }
 
-    toast.success("Reponse envoyee avec succes !")
+    toast.success("Réponse envoyée avec succès !")
     setShowForm(false)
     setLoading(false)
   }
@@ -481,22 +481,22 @@ function CampaignForm({
             <div className="mb-4 flex justify-center">
               <CheckCircle className="h-16 w-16 text-green-600" />
             </div>
-            <CardTitle>Reponse envoyee</CardTitle>
+            <CardTitle>Réponse envoyée</CardTitle>
             <CardDescription>
-              Bonjour {athleteFirstName}, votre reponse a la campagne a bien ete
-              enregistree.
+              Bonjour {athleteFirstName}, votre réponse à la campagne a bien été
+              enregistrée.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border p-4 text-sm">
               <p className="text-muted-foreground">
-                Periode : {campaign.startDate} au {campaign.endDate}
+                Période : {campaign.startDate} au {campaign.endDate}
               </p>
               <p className="text-muted-foreground">
                 Lieu : {campaign.trainingLocation.formatted}
               </p>
               <p className="text-muted-foreground">
-                Envoye le :{" "}
+                Envoyé le :{" "}
                 {new Date(existingResponse.submittedAt).toLocaleDateString(
                   "fr-FR",
                   {
@@ -516,7 +516,7 @@ function CampaignForm({
                 className="w-full"
                 onClick={() => setShowForm(true)}
               >
-                Modifier ma reponse
+                Modifier ma réponse
               </Button>
             )}
 
@@ -538,10 +538,10 @@ function CampaignForm({
             <div className="mb-4 flex justify-center">
               <CheckCircle className="h-16 w-16 text-green-600" />
             </div>
-            <CardTitle>Reponse envoyee !</CardTitle>
+            <CardTitle>Réponse envoyée !</CardTitle>
             <CardDescription>
-              Votre reponse a ete enregistree. Vous recevrez un email lorsque le
-              planning sera valide.
+              Votre réponse a été enregistrée. Vous recevrez un email lorsque le
+              planning sera validé.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -560,7 +560,7 @@ function CampaignForm({
           <div className="mb-4 flex justify-center">
             <Timer className="h-10 w-10 text-blue-600" />
           </div>
-          <CardTitle>Campagne d&apos;entrainement</CardTitle>
+          <CardTitle>Campagne d&apos;entraînement</CardTitle>
           <CardDescription>
             {campaign.startDate} au {campaign.endDate} &mdash;{" "}
             {campaign.trainingLocation.formatted}
@@ -655,7 +655,7 @@ function CampaignForm({
                 </Label>
                 <p className="text-sm text-muted-foreground">
                   Signalez toute contrainte qui pourrait affecter votre
-                  disponibilite (blessure, examen, transport, etc.)
+                  disponibilité (blessure, examen, transport, etc.)
                 </p>
                 <Textarea
                   id="constraints"
@@ -683,7 +683,7 @@ function CampaignForm({
                   onClick={handleSubmit}
                   disabled={loading}
                 >
-                  {loading ? "Envoi en cours..." : "Envoyer ma reponse"}
+                  {loading ? "Envoi en cours..." : "Envoyer ma réponse"}
                 </Button>
               </div>
             </div>
@@ -752,7 +752,7 @@ function DeleteDataSection({ campaignId }: { campaignId: string }) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <ul className="ml-4 list-disc space-y-1 text-sm text-muted-foreground">
-            <li>Adresses (domicile, etudes)</li>
+            <li>Adresses (domicile, études)</li>
             <li>Emploi du temps</li>
             <li>Contraintes specifiques</li>
             <li>Votre compte utilisateur</li>
