@@ -112,7 +112,10 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
             </Button>
           </DialogTrigger>
           <DialogContent
-            className="max-w-md"
+            // Cap the modal height to the viewport and let the body scroll.
+            // Without this, adding the coach-availability grid pushes the
+            // submit button below the fold on small laptops.
+            className="flex max-h-[90vh] max-w-md flex-col overflow-hidden"
             // Google Places Autocomplete appends its dropdown (.pac-container) to
             // <body>, i.e. outside this modal's DOM subtree. Radix treats those
             // clicks as "pointer-down outside" and closes the dialog before the
@@ -135,8 +138,8 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
                 Définissez la période et les paramètres de la campagne.
               </DialogDescription>
             </DialogHeader>
-            <form action={handleCreateCampaign}>
-              <div className="space-y-4 py-4">
+            <form action={handleCreateCampaign} className="flex min-h-0 flex-1 flex-col">
+              <div className="flex-1 space-y-4 overflow-y-auto py-4 pr-1">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Date de début</Label>
