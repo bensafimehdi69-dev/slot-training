@@ -139,6 +139,68 @@ export async function sendPlanningNotification(
   }
 }
 
+export async function sendCampaignUpdatedNotification(
+  to: string,
+  athleteFirstName: string,
+  campaignData: {
+    trainingLocation: string
+    startDate: string
+    endDate: string
+    deadline: string
+    responseLink: string
+  }
+) {
+  const subject = `Mise à jour de la campagne - ${campaignData.startDate} au ${campaignData.endDate}`
+  logEmailInDev(to, subject, { "Response link": campaignData.responseLink })
+  try {
+    await getResend().emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject,
+      html: `
+        <h2>Bonjour ${esc(athleteFirstName)},</h2>
+        <p>Une campagne d'entraînement à laquelle vous participez a été modifiée. Merci de revérifier vos disponibilités :</p>
+        <ul>
+          <li><strong>Lieu :</strong> ${esc(campaignData.trainingLocation)}</li>
+          <li><strong>Période :</strong> ${esc(campaignData.startDate)} au ${esc(campaignData.endDate)}</li>
+          <li><strong>Date limite de réponse :</strong> ${esc(campaignData.deadline)}</li>
+        </ul>
+        <p><a href="${esc(campaignData.responseLink)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Mettre à jour ma réponse</a></p>
+      `,
+    })
+  } catch (error) {
+    console.error("[EMAIL] sendCampaignUpdatedNotification failed:", error instanceof Error ? error.message : "unknown")
+  }
+}
+
+export async function sendCampaignDeletedNotification(
+  to: string,
+  athleteFirstName: string,
+  campaignData: {
+    startDate: string
+    endDate: string
+  }
+) {
+  const subject = `Annulation de campagne - ${campaignData.startDate} au ${campaignData.endDate}`
+  logEmailInDev(to, subject, {
+    "Period": `${campaignData.startDate} au ${campaignData.endDate}`,
+  })
+  try {
+    await getResend().emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject,
+      html: `
+        <h2>Bonjour ${esc(athleteFirstName)},</h2>
+        <p>La campagne d'entraînement prévue du <strong>${esc(campaignData.startDate)}</strong> au <strong>${esc(campaignData.endDate)}</strong> a été <strong>annulée</strong> par votre entraîneur.</p>
+        <p>Aucune action n'est requise de votre part. Vos données pour cette campagne ont été supprimées.</p>
+      `,
+    })
+  } catch (error) {
+    console.error("[EMAIL] sendCampaignDeletedNotification failed:", error instanceof Error ? error.message : "unknown")
+  }
+}
+
 export async function sendDeletionConfirmation(to: string, firstName: string) {
   const subject = "Confirmation de suppression de vos données"
   logEmailInDev(to, subject, { "First name": firstName })

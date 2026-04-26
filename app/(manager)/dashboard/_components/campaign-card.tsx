@@ -8,6 +8,8 @@ import {
   Lock,
   Play,
   Loader2,
+  Pencil,
+  Trash2,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,12 +27,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { OptimizationResultView } from "@/components/custom/optimization-result-view"
+import { CampaignEditDialog } from "./campaign-edit-dialog"
 import {
   closeCampaign,
   runOptimization,
   validatePlanning,
   rejectPlanning,
   getResponseCount,
+  deleteCampaign,
 } from "../actions"
 import type { Campaign } from "@/lib/types/campaign"
 
@@ -47,6 +51,8 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
   const [validating, setValidating] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [showResult, setShowResult] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     async function loadCount() {
@@ -89,6 +95,18 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
       toast.error(result.error)
     } else {
       toast.success("Planning validé. Les athlètes ont été notifiés par email.")
+      onRefresh()
+    }
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    const result = await deleteCampaign(groupId, campaign.id)
+    setDeleting(false)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success("Campagne supprimée. Les athlètes ont été notifiés.")
       onRefresh()
     }
   }
@@ -214,8 +232,61 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
                   {showResult ? "Masquer" : "Voir le résultat"}
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditOpen(true)}
+                aria-label="Modifier la campagne"
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="ml-1 hidden sm:inline">Modifier</span>
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={deleting}
+                    aria-label="Supprimer la campagne"
+                  >
+                    {deleting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    <span className="ml-1 hidden sm:inline">Supprimer</span>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Supprimer cette campagne ?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Toutes les réponses seront effacées et un email d&apos;annulation
+                      sera envoyé aux athlètes du groupe. Cette action est
+                      irréversible.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-white hover:bg-destructive/90"
+                    >
+                      Supprimer
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
+
+          <CampaignEditDialog
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            groupId={groupId}
+            campaign={campaign}
+            onSaved={onRefresh}
+          />
 
           {showResult && campaign.optimizationResult && (
             <>

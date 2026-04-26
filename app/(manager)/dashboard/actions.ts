@@ -6,11 +6,17 @@ import { requireManager } from "@/lib/firebase/auth"
 import { adminDb } from "@/lib/firebase/admin"
 import { decryptAddress } from "@/lib/utils/encryption"
 import { optimizeSlots } from "@/lib/utils/optimizer"
-import { sendCampaignNotification, sendPlanningNotification } from "@/lib/utils/email"
+import {
+  sendCampaignNotification,
+  sendCampaignUpdatedNotification,
+  sendCampaignDeletedNotification,
+  sendPlanningNotification,
+} from "@/lib/utils/email"
 import {
   writeInviteIndex,
   deleteInviteIndex,
   writeCampaignIndex,
+  deleteCampaignIndex,
   deleteIndexesForGroup,
 } from "@/lib/server/indexes"
 import { revalidatePath } from "next/cache"
@@ -395,6 +401,164 @@ export async function closeCampaign(groupId: string, campaignId: string) {
     .collection("groups").doc(groupId)
     .collection("campaigns").doc(campaignId)
     .update({ status: "closed" })
+
+  revalidatePath("/dashboard")
+  return { success: true }
+}
+
+export async function updateCampaign(
+  groupId: string,
+  campaignId: string,
+  formData: FormData
+) {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const parsedGroupId = firestoreId.safeParse(groupId)
+  const parsedCampaignId = firestoreId.safeParse(campaignId)
+  if (!parsedGroupId.success || !parsedCampaignId.success) {
+    return { error: "Identifiant invalide." }
+  }
+
+  let availableSlotsRaw: unknown = undefined
+  const availableSlotsField = formData.get("availableSlots")
+  if (typeof availableSlotsField === "string" && availableSlotsField.length > 0) {
+    try {
+      availableSlotsRaw = JSON.parse(availableSlotsField)
+    } catch {
+      return { error: "Créneaux dispos invalides." }
+    }
+  }
+
+  const parsed = campaignSchema.safeParse({
+    startDate: formData.get("startDate"),
+    endDate: formData.get("endDate"),
+    timeRangeStart: formData.get("timeRangeStart") || undefined,
+    timeRangeEnd: formData.get("timeRangeEnd") || undefined,
+    trainingLocationFormatted: formData.get("trainingLocationFormatted"),
+    trainingLocationLat: formData.get("trainingLocationLat"),
+    trainingLocationLng: formData.get("trainingLocationLng"),
+    deadline: formData.get("deadline"),
+    availableSlots: availableSlotsRaw,
+  })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Champs invalides." }
+  }
+  const input = parsed.data
+
+  const campaignRef = adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedGroupId.data)
+    .collection("campaigns").doc(parsedCampaignId.data)
+
+  const snap = await campaignRef.get()
+  if (!snap.exists) return { error: "Campagne introuvable." }
+
+  // Editing parameters invalidates any prior optimisation — Distance Matrix
+  // results depend on the training location and the schedule windows. Wipe
+  // the result and the travel-time cache so the next \`runOptimization\` call
+  // recomputes everything from scratch.
+  await campaignRef.update({
+    startDate: input.startDate,
+    endDate: input.endDate,
+    timeRangeStart: input.timeRangeStart,
+    timeRangeEnd: input.timeRangeEnd,
+    trainingLocation: {
+      formatted: input.trainingLocationFormatted,
+      lat: input.trainingLocationLat,
+      lng: input.trainingLocationLng,
+    },
+    deadline: new Date(input.deadline),
+    availableSlots: JSON.stringify(input.availableSlots),
+    optimizationResult: null,
+    optimizationStatus: "idle",
+    planningStatus: "pending",
+    planningStatusUpdatedAt: null,
+  })
+
+  // Clear the travel cache subcollection — best-effort; small deck so a
+  // single page is plenty in practice.
+  try {
+    const travelSnap = await campaignRef.collection("travelTimes").get()
+    if (!travelSnap.empty) {
+      const batch = adminDb.batch()
+      for (const doc of travelSnap.docs) batch.delete(doc.ref)
+      await batch.commit()
+    }
+  } catch (error) {
+    console.error("[CAMPAIGN] travelTimes wipe failed:", error instanceof Error ? error.message : "unknown")
+  }
+
+  // Notify everyone in the group — even athletes who haven't responded yet —
+  // so they can adjust before the new deadline.
+  const athletesSnapshot = await adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedGroupId.data)
+    .collection("athletes")
+    .get()
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  await Promise.allSettled(
+    athletesSnapshot.docs.map((athleteDoc) => {
+      const athlete = athleteDoc.data()
+      if (!athlete.email) return Promise.resolve()
+      return sendCampaignUpdatedNotification(athlete.email, athlete.firstName || "Athlete", {
+        trainingLocation: input.trainingLocationFormatted,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        deadline: input.deadline,
+        responseLink: `${appUrl}/campaign/${parsedCampaignId.data}`,
+      })
+    })
+  )
+
+  revalidatePath("/dashboard")
+  return { success: true }
+}
+
+export async function deleteCampaign(groupId: string, campaignId: string) {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const parsedGroupId = firestoreId.safeParse(groupId)
+  const parsedCampaignId = firestoreId.safeParse(campaignId)
+  if (!parsedGroupId.success || !parsedCampaignId.success) {
+    return { error: "Identifiant invalide." }
+  }
+
+  const campaignRef = adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedGroupId.data)
+    .collection("campaigns").doc(parsedCampaignId.data)
+
+  const snap = await campaignRef.get()
+  if (!snap.exists) return { error: "Campagne introuvable." }
+  const data = snap.data()!
+
+  // Notify athletes BEFORE the data is gone so we can still read their
+  // emails from the group's athletes subcollection.
+  const athletesSnapshot = await adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedGroupId.data)
+    .collection("athletes")
+    .get()
+
+  await Promise.allSettled(
+    athletesSnapshot.docs.map((athleteDoc) => {
+      const athlete = athleteDoc.data()
+      if (!athlete.email) return Promise.resolve()
+      return sendCampaignDeletedNotification(athlete.email, athlete.firstName || "Athlete", {
+        startDate: data.startDate,
+        endDate: data.endDate,
+      })
+    })
+  )
+
+  // Wipe the campaign tree (responses, travelTimes, the campaign doc itself)
+  // and the reverse index. Use Firestore's recursiveDelete to avoid leaving
+  // orphan subcollections.
+  await adminDb.recursiveDelete(campaignRef)
+  await deleteCampaignIndex(parsedCampaignId.data)
 
   revalidatePath("/dashboard")
   return { success: true }
