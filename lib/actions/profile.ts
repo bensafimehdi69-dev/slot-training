@@ -10,12 +10,13 @@ import {
 import { addressSchema } from "@/lib/types/address"
 import type { AthleteProfile } from "@/lib/types/profile"
 
-// Constraints grid: 7 days × 16 time slots of booleans. A malicious client
-// could otherwise ship a 1000×1000 array that stalls the optimizer.
+// Constraints grid: 7 days × 16 time slots of three-state cells. A malicious
+// client could otherwise ship a 1000×1000 array that stalls the optimizer.
 const CONSTRAINTS_GRID_DAYS = 7
 const CONSTRAINTS_GRID_SLOTS = 16
+const constraintCellSchema = z.enum(["training", "school", "home"])
 const constraintsGridSchema = z
-  .array(z.array(z.boolean()).length(CONSTRAINTS_GRID_SLOTS))
+  .array(z.array(constraintCellSchema).length(CONSTRAINTS_GRID_SLOTS))
   .length(CONSTRAINTS_GRID_DAYS)
 
 const profileInputSchema = z.object({

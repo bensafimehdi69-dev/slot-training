@@ -17,7 +17,8 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StepProgress } from "@/components/custom/step-progress"
 import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete-map"
-import { ConstraintsTapGrid } from "@/components/custom/constraints-tap-grid"
+import { AthleteAvailabilityGrid } from "@/components/custom/athlete-availability-grid"
+import type { ConstraintCell, ConstraintsGrid } from "@/lib/types/profile"
 import { Timer, CheckCircle, Shield } from "lucide-react"
 import { toast } from "sonner"
 import type { AddressWithCoords } from "@/lib/types/address"
@@ -57,11 +58,11 @@ export function JoinForm({
     null
   )
 
-  // Step 6: Availability
-  const [constraintsGrid, setConstraintsGrid] = useState<boolean[][]>(
+  // Step 6: Availability — three-state grid (training / school / home).
+  const [constraintsGrid, setConstraintsGrid] = useState<ConstraintsGrid>(
     Array(7)
       .fill(null)
-      .map(() => Array(16).fill(true))
+      .map(() => Array<ConstraintCell>(16).fill("training"))
   )
 
   async function handleCreateAccount(): Promise<void> {
@@ -374,7 +375,7 @@ export function JoinForm({
                   Touchez les créneaux pour indiquer vos indisponibilités (en
                   gris).
                 </p>
-                <ConstraintsTapGrid
+                <AthleteAvailabilityGrid
                   value={constraintsGrid}
                   onChange={setConstraintsGrid}
                 />

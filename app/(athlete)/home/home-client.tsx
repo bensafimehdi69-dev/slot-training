@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete-map"
-import { ConstraintsTapGrid } from "@/components/custom/constraints-tap-grid"
+import { AthleteAvailabilityGrid } from "@/components/custom/athlete-availability-grid"
 import { LogoutButton } from "@/components/custom/logout-button"
 import { saveAthleteProfile } from "@/lib/actions/profile"
 import type { AddressWithCoords } from "@/lib/types/address"
@@ -120,7 +120,7 @@ export function HomeClient({ email, profile }: HomeClientProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ConstraintsTapGrid
+            <AthleteAvailabilityGrid
               value={constraintsGrid}
               onChange={setConstraintsGrid}
             />

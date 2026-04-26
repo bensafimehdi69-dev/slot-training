@@ -29,12 +29,15 @@ import { CampaignCard } from "./campaign-card"
 import type { Group } from "@/lib/types/group"
 import type { Campaign } from "@/lib/types/campaign"
 import type { AddressWithCoords } from "@/lib/types/address"
-import type { ConstraintsGrid } from "@/lib/types/profile"
 
-function createDefaultAvailableSlots(): ConstraintsGrid {
+// Coach + facility availability is a plain boolean grid — no school/home
+// distinction. The athlete-side ConstraintsGrid moved to a three-state shape
+// in Lot 4, but the coach side stays boolean.
+type AvailableSlots = boolean[][]
+function createDefaultAvailableSlots(): AvailableSlots {
   return Array(7)
     .fill(null)
-    .map(() => Array(16).fill(true))
+    .map(() => Array<boolean>(16).fill(true))
 }
 
 interface CampaignsTabProps {
@@ -49,7 +52,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
   const [timeRangeStart, setTimeRangeStart] = useState("08:00")
   const [timeRangeEnd, setTimeRangeEnd] = useState("20:00")
   const [trainingLocation, setTrainingLocation] = useState<AddressWithCoords | null>(null)
-  const [availableSlots, setAvailableSlots] = useState<ConstraintsGrid>(
+  const [availableSlots, setAvailableSlots] = useState<AvailableSlots>(
     createDefaultAvailableSlots()
   )
 

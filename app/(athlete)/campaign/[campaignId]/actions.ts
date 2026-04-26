@@ -8,7 +8,7 @@ import { readAthleteProfile } from "@/lib/server/profile-service"
 import { readCampaignIndex } from "@/lib/server/indexes"
 import { sendDeletionConfirmation } from "@/lib/utils/email"
 import { addressSchema } from "@/lib/types/address"
-import { dayKeys } from "@/lib/types/schedule"
+import { dayKeys, migrateWeeklySchedule } from "@/lib/types/schedule"
 import type { Campaign, CampaignResponse } from "@/lib/types/campaign"
 import type { AthleteProfile } from "@/lib/types/profile"
 import type { OptimizationResult, IndividualSlot } from "@/lib/types/planning"
@@ -19,14 +19,19 @@ const firestoreId = z.string().min(1).max(128).regex(/^[^/]+$/, "Identifiant inv
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horaire invalide.")
 
-// WeeklySchedule keyed by dayKeys — each day holds a list of HH:MM class
-// start times. Reject unknown keys so a malicious client can't inflate the
-// payload or inject extra data that downstream code might index on.
+// WeeklySchedule keyed by dayKeys. Each day holds a list of busy slots, where
+// each slot now carries an explicit \`location\` ("school" / "home") that the
+// optimiser uses as the actual departure point for the next training trip
+// instead of inferring it from the schedule shape (Lot 4). Reject unknown
+// keys so a malicious client can't inflate the payload or inject extra data.
+const scheduleSlotSchema = z.object({
+  hour: hhmm,
+  location: z.enum(["school", "home"]),
+})
 const weeklyScheduleSchema = z.object(
-  Object.fromEntries(dayKeys.map((k) => [k, z.array(hhmm).max(24)])) as Record<
-    (typeof dayKeys)[number],
-    z.ZodArray<typeof hhmm>
-  >
+  Object.fromEntries(
+    dayKeys.map((k) => [k, z.array(scheduleSlotSchema).max(24)])
+  ) as Record<(typeof dayKeys)[number], z.ZodArray<typeof scheduleSlotSchema>>
 )
 
 const submitResponseSchema = z.object({
@@ -142,7 +147,10 @@ export async function getCampaignForAthlete(
       const rData = responseDoc.data()!
       response = {
         athleteId: uid,
-        schedule: rData.schedule,
+        // Migrate legacy responses that stored \`schedule\` as a plain string[]
+        // of class hours into the new ScheduleSlot[] shape so the form can
+        // render them with the school/home location.
+        schedule: migrateWeeklySchedule(rData.schedule),
         homeAddress: rData.homeAddress,
         schoolAddress: rData.schoolAddress,
         constraints: rData.constraints || "",

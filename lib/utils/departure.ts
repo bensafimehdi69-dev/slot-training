@@ -9,6 +9,15 @@ interface DepartureResult {
   conflictReason?: string
 }
 
+/**
+ * Where is the athlete during the hour right before \`slotStartTime\`, and is
+ * any class running at \`slotStartTime\` itself?
+ *
+ * Lot 4 changed \`DaySchedule\` from a plain string[] of class hours to a
+ * ScheduleSlot[] that records the explicit location ("school" / "home") on
+ * each occupied cell, so we no longer have to guess that "occupied = at
+ * school". The athlete tells us directly.
+ */
 export function getDepartureInfo(
   daySchedule: DaySchedule,
   slotStartTime: string,
@@ -26,32 +35,53 @@ export function getDepartureInfo(
 
   const slotStartMinutes = timeToMinutes(slotStartTime)
 
-  for (const hourStr of daySchedule) {
-    const classStartMinutes = timeToMinutes(hourStr)
+  for (const slot of daySchedule) {
+    const classStartMinutes = timeToMinutes(slot.hour)
     const classEndMinutes = classStartMinutes + 60
     if (classStartMinutes <= slotStartMinutes && classEndMinutes > slotStartMinutes) {
+      const isHome = slot.location === "home"
       return {
-        address: homeAddress,
-        label: "domicile",
+        address: isHome ? homeAddress : (schoolAddress ?? homeAddress),
+        label: isHome ? "domicile" : "école",
         availableFromTime: null,
         conflict: true,
-        conflictReason: `Cours jusqu'à ${minutesToTime(classEndMinutes)}`,
+        conflictReason: isHome
+          ? `À la maison jusqu'à ${minutesToTime(classEndMinutes)}`
+          : `Cours jusqu'à ${minutesToTime(classEndMinutes)}`,
       }
     }
   }
 
-  const sortedClasses = [...daySchedule].map(timeToMinutes).sort((a, b) => a - b)
+  // Find the most recent occupied slot that finishes before the training slot
+  // starts; the location on that slot is the actual departure point.
+  const sortedSlots = [...daySchedule].sort(
+    (a, b) => timeToMinutes(a.hour) - timeToMinutes(b.hour)
+  )
+  let lastSlotBefore: { endMinutes: number; location: "school" | "home" } | null = null
+  for (const slot of sortedSlots) {
+    const startMinutes = timeToMinutes(slot.hour)
+    const endMinutes = startMinutes + 60
+    if (endMinutes <= slotStartMinutes) {
+      lastSlotBefore = { endMinutes, location: slot.location }
+    }
+  }
 
-  const lastClassBeforeSlot = sortedClasses
-    .filter((classStart) => classStart + 60 <= slotStartMinutes)
-    .pop()
-
-  if (lastClassBeforeSlot !== undefined && schoolAddress) {
-    return {
-      address: schoolAddress,
-      label: "école",
-      availableFromTime: minutesToTime(lastClassBeforeSlot + 60),
-      conflict: false,
+  if (lastSlotBefore) {
+    if (lastSlotBefore.location === "school" && schoolAddress) {
+      return {
+        address: schoolAddress,
+        label: "école",
+        availableFromTime: minutesToTime(lastSlotBefore.endMinutes),
+        conflict: false,
+      }
+    }
+    if (lastSlotBefore.location === "home") {
+      return {
+        address: homeAddress,
+        label: "domicile",
+        availableFromTime: minutesToTime(lastSlotBefore.endMinutes),
+        conflict: false,
+      }
     }
   }
 

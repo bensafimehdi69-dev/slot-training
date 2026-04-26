@@ -12,9 +12,13 @@ const firestoreId = z.string().min(1).max(128).regex(/^[^/]+$/, "Identifiant inv
 const inviteTokenSchema = z.string().min(8).max(128)
 const emailSchema = z.string().trim().toLowerCase().email().max(254)
 
-// Constraints grid must be 7 × 16 booleans — a malicious client could ship a
-// 1000×1000 array that stalls the optimizer.
-const constraintsGridSchema = z.array(z.array(z.boolean()).length(16)).length(7)
+// Constraints grid: 7 × 16 three-state cells (training / school / home).
+// A malicious client could otherwise ship a 1000×1000 array that stalls the
+// optimiser. The Lot 4 schema replaces the old boolean[][] payload.
+const constraintCellSchema = z.enum(["training", "school", "home"])
+const constraintsGridSchema = z
+  .array(z.array(constraintCellSchema).length(16))
+  .length(7)
 
 const onboardingDataSchema = z.object({
   firstName: z.string().trim().min(1).max(80),

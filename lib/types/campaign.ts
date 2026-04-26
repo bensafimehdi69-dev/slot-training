@@ -1,5 +1,4 @@
 import type { OptimizationResult } from "./planning"
-import type { ConstraintsGrid } from "./profile"
 import type { WeeklySchedule } from "./schedule"
 
 export interface Campaign {
@@ -13,12 +12,12 @@ export interface Campaign {
     lat: number
     lng: number
   }
-  // Coach + facility availability — same 7×16 grid shape as athlete profiles.
-  // true = the coach AND the room are available for that hour. The optimizer
-  // treats this as a hard constraint: a slot can only be picked if the
-  // corresponding hour cell here is true. Defaults to all-true for legacy
+  // Coach + facility availability — 7 days × 16 hours of plain booleans.
+  // true = the coach AND the room are available for that hour. Distinct
+  // from the athlete's three-state ConstraintsGrid because the coach side
+  // has no "school vs home" notion. Defaults to all-true for legacy
   // campaigns created before this field existed.
-  availableSlots: ConstraintsGrid
+  availableSlots: boolean[][]
   status: "active" | "closed"
   deadline: Date
   createdAt: Date

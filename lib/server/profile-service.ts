@@ -13,6 +13,7 @@ import "server-only"
 import { adminDb } from "@/lib/firebase/admin"
 import { encryptAddress, decryptAddress } from "@/lib/utils/encryption"
 import type { AthleteProfile, ConstraintsGrid } from "@/lib/types/profile"
+import { migrateConstraintsGrid } from "@/lib/types/profile"
 import type { AddressWithCoords } from "@/lib/types/address"
 
 export interface AthleteProfileInput {
@@ -40,17 +41,25 @@ export async function readAthleteProfile(uid: string): Promise<AthleteProfile | 
   if (!doc.exists) return null
 
   const data = doc.data()!
+  // The grid was originally stored as boolean[][]; in Lot 4 it became a
+  // three-state grid. \`migrateConstraintsGrid\` accepts either shape and
+  // upgrades booleans to "training" / "school" so legacy profiles keep
+  // rendering without a one-shot migration script.
+  let rawGrid: unknown = null
+  if (typeof data.constraintsGrid === "string") {
+    try {
+      rawGrid = JSON.parse(data.constraintsGrid)
+    } catch {
+      rawGrid = null
+    }
+  } else if (Array.isArray(data.constraintsGrid)) {
+    rawGrid = data.constraintsGrid
+  }
   return {
     homeAddress: data.homeAddress ? decryptAddress(data.homeAddress) : null,
     schoolAddress: data.schoolAddress ? decryptAddress(data.schoolAddress) : null,
     clubAddress: data.clubAddress ? decryptAddress(data.clubAddress) : null,
-    constraintsGrid: data.constraintsGrid
-      ? typeof data.constraintsGrid === "string"
-        ? JSON.parse(data.constraintsGrid)
-        : data.constraintsGrid
-      : Array(7)
-          .fill(null)
-          .map(() => Array(16).fill(true)),
+    constraintsGrid: migrateConstraintsGrid(rawGrid),
     updatedAt: data.updatedAt?.toDate() || new Date(),
   }
 }

@@ -42,7 +42,8 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import type { AddressWithCoords } from "@/lib/types/address"
-import type { WeeklySchedule, DayKey } from "@/lib/types/schedule"
+import type { WeeklySchedule, DayKey, ScheduleSlot } from "@/lib/types/schedule"
+import type { ConstraintsGrid } from "@/lib/types/profile"
 import { dayKeys } from "@/lib/types/schedule"
 
 // Serializable versions of types (dates as strings)
@@ -117,7 +118,7 @@ interface SerializedProfile {
   homeAddress: AddressWithCoords | null
   schoolAddress: AddressWithCoords | null
   clubAddress: AddressWithCoords | null
-  constraintsGrid: boolean[][]
+  constraintsGrid: ConstraintsGrid
   updatedAt: string
 }
 
@@ -773,12 +774,14 @@ function DeleteDataSection({ campaignId }: { campaignId: string }) {
   )
 }
 
-// Convert the 7x15 constraintsGrid (boolean[][]) to WeeklySchedule
-// constraintsGrid: 7 days (lun-dim) x 15 hours (06:00-20:00)
-// true = available, false = unavailable (has class)
-// WeeklySchedule only covers Mon-Fri
+// Convert the profile's 7×16 ConstraintsGrid into a WeeklySchedule for the
+// campaign response form. The grid spans Sun..Sat with one row per day and
+// 16 cells starting at 07:00; the campaign response only uses Mon–Fri and
+// the campaign's time range. Lot 4 changed cells from boolean to a
+// three-state string ("training" | "school" | "home") and the schedule now
+// stores ScheduleSlot { hour, location } instead of plain strings.
 function constraintsGridToSchedule(
-  grid: boolean[][],
+  grid: ConstraintsGrid,
   timeRangeStart: string,
   timeRangeEnd: string
 ): WeeklySchedule {
@@ -786,25 +789,26 @@ function constraintsGridToSchedule(
   const startHour = parseInt(timeRangeStart.split(":")[0], 10)
   const endHour = parseInt(timeRangeEnd.split(":")[0], 10)
 
-  // constraintsGrid is [dayIndex][hourIndex] where dayIndex 0=Lun ... 4=Ven (5=Sam, 6=Dim)
-  // Hours start at 06:00 -> index 0
-
+  // ConstraintsTapGrid first row is "Dim" (index 0), then Lun (1)…Sam (6).
+  // The athlete profile only fills Mon–Fri, so index into rows 1–5.
+  // Hours in the grid start at 07:00 -> column 0.
+  const GRID_START_HOUR = 7
   const dayMapping: DayKey[] = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"]
 
-  for (let dayIdx = 0; dayIdx < 5; dayIdx++) {
-    const day = dayMapping[dayIdx]
-    if (!grid[dayIdx]) continue
-    const classHours: string[] = []
+  for (let mfIdx = 0; mfIdx < dayMapping.length; mfIdx++) {
+    const day = dayMapping[mfIdx]
+    const gridRow = grid[mfIdx + 1] // skip Dim
+    if (!gridRow) continue
+    const slots: ScheduleSlot[] = []
     for (let h = startHour; h < endHour; h++) {
-      const gridHourIdx = h - 6 // grid starts at 06:00
-      if (gridHourIdx >= 0 && gridHourIdx < grid[dayIdx].length) {
-        // In constraintsGrid, false = unavailable = has class
-        if (!grid[dayIdx][gridHourIdx]) {
-          classHours.push(`${h.toString().padStart(2, "0")}:00`)
-        }
+      const cellIdx = h - GRID_START_HOUR
+      if (cellIdx < 0 || cellIdx >= gridRow.length) continue
+      const cell = gridRow[cellIdx]
+      if (cell === "school" || cell === "home") {
+        slots.push({ hour: `${h.toString().padStart(2, "0")}:00`, location: cell })
       }
     }
-    schedule[day] = classHours
+    schedule[day] = slots
   }
 
   return schedule
