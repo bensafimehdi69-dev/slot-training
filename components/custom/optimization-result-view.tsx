@@ -16,6 +16,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { CheckCircle, XCircle, Clock, Users, User, Loader2 } from "lucide-react"
+import { DailyPlanningView } from "@/components/custom/daily-planning-view"
 import type { OptimizationResult, AthleteSlotInfo, IndividualSlot } from "@/lib/types/planning"
 
 function TravelBadge({ minutes }: { minutes?: number }) {
@@ -128,6 +129,12 @@ export function OptimizationResultView({
 
   return (
     <div className="space-y-4">
+      {/* Per-day planning (new structure from Lot 3b). Falls back gracefully
+          for legacy optimisations whose dailyPlannings array is empty. */}
+      {result.dailyPlannings && result.dailyPlannings.length > 0 && (
+        <DailyPlanningView dailyPlannings={result.dailyPlannings} />
+      )}
+
       {/* Best Slot Summary */}
       <Card>
         <CardHeader className="pb-3">
