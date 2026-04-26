@@ -149,7 +149,14 @@ function AutocompletePicker({
     setShowDropdown(false)
     try {
       const geocoder = new geocoding.Geocoder()
-      const response = await geocoder.geocode({ address: suggestion.fullText })
+      // Resolve by placeId (the exact place the user picked) rather than by
+      // free-form text. Text-based geocoding often snaps to a city or
+      // postcode centroid that can be several kilometres off the real
+      // address; a placeId returns Google's exact coordinates for that
+      // specific listing.
+      const response = suggestion.placeId
+        ? await geocoder.geocode({ placeId: suggestion.placeId })
+        : await geocoder.geocode({ address: suggestion.fullText })
       const first = response.results?.[0]
       if (!first?.geometry?.location) {
         setError("Impossible de localiser cette adresse.")
