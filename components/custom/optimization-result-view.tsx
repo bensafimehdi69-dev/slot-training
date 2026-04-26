@@ -180,8 +180,14 @@ export function OptimizationResultView({
                 </tr>
               </thead>
               <tbody>
-                {allAthletes.map((athlete) => (
-                  <AthleteRow key={athlete.athleteId} athlete={athlete} />
+                {allAthletes.map((athlete, index) => (
+                  // Composite key: an athlete can theoretically appear in both
+                  // available and unavailable lists if upstream data is dirty,
+                  // so include the index to keep React keys unique.
+                  <AthleteRow
+                    key={`${athlete.athleteId}-${index}`}
+                    athlete={athlete}
+                  />
                 ))}
               </tbody>
             </table>
@@ -200,7 +206,13 @@ export function OptimizationResultView({
           </CardHeader>
           <CardContent className="space-y-2">
             {result.individualSlots.map((slot) => (
-              <IndividualSlotCard key={slot.athleteId} slot={slot} />
+              // The same athlete can have two individual sessions in a day
+              // (morning + end-of-day) under the new per-day algorithm, so a
+              // bare athleteId is no longer unique — compose with day+startTime.
+              <IndividualSlotCard
+                key={`${slot.athleteId}-${slot.day}-${slot.startTime}`}
+                slot={slot}
+              />
             ))}
           </CardContent>
         </Card>

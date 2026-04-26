@@ -434,10 +434,14 @@ function scheduleMorningIndividuals(morningCandidates: SlotResult[]): DailySessi
 }
 
 /**
- * Find the SlotResult corresponding to the strongest end-of-day collective
- * across the whole week. This is what the legacy UI surfaces as "best slot".
- * Falls back to the highest-attendance slot anywhere if no end-of-day
- * collective was scheduled.
+ * Pick the SlotResult the legacy dashboard UI should surface as the headline
+ * "best slot". The product preference is end-of-day, so we look in this order:
+ *
+ *   1. The strongest end-of-day collective across the week.
+ *   2. If no end-of-day collective exists (e.g. only one athlete responded),
+ *      the best end-of-day individual session — still respects "fin de
+ *      journée" rather than letting a morning individual win on travel time.
+ *   3. As a last resort, the highest-attendance slot anywhere.
  */
 function pickBestSlotFromPlannings(
   plannings: DailyPlanning[],
@@ -447,19 +451,44 @@ function pickBestSlotFromPlannings(
     .map((p) => p.endOfDaySession)
     .filter((s): s is DailySession => s !== null && s.type === "collective")
 
-  if (endOfDayCollectives.length === 0) return sortedResults[0]
+  if (endOfDayCollectives.length > 0) {
+    const best = endOfDayCollectives.reduce((acc, cur) => {
+      if (cur.athletes.length !== acc.athletes.length) {
+        return cur.athletes.length > acc.athletes.length ? cur : acc
+      }
+      return cur.averageTravelMinutes < acc.averageTravelMinutes ? cur : acc
+    })
+    const bestPlanning = plannings.find((p) => p.endOfDaySession === best)
+    const matching = sortedResults.find(
+      (r) => r.day === bestPlanning?.day && r.startTime === best.startTime
+    )
+    if (matching) return matching
+  }
 
-  const best = endOfDayCollectives.reduce((acc, cur) => {
-    if (cur.athletes.length !== acc.athletes.length) {
-      return cur.athletes.length > acc.athletes.length ? cur : acc
-    }
-    return cur.averageTravelMinutes < acc.averageTravelMinutes ? cur : acc
-  })
-  const bestPlanning = plannings.find((p) => p.endOfDaySession === best)
-  const matching = sortedResults.find(
-    (r) => r.day === bestPlanning?.day && r.startTime === best.startTime
-  )
-  return matching ?? sortedResults[0]
+  const endOfDayAny = plannings
+    .map((p) => p.endOfDaySession)
+    .filter((s): s is DailySession => s !== null)
+
+  if (endOfDayAny.length > 0) {
+    // Prefer the latest start (closest to fin de journée), tiebreak by
+    // attendance, then by travel time.
+    const best = endOfDayAny.reduce((acc, cur) => {
+      const accHour = getStartHour(acc.startTime)
+      const curHour = getStartHour(cur.startTime)
+      if (curHour !== accHour) return curHour > accHour ? cur : acc
+      if (cur.athletes.length !== acc.athletes.length) {
+        return cur.athletes.length > acc.athletes.length ? cur : acc
+      }
+      return cur.averageTravelMinutes < acc.averageTravelMinutes ? cur : acc
+    })
+    const bestPlanning = plannings.find((p) => p.endOfDaySession === best)
+    const matching = sortedResults.find(
+      (r) => r.day === bestPlanning?.day && r.startTime === best.startTime
+    )
+    if (matching) return matching
+  }
+
+  return sortedResults[0]
 }
 
 function collectIndividualSlots(plannings: DailyPlanning[]): IndividualSlot[] {
