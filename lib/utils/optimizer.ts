@@ -10,7 +10,7 @@ import type {
   DailySession,
 } from "@/lib/types/planning"
 import type { AddressWithCoords } from "@/lib/types/address"
-import { getDepartureInfo } from "./departure"
+import { getDepartureInfo, getReturnInfo } from "./departure"
 import { getTravelTime } from "./travel"
 
 interface AthleteData {
@@ -139,6 +139,40 @@ function enumerateUniqueTravelPairs(
   return pairs
 }
 
+/**
+ * Mirror enumeration for the return leg (training → next location). We need
+ * to ask Distance Matrix in the opposite direction for the days where an
+ * athlete has at least one occupied slot after a candidate training slot.
+ * Pre-warming the cache here avoids the inner loop blocking on N round-trips.
+ */
+function enumerateUniqueReturnPairs(
+  athletes: AthleteData[]
+): Array<{ destination: AddressWithCoords; day: DayKey }> {
+  const seen = new Set<string>()
+  const pairs: Array<{ destination: AddressWithCoords; day: DayKey }> = []
+
+  for (const day of dayKeys) {
+    for (const athlete of athletes) {
+      // The athlete might need to go home or to school after training.
+      const homeKey = `${day}|return|${athlete.homeAddress.lat},${athlete.homeAddress.lng}`
+      if (!seen.has(homeKey)) {
+        seen.add(homeKey)
+        pairs.push({ destination: athlete.homeAddress, day })
+      }
+      const daySchedule = athlete.schedule[day] || []
+      const hasSchoolSlot = daySchedule.some((s) => s.location === "school")
+      if (hasSchoolSlot && athlete.schoolAddress) {
+        const schoolKey = `${day}|return|${athlete.schoolAddress.lat},${athlete.schoolAddress.lng}`
+        if (!seen.has(schoolKey)) {
+          seen.add(schoolKey)
+          pairs.push({ destination: athlete.schoolAddress, day })
+        }
+      }
+    }
+  }
+  return pairs
+}
+
 export class MapsUnavailableError extends Error {
   constructor() {
     super("Google Maps a échoué sur la majorité des trajets. Optimisation annulée.")
@@ -154,14 +188,32 @@ export async function optimizeSlots(
   const days = dayKeys
 
   // Pre-warm the travel-time cache in parallel. Every inner call then hits
-  // the cache and runs synchronously.
-  const pairs = enumerateUniqueTravelPairs(athletes)
-  if (pairs.length > 0) {
+  // the cache and runs synchronously. We warm BOTH directions: the trip to
+  // the training and the return trip to the athlete's next location.
+  const departurePairs = enumerateUniqueTravelPairs(athletes)
+  const returnPairs = enumerateUniqueReturnPairs(athletes)
+  const allPairs: Array<{
+    origin: AddressWithCoords
+    destination: AddressWithCoords
+    day: DayKey
+  }> = [
+    ...departurePairs.map((p) => ({
+      origin: p.origin,
+      destination: config.trainingLocation,
+      day: p.day,
+    })),
+    ...returnPairs.map((p) => ({
+      origin: config.trainingLocation,
+      destination: p.destination,
+      day: p.day,
+    })),
+  ]
+  if (allPairs.length > 0) {
     const warmupResults = await Promise.all(
-      pairs.map(({ origin, day }) =>
+      allPairs.map(({ origin, destination, day }) =>
         getTravelTime(
           origin,
-          config.trainingLocation,
+          destination,
           day,
           config.managerUid,
           config.groupId,
@@ -229,6 +281,40 @@ export async function optimizeSlots(
               travelMinutes: travel.durationMinutes,
             })
             continue
+          }
+
+          // Return leg: can the athlete reach their next class on time after
+          // training ends? If not, we mark them unavailable for this slot.
+          const slotEndMinutes = timeToMinutes(slotEnd)
+          const returnInfo = getReturnInfo(
+            daySchedule,
+            slotEnd,
+            athlete.homeAddress,
+            athlete.schoolAddress
+          )
+          if (returnInfo.mustArriveByMinutes !== null) {
+            const returnTravel = await getTravelTime(
+              config.trainingLocation,
+              returnInfo.address,
+              day,
+              config.managerUid,
+              config.groupId,
+              config.campaignId
+            )
+            if (returnTravel) {
+              const reachByMinutes = slotEndMinutes + returnTravel.durationMinutes
+              if (reachByMinutes > returnInfo.mustArriveByMinutes) {
+                unavailableAthletes.push({
+                  athleteId: athlete.athleteId,
+                  firstName: athlete.firstName,
+                  lastName: athlete.lastName,
+                  available: false,
+                  reason: `Trajet retour vers ${returnInfo.label} = ${returnTravel.durationMinutes} min — n'arrive pas avant ${minutesToTime(returnInfo.mustArriveByMinutes)}`,
+                  travelMinutes: travel.durationMinutes,
+                })
+                continue
+              }
+            }
           }
 
           availableAthletes.push({

@@ -93,6 +93,44 @@ export function getDepartureInfo(
   }
 }
 
+interface ReturnResult {
+  // Where the athlete needs to be after the training slot finishes — the
+  // first occupied cell that comes after \`slotEndTime\` decides this. If
+  // there's no next class on the same day we default to "home".
+  address: AddressWithCoords
+  label: "domicile" | "école"
+  // The wall-clock minute the athlete must have arrived at \`address\` by.
+  // null means "no hard deadline today".
+  mustArriveByMinutes: number | null
+}
+
+export function getReturnInfo(
+  daySchedule: DaySchedule,
+  slotEndTime: string,
+  homeAddress: AddressWithCoords,
+  schoolAddress: AddressWithCoords | null
+): ReturnResult {
+  const slotEndMinutes = timeToMinutes(slotEndTime)
+
+  // Sort by start hour then take the first slot that starts at or after the
+  // training ends. (We treat a slot starting exactly at slotEndTime as the
+  // next destination — the athlete must arrive by then.)
+  const sortedSlots = [...(daySchedule ?? [])].sort(
+    (a, b) => timeToMinutes(a.hour) - timeToMinutes(b.hour)
+  )
+  const next = sortedSlots.find((s) => timeToMinutes(s.hour) >= slotEndMinutes)
+  if (!next) {
+    return { address: homeAddress, label: "domicile", mustArriveByMinutes: null }
+  }
+
+  const isHome = next.location === "home"
+  return {
+    address: isHome ? homeAddress : (schoolAddress ?? homeAddress),
+    label: isHome ? "domicile" : "école",
+    mustArriveByMinutes: timeToMinutes(next.hour),
+  }
+}
+
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number)
   return h * 60 + m
