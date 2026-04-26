@@ -122,16 +122,14 @@ interface SerializedProfile {
   updatedAt: string
 }
 
-interface AthleteSlotData {
-  type: "collectif" | "individuel" | "aucun"
-  day?: string
-  startTime?: string
-  endTime?: string
+interface AthleteSession {
+  type: "collectif" | "individuel"
+  day: string
+  startTime: string
+  endTime: string
   departureTime?: string
   travelMinutes?: number
   departureAddress?: string
-  trainingLocation?: string
-  exclusionReason?: string
 }
 
 interface CampaignClientPageProps {
@@ -140,7 +138,7 @@ interface CampaignClientPageProps {
   existingResponse: SerializedResponse | null
   profile: SerializedProfile | null
   athleteFirstName: string
-  athleteSlot: AthleteSlotData | null
+  athleteSessions: AthleteSession[]
   trainingLocation: { formatted: string; lat: number; lng: number }
 }
 
@@ -158,24 +156,24 @@ export function CampaignClientPage({
   existingResponse,
   profile,
   athleteFirstName,
-  athleteSlot,
+  athleteSessions,
   trainingLocation,
 }: CampaignClientPageProps) {
   // If planning is validated, show the planning view
-  if (campaign.planningStatus === "validated" && athleteSlot) {
+  if (campaign.planningStatus === "validated") {
     return (
       <PlanningView
         campaignId={campaignId}
         campaign={campaign}
         athleteFirstName={athleteFirstName}
-        athleteSlot={athleteSlot}
+        athleteSessions={athleteSessions}
         trainingLocation={trainingLocation}
       />
     )
   }
 
-  // If campaign is closed, show closed message
-  if (campaign.status === "closed" && campaign.planningStatus !== "validated") {
+  // If campaign is closed (and we didn't already show the planning view above)
+  if (campaign.status === "closed") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
         <Card className="w-full max-w-md text-center">
@@ -213,18 +211,17 @@ export function CampaignClientPage({
   )
 }
 
-// Planning View Component (Task 21)
 function PlanningView({
   campaignId,
   campaign,
   athleteFirstName,
-  athleteSlot,
+  athleteSessions,
   trainingLocation,
 }: {
   campaignId: string
   campaign: SerializedCampaign
   athleteFirstName: string
-  athleteSlot: AthleteSlotData
+  athleteSessions: AthleteSession[]
   trainingLocation: { formatted: string; lat: number; lng: number }
 }) {
   return (
@@ -236,172 +233,103 @@ function PlanningView({
           </div>
           <CardTitle>Votre planning</CardTitle>
           <CardDescription>
-            Bonjour {athleteFirstName}, voici votre créneau pour la période du{" "}
-            {campaign.startDate} au {campaign.endDate}
+            Bonjour {athleteFirstName}, voici vos {athleteSessions.length}{" "}
+            séance(s) pour la période du {campaign.startDate} au {campaign.endDate}.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {athleteSlot.type === "collectif" && (
-            <div className="space-y-4">
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-blue-600" />
-                  <h3 className="font-semibold text-blue-800">
-                    Creneau collectif
-                  </h3>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Jour</p>
-                    <p className="font-medium">{athleteSlot.day}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Horaire</p>
-                    <p className="font-medium">
-                      {athleteSlot.startTime} - {athleteSlot.endTime}
-                    </p>
-                  </div>
-                  {athleteSlot.departureTime && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Heure de depart
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        <p className="font-medium">
-                          {athleteSlot.departureTime}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {athleteSlot.travelMinutes !== undefined && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Trajet estime
-                      </p>
-                      <TravelTimeBadge minutes={athleteSlot.travelMinutes} />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {athleteSlot.departureAddress && (
-                <div className="flex items-start gap-2 text-sm">
-                  <Navigation className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      Adresse de depart
-                    </p>
-                    <p>{athleteSlot.departureAddress}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-start gap-2 text-sm">
-                <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Lieu d&apos;entraînement
-                  </p>
-                  <p>{trainingLocation.formatted}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {athleteSlot.type === "individuel" && (
-            <div className="space-y-4">
-              <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-orange-600" />
-                  <h3 className="font-semibold text-orange-800">
-                    Creneau individuel
-                  </h3>
-                </div>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Un creneau individuel vous a ete attribue car le creneau
-                  collectif ne correspondait pas à vos disponibilités.
-                </p>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Jour</p>
-                    <p className="font-medium">{athleteSlot.day}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Horaire</p>
-                    <p className="font-medium">
-                      {athleteSlot.startTime} - {athleteSlot.endTime}
-                    </p>
-                  </div>
-                  {athleteSlot.departureTime && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Heure de depart
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        <p className="font-medium">
-                          {athleteSlot.departureTime}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {athleteSlot.travelMinutes !== undefined && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Trajet estime
-                      </p>
-                      <TravelTimeBadge minutes={athleteSlot.travelMinutes} />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {athleteSlot.departureAddress && (
-                <div className="flex items-start gap-2 text-sm">
-                  <Navigation className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      Adresse de depart
-                    </p>
-                    <p>{athleteSlot.departureAddress}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-start gap-2 text-sm">
-                <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Lieu d&apos;entraînement
-                  </p>
-                  <p>{trainingLocation.formatted}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {athleteSlot.type === "aucun" && (
+          {athleteSessions.length === 0 ? (
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
               <div className="mb-2 flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-gray-500" />
                 <h3 className="font-semibold text-gray-700">
-                  Aucun creneau attribue
+                  Aucune séance attribuée
                 </h3>
               </div>
               <p className="text-sm text-muted-foreground">
-                Malheureusement, aucun creneau compatible n&apos;a pu etre
-                trouve pour cette periode. Contactez votre entraineur pour plus
-                d&apos;informations.
+                Aucun créneau compatible n&apos;a pu être trouvé pour cette période.
+                Contactez votre entraîneur pour plus d&apos;informations.
               </p>
             </div>
+          ) : (
+            athleteSessions.map((session, index) => (
+              <SessionCard
+                key={`${session.day}-${session.startTime}-${index}`}
+                session={session}
+              />
+            ))
           )}
+
+          <div className="flex items-start gap-2 text-sm">
+            <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Lieu d&apos;entraînement
+              </p>
+              <p>{trainingLocation.formatted}</p>
+            </div>
+          </div>
 
           <Separator />
 
           <DeleteDataSection campaignId={campaignId} />
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function SessionCard({ session }: { session: AthleteSession }) {
+  const isCollective = session.type === "collectif"
+  const cardClass = isCollective
+    ? "border-blue-200 bg-blue-50"
+    : "border-orange-200 bg-orange-50"
+  const titleClass = isCollective ? "text-blue-800" : "text-orange-800"
+  const iconClass = isCollective ? "text-blue-600" : "text-orange-600"
+  const title = isCollective ? "Créneau collectif" : "Créneau individuel"
+
+  return (
+    <div className={`space-y-3 rounded-lg border p-4 ${cardClass}`}>
+      <div className="flex items-center gap-2">
+        <CheckCircle className={`h-5 w-5 ${iconClass}`} />
+        <h3 className={`font-semibold ${titleClass}`}>{title}</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-xs text-muted-foreground">Jour</p>
+          <p className="font-medium">{session.day}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Horaire</p>
+          <p className="font-medium">
+            {session.startTime} - {session.endTime}
+          </p>
+        </div>
+        {session.departureTime && (
+          <div>
+            <p className="text-xs text-muted-foreground">Heure de départ</p>
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3 text-muted-foreground" />
+              <p className="font-medium">{session.departureTime}</p>
+            </div>
+          </div>
+        )}
+        {session.travelMinutes !== undefined && (
+          <div>
+            <p className="text-xs text-muted-foreground">Trajet estimé</p>
+            <TravelTimeBadge minutes={session.travelMinutes} />
+          </div>
+        )}
+      </div>
+      {session.departureAddress && (
+        <div className="flex items-start gap-2 text-sm">
+          <Navigation className="mt-0.5 h-4 w-4 text-muted-foreground" />
+          <div>
+            <p className="text-xs text-muted-foreground">Adresse de départ</p>
+            <p>{session.departureAddress}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

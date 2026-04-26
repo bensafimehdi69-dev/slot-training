@@ -41,6 +41,16 @@ const submitResponseSchema = z.object({
   constraints: z.string().max(2000),
 })
 
+export interface AthleteSession {
+  type: "collectif" | "individuel"
+  day: string
+  startTime: string
+  endTime: string
+  departureTime?: string
+  travelMinutes?: number
+  departureAddress?: string
+}
+
 interface CampaignForAthlete {
   campaign: Campaign
   response: CampaignResponse | null
@@ -50,17 +60,10 @@ interface CampaignForAthlete {
   athleteEmail: string
   managerUid: string
   groupId: string
-  athleteSlot: {
-    type: "collectif" | "individuel" | "aucun"
-    day?: string
-    startTime?: string
-    endTime?: string
-    departureTime?: string
-    travelMinutes?: number
-    departureAddress?: string
-    trainingLocation?: string
-    exclusionReason?: string
-  } | null
+  trainingLocation: string
+  // All sessions assigned to this athlete across the week. Empty list means
+  // no session was plannable. Populated only when the planning is validated.
+  athleteSessions: AthleteSession[]
 }
 
 export async function getCampaignForAthlete(
@@ -162,14 +165,11 @@ export async function getCampaignForAthlete(
     // session above, so reading via the internal helper is safe.
     const profile = await readAthleteProfile(uid)
 
-    // Find athlete's assigned slot if planning is validated
-    let athleteSlot: CampaignForAthlete["athleteSlot"] = null
+    // Collect every session assigned to this athlete across the week, but
+    // only once the planning has been validated by the manager.
+    let athleteSessions: AthleteSession[] = []
     if (campaignData.planningStatus === "validated" && campaignData.optimizationResult) {
-      athleteSlot = findAthleteSlot(
-        uid,
-        campaignData.optimizationResult,
-        campaignData.trainingLocation.formatted
-      )
+      athleteSessions = findAthleteSessions(uid, campaignData.optimizationResult)
     }
 
     return {
@@ -182,7 +182,8 @@ export async function getCampaignForAthlete(
         athleteEmail: athleteData.email || session.email || "",
         managerUid,
         groupId,
-        athleteSlot,
+        trainingLocation: campaignData.trainingLocation.formatted,
+        athleteSessions,
       },
     }
   } catch (error) {
@@ -317,20 +318,48 @@ export async function deleteAthleteData(
   }
 }
 
-// Helper function to find an athlete's assigned slot
-function findAthleteSlot(
+// Walk the per-day plannings and collect every session that includes this
+// athlete. Falls back to the legacy bestSlot + individualSlots projection if
+// dailyPlannings is empty (campaigns optimised before Lot 3b).
+function findAthleteSessions(
   athleteId: string,
-  result: OptimizationResult,
-  trainingLocation: string
-): CampaignForAthlete["athleteSlot"] {
-  // Check if athlete is in the best collective slot
+  result: OptimizationResult
+): AthleteSession[] {
+  const out: AthleteSession[] = []
+
+  const dailyPlannings = result.dailyPlannings ?? []
+  if (dailyPlannings.length > 0) {
+    for (const planning of dailyPlannings) {
+      const candidates = [
+        planning.endOfDaySession,
+        ...planning.morningSessions,
+      ]
+      for (const session of candidates) {
+        if (!session) continue
+        const member = session.athletes.find((a) => a.athleteId === athleteId)
+        if (!member) continue
+        out.push({
+          type: session.type === "collective" ? "collectif" : "individuel",
+          day: planning.day,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          departureTime: member.departureTime,
+          travelMinutes: member.travelMinutes,
+          departureAddress: member.departureAddress,
+        })
+      }
+    }
+    return dedupeSessions(out)
+  }
+
+  // Legacy fallback: collective bestSlot + the athlete's individual slot.
   const bestSlot = result.bestSlot
   if (bestSlot) {
     const inCollective = bestSlot.availableAthletes.find(
       (a) => a.athleteId === athleteId
     )
     if (inCollective) {
-      return {
+      out.push({
         type: "collectif",
         day: bestSlot.day,
         startTime: bestSlot.startTime,
@@ -338,36 +367,34 @@ function findAthleteSlot(
         departureTime: inCollective.departureTime,
         travelMinutes: inCollective.travelMinutes,
         departureAddress: inCollective.departureAddress,
-        trainingLocation,
-      }
+      })
     }
   }
-
-  // Check if athlete has an individual slot
-  if (result.individualSlots) {
-    const individualSlot = result.individualSlots.find(
-      (s: IndividualSlot) => s.athleteId === athleteId
-    )
-    if (individualSlot) {
-      return {
-        type: "individuel",
-        day: individualSlot.day,
-        startTime: individualSlot.startTime,
-        endTime: individualSlot.endTime,
-        departureTime: individualSlot.departureTime,
-        travelMinutes: individualSlot.travelMinutes,
-        departureAddress: individualSlot.departureAddress,
-        trainingLocation,
-        exclusionReason: individualSlot.exclusionReason,
-      }
-    }
+  for (const slot of result.individualSlots ?? []) {
+    if (slot.athleteId !== athleteId) continue
+    out.push({
+      type: "individuel",
+      day: slot.day,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      departureTime: slot.departureTime,
+      travelMinutes: slot.travelMinutes,
+      departureAddress: slot.departureAddress,
+    })
   }
+  return dedupeSessions(out)
+}
 
-  // No slot assigned
-  return {
-    type: "aucun",
-    trainingLocation,
+function dedupeSessions(sessions: AthleteSession[]): AthleteSession[] {
+  const seen = new Set<string>()
+  const out: AthleteSession[] = []
+  for (const s of sessions) {
+    const key = `${s.day}|${s.startTime}|${s.endTime}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(s)
   }
+  return out
 }
 
 function deserializeOptimizationResult(data: Record<string, unknown>): OptimizationResult {

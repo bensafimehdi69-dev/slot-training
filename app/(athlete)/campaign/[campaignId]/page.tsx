@@ -54,7 +54,7 @@ export default async function CampaignPage({
           : null
       }
       athleteFirstName={data.athleteFirstName}
-      athleteSlot={data.athleteSlot}
+      athleteSessions={data.athleteSessions}
       trainingLocation={data.campaign.trainingLocation}
     />
   )

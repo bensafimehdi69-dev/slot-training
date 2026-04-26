@@ -84,43 +84,66 @@ export async function sendCampaignNotification(
   }
 }
 
+export interface PlanningSession {
+  type: "collectif" | "individuel"
+  day: string
+  startTime: string
+  endTime: string
+  departureTime?: string
+  travelMinutes?: number
+  departureAddress?: string
+}
+
 export async function sendPlanningNotification(
   to: string,
   athleteFirstName: string,
   planningData: {
-    slotType: "collectif" | "individuel" | "aucun"
-    day?: string
-    startTime?: string
-    endTime?: string
-    departureTime?: string
-    travelEstimate?: string
+    // Empty array = the athlete has no plannable session this week. The email
+    // body falls back to a "no slot found" message in that case.
+    sessions: PlanningSession[]
     trainingLocation: string
-    reason?: string
     planningLink: string
+    // Optional reason explaining why no session could be planned, surfaced
+    // when \`sessions\` is empty.
+    reason?: string
   }
 ) {
   try {
-    let content = ""
-    if (planningData.slotType === "collectif" || planningData.slotType === "individuel") {
-      content = `
-        <p>Votre créneau (${esc(planningData.slotType)}) :</p>
-        <ul>
-          <li><strong>Jour :</strong> ${esc(planningData.day)}</li>
-          <li><strong>Horaire :</strong> ${esc(planningData.startTime)} - ${esc(planningData.endTime)}</li>
-          ${planningData.departureTime ? `<li><strong>Heure de départ :</strong> ${esc(planningData.departureTime)}</li>` : ""}
-          ${planningData.travelEstimate ? `<li><strong>Trajet estimé :</strong> ${esc(planningData.travelEstimate)}</li>` : ""}
-          <li><strong>Lieu :</strong> ${esc(planningData.trainingLocation)}</li>
-        </ul>
-      `
+    let content: string
+    if (planningData.sessions.length === 0) {
+      content = `<p>Malheureusement, aucun créneau compatible n'a pu être trouvé pour cette campagne.</p><p>Raison : ${esc(planningData.reason) || "Aucun créneau sans conflit avec votre emploi du temps."}</p>`
     } else {
-      content = `<p>Malheureusement, aucun créneau compatible n'a pu être trouvé.</p><p>Raison : ${esc(planningData.reason) || "Aucun créneau sans conflit de cours."}</p>`
+      const sessionList = planningData.sessions
+        .map((s) => {
+          const travel =
+            s.travelMinutes !== undefined
+              ? `<li><strong>Trajet estimé :</strong> ${s.travelMinutes} min</li>`
+              : ""
+          const departure = s.departureTime
+            ? `<li><strong>Heure de départ :</strong> ${esc(s.departureTime)}</li>`
+            : ""
+          const departureAddress = s.departureAddress
+            ? `<li><strong>Adresse de départ :</strong> ${esc(s.departureAddress)}</li>`
+            : ""
+          return `
+            <li style="margin-bottom:12px">
+              <strong>${esc(s.day)} ${esc(s.startTime)} – ${esc(s.endTime)}</strong>
+              (séance ${esc(s.type)})
+              <ul>${departure}${travel}${departureAddress}</ul>
+            </li>
+          `
+        })
+        .join("")
+      content = `
+        <p>Voici vos ${planningData.sessions.length} séance(s) pour la semaine :</p>
+        <ul>${sessionList}</ul>
+        <p><strong>Lieu d'entraînement :</strong> ${esc(planningData.trainingLocation)}</p>
+      `
     }
 
     const subject = "Votre planning d'entraînement est disponible"
     logEmailInDev(to, subject, {
-      "Slot": planningData.slotType,
-      "Day": planningData.day ?? "-",
-      "Time": `${planningData.startTime ?? ""}-${planningData.endTime ?? ""}`,
+      "Sessions": String(planningData.sessions.length),
       "Link": planningData.planningLink,
     })
     await getResend().emails.send({

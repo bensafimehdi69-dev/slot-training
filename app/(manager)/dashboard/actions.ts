@@ -11,6 +11,7 @@ import {
   sendCampaignUpdatedNotification,
   sendCampaignDeletedNotification,
   sendPlanningNotification,
+  type PlanningSession,
 } from "@/lib/utils/email"
 import {
   writeInviteIndex,
@@ -715,72 +716,122 @@ export async function validatePlanning(groupId: string, campaignId: string) {
   const campaign = campaignDoc.data()!
   const optimResult = campaign.optimizationResult
 
-  if (optimResult?.bestSlot) {
+  if (optimResult) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const athletesSnapshot = await basePath.collection("athletes").get()
     const athleteMap = new Map(athletesSnapshot.docs.map((d) => [d.id, d.data()]))
 
-    // Build the full list of email tasks then `Promise.allSettled` them in a
-    // single fan-out. Sequential fire-and-forget (previous code) could be
-    // cut short by the serverless function terminating before the last
-    // Resend calls resolved; awaiting each one sequentially would balloon
-    // the response time linearly with group size.
-    const tasks: Array<Promise<unknown>> = []
+    // Group sessions by athlete so each athlete receives a SINGLE email
+    // listing every session they've been assigned this week — collective
+    // end-of-day, morning collective, morning individuals, etc.
+    const sessionsByAthlete = new Map<string, PlanningSession[]>()
 
-    // Collective slot
-    for (const athlete of optimResult.bestSlot.availableAthletes) {
-      const info = athleteMap.get(athlete.athleteId)
-      if (!info?.email) continue
-      tasks.push(
-        sendPlanningNotification(info.email, info.firstName || "Athlete", {
-          slotType: "collectif",
-          day: optimResult.bestSlot.day,
-          startTime: optimResult.bestSlot.startTime,
-          endTime: optimResult.bestSlot.endTime,
-          departureTime: athlete.departureTime,
-          travelEstimate: athlete.travelMinutes ? `${athlete.travelMinutes} min` : undefined,
-          trainingLocation: campaign.trainingLocation.formatted,
-          planningLink: `${appUrl}/campaign/${campaignId}`,
-        })
-      )
+    type RawSession = {
+      type: "collective" | "individual"
+      startTime: string
+      endTime: string
+      athletes: Array<{
+        athleteId: string
+        departureTime?: string
+        travelMinutes?: number
+        departureAddress?: string
+      }>
+    }
+    type RawDayPlanning = {
+      day: string
+      endOfDaySession: RawSession | null
+      morningSessions: RawSession[]
     }
 
-    // Individual slots
-    for (const indiv of optimResult.individualSlots || []) {
-      const info = athleteMap.get(indiv.athleteId)
-      if (!info?.email) continue
-      tasks.push(
-        sendPlanningNotification(info.email, info.firstName || "Athlete", {
-          slotType: "individuel",
+    const dailyPlannings = (optimResult.dailyPlannings ?? []) as RawDayPlanning[]
+    if (dailyPlannings.length > 0) {
+      for (const planning of dailyPlannings) {
+        const all: RawSession[] = [
+          ...(planning.endOfDaySession ? [planning.endOfDaySession] : []),
+          ...planning.morningSessions,
+        ]
+        for (const session of all) {
+          for (const a of session.athletes) {
+            const list = sessionsByAthlete.get(a.athleteId) ?? []
+            list.push({
+              type: session.type === "collective" ? "collectif" : "individuel",
+              day: planning.day,
+              startTime: session.startTime,
+              endTime: session.endTime,
+              departureTime: a.departureTime,
+              travelMinutes: a.travelMinutes,
+              departureAddress: a.departureAddress,
+            })
+            sessionsByAthlete.set(a.athleteId, list)
+          }
+        }
+      }
+    } else if (optimResult.bestSlot) {
+      // Legacy fallback: campaigns optimised before Lot 3b only have the
+      // bestSlot + individualSlots projection.
+      type RawAthlete = {
+        athleteId: string
+        departureTime?: string
+        travelMinutes?: number
+        departureAddress?: string
+      }
+      type RawBestSlot = {
+        day: string
+        startTime: string
+        endTime: string
+        availableAthletes: RawAthlete[]
+      }
+      const bestSlot = optimResult.bestSlot as RawBestSlot
+      for (const a of bestSlot.availableAthletes) {
+        const list = sessionsByAthlete.get(a.athleteId) ?? []
+        list.push({
+          type: "collectif",
+          day: bestSlot.day,
+          startTime: bestSlot.startTime,
+          endTime: bestSlot.endTime,
+          departureTime: a.departureTime,
+          travelMinutes: a.travelMinutes,
+          departureAddress: a.departureAddress,
+        })
+        sessionsByAthlete.set(a.athleteId, list)
+      }
+      type RawIndividual = {
+        athleteId: string
+        day: string
+        startTime: string
+        endTime: string
+        departureTime?: string
+        travelMinutes?: number
+        departureAddress?: string
+      }
+      for (const indiv of (optimResult.individualSlots ?? []) as RawIndividual[]) {
+        const list = sessionsByAthlete.get(indiv.athleteId) ?? []
+        list.push({
+          type: "individuel",
           day: indiv.day,
           startTime: indiv.startTime,
           endTime: indiv.endTime,
           departureTime: indiv.departureTime,
-          travelEstimate: indiv.travelMinutes ? `${indiv.travelMinutes} min` : undefined,
-          trainingLocation: campaign.trainingLocation.formatted,
-          planningLink: `${appUrl}/campaign/${campaignId}`,
+          travelMinutes: indiv.travelMinutes,
+          departureAddress: indiv.departureAddress,
         })
-      )
+        sessionsByAthlete.set(indiv.athleteId, list)
+      }
     }
 
-    // No-slot emails for athletes with neither a collective nor an individual slot
-    for (const excluded of optimResult.bestSlot.unavailableAthletes) {
-      const hasIndividual = optimResult.individualSlots?.some(
-        (i: { athleteId: string }) => i.athleteId === excluded.athleteId
-      )
-      if (hasIndividual) continue
-      const info = athleteMap.get(excluded.athleteId)
-      if (!info?.email) continue
+    const tasks: Array<Promise<unknown>> = []
+    for (const athleteDoc of athletesSnapshot.docs) {
+      const info = athleteDoc.data()
+      if (!info.email) continue
+      const sessions = sessionsByAthlete.get(athleteDoc.id) ?? []
       tasks.push(
         sendPlanningNotification(info.email, info.firstName || "Athlete", {
-          slotType: "aucun",
+          sessions,
           trainingLocation: campaign.trainingLocation.formatted,
-          reason: excluded.reason,
           planningLink: `${appUrl}/campaign/${campaignId}`,
         })
       )
     }
-
     await Promise.allSettled(tasks)
   }
 
