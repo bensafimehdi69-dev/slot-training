@@ -41,12 +41,16 @@ interface CampaignConfig {
 // 08:00 bucket. Slots starting outside 07–22 are treated as unavailable.
 const AVAILABILITY_GRID_FIRST_HOUR = 7
 const AVAILABILITY_GRID_HOURS = 16
+// Row order in ConstraintsTapGrid / AthleteAvailabilityGrid is the local
+// week-start convention: Dim=0, Lun=1, …, Sam=6.
 const dayKeyToGridIndex: Record<DayKey, number> = {
-  lundi: 0,
-  mardi: 1,
-  mercredi: 2,
-  jeudi: 3,
-  vendredi: 4,
+  dimanche: 0,
+  lundi: 1,
+  mardi: 2,
+  mercredi: 3,
+  jeudi: 4,
+  vendredi: 5,
+  samedi: 6,
 }
 
 function isSlotAllowed(grid: boolean[][], day: DayKey, slotStart: string): boolean {

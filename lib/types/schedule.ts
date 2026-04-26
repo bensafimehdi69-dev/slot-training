@@ -1,14 +1,34 @@
-export type DayKey = "lundi" | "mardi" | "mercredi" | "jeudi" | "vendredi"
+export type DayKey =
+  | "dimanche"
+  | "lundi"
+  | "mardi"
+  | "mercredi"
+  | "jeudi"
+  | "vendredi"
+  | "samedi"
 
 export const dayLabels: Record<DayKey, string> = {
+  dimanche: "Dimanche",
   lundi: "Lundi",
   mardi: "Mardi",
   mercredi: "Mercredi",
   jeudi: "Jeudi",
   vendredi: "Vendredi",
+  samedi: "Samedi",
 }
 
-export const dayKeys: DayKey[] = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"]
+// Week starts on Sunday (Saudi/Gulf convention) and ends on Saturday — the
+// order here drives every column header in the schedule grid and every loop
+// in the optimiser.
+export const dayKeys: DayKey[] = [
+  "dimanche",
+  "lundi",
+  "mardi",
+  "mercredi",
+  "jeudi",
+  "vendredi",
+  "samedi",
+]
 
 // Each busy hour now records WHERE the athlete is (school or home), so the
 // optimiser can compute the trip from the actual previous location instead
@@ -46,11 +66,13 @@ export function migrateDaySchedule(raw: unknown): DaySchedule {
 
 export function migrateWeeklySchedule(raw: unknown): WeeklySchedule {
   const empty: WeeklySchedule = {
+    dimanche: [],
     lundi: [],
     mardi: [],
     mercredi: [],
     jeudi: [],
     vendredi: [],
+    samedi: [],
   }
   if (!raw || typeof raw !== "object") return empty
   const obj = raw as Record<string, unknown>

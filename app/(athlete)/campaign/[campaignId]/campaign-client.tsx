@@ -594,8 +594,8 @@ function CampaignForm({
                 <ScheduleGrid
                   value={schedule}
                   onChange={setSchedule}
-                  timeRangeStart={campaign.timeRangeStart || "08:00"}
-                  timeRangeEnd={campaign.timeRangeEnd || "20:00"}
+                  timeRangeStart="07:00"
+                  timeRangeEnd="22:00"
                 />
               </div>
               <Button
@@ -789,15 +789,22 @@ function constraintsGridToSchedule(
   const startHour = parseInt(timeRangeStart.split(":")[0], 10)
   const endHour = parseInt(timeRangeEnd.split(":")[0], 10)
 
-  // ConstraintsTapGrid first row is "Dim" (index 0), then Lun (1)…Sam (6).
-  // The athlete profile only fills Mon–Fri, so index into rows 1–5.
-  // Hours in the grid start at 07:00 -> column 0.
+  // ConstraintsTapGrid / AthleteAvailabilityGrid row order is Dim(0)…Sam(6),
+  // which matches the new dayKeys order exactly.
   const GRID_START_HOUR = 7
-  const dayMapping: DayKey[] = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"]
+  const dayMapping: DayKey[] = [
+    "dimanche",
+    "lundi",
+    "mardi",
+    "mercredi",
+    "jeudi",
+    "vendredi",
+    "samedi",
+  ]
 
-  for (let mfIdx = 0; mfIdx < dayMapping.length; mfIdx++) {
-    const day = dayMapping[mfIdx]
-    const gridRow = grid[mfIdx + 1] // skip Dim
+  for (let dayIdx = 0; dayIdx < dayMapping.length; dayIdx++) {
+    const day = dayMapping[dayIdx]
+    const gridRow = grid[dayIdx]
     if (!gridRow) continue
     const slots: ScheduleSlot[] = []
     for (let h = startHour; h < endHour; h++) {

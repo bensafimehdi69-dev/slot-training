@@ -14,6 +14,9 @@ import React from "react"
 interface ScheduleGridProps {
   value: WeeklySchedule
   onChange: (schedule: WeeklySchedule) => void
+  // Default to the athlete's full waking range (07h–22h) so they can mark
+  // school hours that fall outside the campaign's training window. Callers
+  // can override but generally shouldn't.
   timeRangeStart?: string
   timeRangeEnd?: string
 }
@@ -44,8 +47,8 @@ function nextState(state: CellState): CellState {
 export function ScheduleGrid({
   value,
   onChange,
-  timeRangeStart = "08:00",
-  timeRangeEnd = "20:00",
+  timeRangeStart = "07:00",
+  timeRangeEnd = "22:00",
 }: ScheduleGridProps) {
   const hours = generateHours(timeRangeStart, timeRangeEnd)
 
