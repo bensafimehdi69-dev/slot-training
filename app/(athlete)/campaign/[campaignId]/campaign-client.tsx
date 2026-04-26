@@ -138,7 +138,10 @@ interface CampaignClientPageProps {
   existingResponse: SerializedResponse | null
   profile: SerializedProfile | null
   athleteFirstName: string
-  athleteSessions: AthleteSession[]
+  // Optional with a runtime fallback to [] so a stale HMR / cached page
+  // doesn't throw "athleteSessions.length is undefined" when an older render
+  // forgot to pass the new prop.
+  athleteSessions?: AthleteSession[]
   trainingLocation: { formatted: string; lat: number; lng: number }
 }
 
@@ -159,6 +162,8 @@ export function CampaignClientPage({
   athleteSessions,
   trainingLocation,
 }: CampaignClientPageProps) {
+  const sessions = athleteSessions ?? []
+
   // If planning is validated, show the planning view
   if (campaign.planningStatus === "validated") {
     return (
@@ -166,7 +171,7 @@ export function CampaignClientPage({
         campaignId={campaignId}
         campaign={campaign}
         athleteFirstName={athleteFirstName}
-        athleteSessions={athleteSessions}
+        athleteSessions={sessions}
         trainingLocation={trainingLocation}
       />
     )
