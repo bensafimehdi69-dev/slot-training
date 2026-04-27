@@ -1,6 +1,11 @@
 import { Resend } from "resend"
 
-const FROM_EMAIL = "Slot Training <onboarding@resend.dev>"
+// Verified domain on Resend (slot-training.mbapps.cloud — DKIM + SPF + DMARC
+// records added on OVH). Override via RESEND_FROM_EMAIL if you ever need to
+// switch domains without redeploying.
+const FROM_EMAIL =
+  process.env.RESEND_FROM_EMAIL ??
+  "Slot Training <noreply@slot-training.mbapps.cloud>"
 
 // Lazy singleton. Resend's constructor throws synchronously if the key is
 // missing, so instantiating at module scope breaks `next build`'s page-data
