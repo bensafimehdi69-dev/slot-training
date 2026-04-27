@@ -11,6 +11,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ArrowRight,
+  User,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete-map"
 import { AthleteAvailabilityGrid } from "@/components/custom/athlete-availability-grid"
 import { LogoutButton } from "@/components/custom/logout-button"
@@ -48,6 +50,9 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
     profile.constraintsGrid
   )
   const [saving, setSaving] = useState(false)
+  // Tab state lifts up so the sticky "save" bar is only rendered on the
+  // profile tab (it would float meaninglessly over the campaigns list).
+  const [tab, setTab] = useState<"campaigns" | "profile">("campaigns")
 
   async function handleSave() {
     if (!homeAddress) {
@@ -87,100 +92,121 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
       </header>
 
       <main className="container mx-auto max-w-3xl space-y-6 px-4 py-8">
-        <div>
-          <h1 className="text-2xl font-bold">Mon profil</h1>
-          <p className="text-muted-foreground">
-            Gérez vos disponibilités et adresses. Ces informations seront
-            pré-remplies à chaque nouvelle campagne.
-          </p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Mes adresses</CardTitle>
-            <CardDescription>
-              Utilisées pour calculer vos temps de trajet vers l&apos;entraînement.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <AddressAutocompleteMap
-              label="Adresse de domicile"
-              value={homeAddress}
-              onChange={setHomeAddress}
-              required
-            />
-            <AddressAutocompleteMap
-              label="Adresse du lieu d'études (optionnel)"
-              value={schoolAddress}
-              onChange={setSchoolAddress}
-            />
-            <AddressAutocompleteMap
-              label="Adresse du club (optionnel)"
-              value={clubAddress}
-              onChange={setClubAddress}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Mes disponibilités hebdomadaires</CardTitle>
-            <CardDescription>
-              Touchez les créneaux pour indiquer vos indisponibilités (en gris).
-              Vous pourrez toujours ajuster ces dispos spécifiquement pour chaque
-              campagne.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AthleteAvailabilityGrid
-              value={constraintsGrid}
-              onChange={setConstraintsGrid}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-blue-600" />
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as "campaigns" | "profile")}
+        >
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="campaigns" className="flex-1 sm:flex-none">
+              <CalendarDays className="mr-2 h-4 w-4" />
               Mes campagnes
-            </CardTitle>
-            <CardDescription>
-              Toutes les campagnes auxquelles vous êtes invité, avec votre
-              statut de réponse. Cliquez pour répondre, modifier ou voir votre
-              planning.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {campaigns.length === 0 ? (
-              <div className="rounded-md border border-dashed p-6 text-center">
-                <Mail className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Vous n&apos;avez pas encore été invité à une campagne. Vous
-                  recevrez un email dès qu&apos;une campagne sera créée pour
-                  votre groupe.
-                </p>
-              </div>
-            ) : (
-              <ul className="space-y-3">
-                {campaigns.map((c) => (
-                  <CampaignRow key={c.id} campaign={c} />
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+            </TabsTrigger>
+            <TabsTrigger value="profile" className="flex-1 sm:flex-none">
+              <User className="mr-2 h-4 w-4" />
+              Mon profil
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="sticky bottom-4 flex justify-end">
-          <Button size="lg" onClick={handleSave} disabled={saving}>
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Enregistrer les modifications
-          </Button>
-        </div>
+          <TabsContent value="campaigns" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-blue-600" />
+                  Mes campagnes
+                </CardTitle>
+                <CardDescription>
+                  Toutes les campagnes auxquelles vous êtes invité, avec votre
+                  statut de réponse. Cliquez pour répondre, modifier ou voir
+                  votre planning.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {campaigns.length === 0 ? (
+                  <div className="rounded-md border border-dashed p-6 text-center">
+                    <Mail className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Vous n&apos;avez pas encore été invité à une campagne.
+                      Vous recevrez un email dès qu&apos;une campagne sera créée
+                      pour votre groupe.
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {campaigns.map((c) => (
+                      <CampaignRow key={c.id} campaign={c} />
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="profile" className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold">Mon profil</h1>
+              <p className="text-muted-foreground">
+                Gérez vos disponibilités et adresses. Ces informations seront
+                pré-remplies à chaque nouvelle campagne.
+              </p>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Mes adresses</CardTitle>
+                <CardDescription>
+                  Utilisées pour calculer vos temps de trajet vers
+                  l&apos;entraînement.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <AddressAutocompleteMap
+                  label="Adresse de domicile"
+                  value={homeAddress}
+                  onChange={setHomeAddress}
+                  required
+                />
+                <AddressAutocompleteMap
+                  label="Adresse du lieu d'études (optionnel)"
+                  value={schoolAddress}
+                  onChange={setSchoolAddress}
+                />
+                <AddressAutocompleteMap
+                  label="Adresse du club (optionnel)"
+                  value={clubAddress}
+                  onChange={setClubAddress}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Mes disponibilités hebdomadaires</CardTitle>
+                <CardDescription>
+                  Touchez les créneaux pour indiquer vos indisponibilités (en
+                  gris). Vous pourrez toujours ajuster ces dispos spécifiquement
+                  pour chaque campagne.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AthleteAvailabilityGrid
+                  value={constraintsGrid}
+                  onChange={setConstraintsGrid}
+                />
+              </CardContent>
+            </Card>
+
+            <div className="sticky bottom-4 flex justify-end">
+              <Button size="lg" onClick={handleSave} disabled={saving}>
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Enregistrer les modifications
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   )
