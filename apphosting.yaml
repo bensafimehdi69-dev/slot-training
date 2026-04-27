@@ -29,16 +29,9 @@ env:
     secret: NEXT_PUBLIC_FIREBASE_APP_ID
     availability: [BUILD, RUNTIME]
 
-  # --- Firebase Admin (server-only) ---
-  - variable: FIREBASE_ADMIN_PROJECT_ID
-    secret: FIREBASE_ADMIN_PROJECT_ID
-    availability: [RUNTIME]
-  - variable: FIREBASE_ADMIN_CLIENT_EMAIL
-    secret: FIREBASE_ADMIN_CLIENT_EMAIL
-    availability: [RUNTIME]
-  - variable: FIREBASE_ADMIN_PRIVATE_KEY
-    secret: FIREBASE_ADMIN_PRIVATE_KEY
-    availability: [RUNTIME]
+  # --- Firebase Admin ---
+  # No env vars needed: applicationDefault() uses the App Hosting compute
+  # service account, which has roles/firebase.sdkAdminServiceAgent.
 
   # --- Google Maps ---
   - variable: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
