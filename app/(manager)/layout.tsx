@@ -30,8 +30,10 @@ export default async function ManagerLayout({ children }: { children: React.Reac
             <Timer className="h-6 w-6 text-blue-600" />
             Slot Training
           </Link>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <span className="hidden text-sm text-muted-foreground sm:inline">Bonjour, {managerName}</span>
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+            <span className="max-w-[140px] truncate text-sm text-muted-foreground sm:max-w-none">
+              Bonjour, {managerName}
+            </span>
             <LogoutButton />
           </div>
         </div>

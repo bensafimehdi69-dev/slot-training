@@ -82,8 +82,8 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
             <Timer className="h-6 w-6 text-blue-600" />
             Slot Training
           </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <span className="hidden text-sm text-muted-foreground sm:inline">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+            <span className="max-w-[160px] truncate text-sm text-muted-foreground sm:max-w-none">
               {email}
             </span>
             <LogoutButton />
