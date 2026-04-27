@@ -13,8 +13,11 @@ export function AppHeader() {
           Slot Training
         </Link>
         <div className="flex items-center gap-2 sm:gap-4">
+          <Link href="/athlete-login">
+            <Button variant="ghost">Espace athlète</Button>
+          </Link>
           <Link href="/login">
-            <Button variant="ghost">Connexion</Button>
+            <Button variant="ghost">Connexion coach</Button>
           </Link>
           <Link href="/register">
             <Button>Créer un compte</Button>

@@ -114,7 +114,7 @@ export async function sendMagicLink(email: unknown) {
     const resend = new Resend(process.env.RESEND_API_KEY)
 
     await resend.emails.send({
-      from: "Slot Training <onboarding@resend.dev>",
+      from: "Slot Training <noreply@slot-training.mbapps.cloud>",
       to: parsed.data,
       subject: "Vérifiez votre email - Slot Training",
       html: `
