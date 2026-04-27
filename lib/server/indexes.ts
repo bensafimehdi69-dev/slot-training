@@ -20,6 +20,12 @@ import { adminDb } from "@/lib/firebase/admin"
 
 const INVITE_INDEX = "inviteIndex"
 const CAMPAIGN_INDEX = "campaignIndex"
+// athleteMemberships/{athleteUid} stores the (managerUid, groupId) tuples of
+// every group an athlete belongs to, so the athlete-side dashboard can list
+// "Mes campagnes" in a single read instead of scanning every manager. Like
+// the other reverse-index collections, this is admin-only (deny-all client
+// rules).
+const ATHLETE_MEMBERSHIPS = "athleteMemberships"
 
 export interface InviteIndexEntry {
   managerUid: string
@@ -80,6 +86,65 @@ export async function readCampaignIndex(campaignId: string): Promise<CampaignInd
   const data = snap.data()!
   if (typeof data.managerUid !== "string" || typeof data.groupId !== "string") return null
   return { managerUid: data.managerUid, groupId: data.groupId }
+}
+
+export interface AthleteMembership {
+  managerUid: string
+  groupId: string
+  joinedAt: Date
+}
+
+export async function readAthleteMemberships(
+  athleteUid: string
+): Promise<AthleteMembership[]> {
+  const snap = await adminDb.collection(ATHLETE_MEMBERSHIPS).doc(athleteUid).get()
+  if (!snap.exists) return []
+  const data = snap.data()
+  const groups = (data?.groups ?? []) as Array<{
+    managerUid?: unknown
+    groupId?: unknown
+    joinedAt?: { toDate?: () => Date }
+  }>
+  const out: AthleteMembership[] = []
+  for (const g of groups) {
+    if (typeof g.managerUid !== "string" || typeof g.groupId !== "string") continue
+    out.push({
+      managerUid: g.managerUid,
+      groupId: g.groupId,
+      joinedAt: g.joinedAt?.toDate?.() ?? new Date(0),
+    })
+  }
+  return out
+}
+
+/**
+ * Idempotent: registers the athlete as a member of (managerUid, groupId) if
+ * not already recorded. Used both at onboarding (\`completeOnboarding\`) and as
+ * a self-heal on first access from \`getCampaignForAthlete\` so legacy athletes
+ * who joined before this index existed get backfilled lazily.
+ */
+export async function addAthleteMembership(
+  athleteUid: string,
+  managerUid: string,
+  groupId: string
+): Promise<void> {
+  const ref = adminDb.collection(ATHLETE_MEMBERSHIPS).doc(athleteUid)
+  await adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(ref)
+    const current = (snap.exists ? (snap.data()?.groups ?? []) : []) as Array<{
+      managerUid?: string
+      groupId?: string
+    }>
+    const exists = current.some(
+      (g) => g.managerUid === managerUid && g.groupId === groupId
+    )
+    if (exists) return
+    const next = [
+      ...current,
+      { managerUid, groupId, joinedAt: new Date() },
+    ]
+    tx.set(ref, { groups: next }, { merge: true })
+  })
 }
 
 /**

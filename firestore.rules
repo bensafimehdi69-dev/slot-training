@@ -52,6 +52,9 @@ service cloud.firestore {
     match /campaignIndex/{campaignId} {
       allow read, write: if false;
     }
+    match /athleteMemberships/{athleteUid} {
+      allow read, write: if false;
+    }
 
     // Rate-limit counters: server-only. Clients must never read (would
     // leak usage of other buckets) or write (would let an attacker reset

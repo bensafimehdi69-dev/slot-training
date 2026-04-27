@@ -4,7 +4,7 @@ import { z } from "zod"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { createSessionCookie } from "@/lib/firebase/auth"
 import { writeAthleteProfile } from "@/lib/server/profile-service"
-import { readInviteIndex } from "@/lib/server/indexes"
+import { readInviteIndex, addAthleteMembership } from "@/lib/server/indexes"
 import { checkRateLimit, formatRetryAfter, getClientIp } from "@/lib/server/rate-limit"
 import { addressSchema } from "@/lib/types/address"
 
@@ -191,6 +191,9 @@ export async function completeOnboarding(
       clubAddress: data.clubAddress,
       constraintsGrid: data.constraintsGrid,
     })
+
+    // Reverse index for the athlete-side "Mes campagnes" listing.
+    await addAthleteMembership(uid, managerUid, parsedGroupId.data)
 
     return { success: true }
   } catch (error) {

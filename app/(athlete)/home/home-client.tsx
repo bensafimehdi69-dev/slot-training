@@ -1,8 +1,18 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { toast } from "sonner"
-import { Timer, Loader2, Save, Mail } from "lucide-react"
+import {
+  Timer,
+  Loader2,
+  Save,
+  Mail,
+  CalendarDays,
+  CheckCircle2,
+  ArrowRight,
+} from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -17,6 +27,7 @@ import { LogoutButton } from "@/components/custom/logout-button"
 import { saveAthleteProfile } from "@/lib/actions/profile"
 import type { AddressWithCoords } from "@/lib/types/address"
 import type { ConstraintsGrid } from "@/lib/types/profile"
+import type { AthleteCampaignSummary } from "./actions"
 
 interface HomeClientProps {
   email: string
@@ -26,9 +37,10 @@ interface HomeClientProps {
     clubAddress: AddressWithCoords | null
     constraintsGrid: ConstraintsGrid
   }
+  campaigns: AthleteCampaignSummary[]
 }
 
-export function HomeClient({ email, profile }: HomeClientProps) {
+export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
   const [homeAddress, setHomeAddress] = useState(profile.homeAddress)
   const [schoolAddress, setSchoolAddress] = useState(profile.schoolAddress)
   const [clubAddress, setClubAddress] = useState(profile.clubAddress)
@@ -130,17 +142,32 @@ export function HomeClient({ email, profile }: HomeClientProps) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-blue-600" />
-              Campagnes d&apos;entraînement
+              <CalendarDays className="h-5 w-5 text-blue-600" />
+              Mes campagnes
             </CardTitle>
+            <CardDescription>
+              Toutes les campagnes auxquelles vous êtes invité, avec votre
+              statut de réponse. Cliquez pour répondre, modifier ou voir votre
+              planning.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Vous recevez un email à chaque nouvelle campagne avec un lien
-              direct pour répondre. Votre planning validé vous est également
-              envoyé par email — pensez à vérifier vos spams si vous ne le
-              trouvez pas.
-            </p>
+            {campaigns.length === 0 ? (
+              <div className="rounded-md border border-dashed p-6 text-center">
+                <Mail className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Vous n&apos;avez pas encore été invité à une campagne. Vous
+                  recevrez un email dès qu&apos;une campagne sera créée pour
+                  votre groupe.
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {campaigns.map((c) => (
+                  <CampaignRow key={c.id} campaign={c} />
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
 
@@ -157,4 +184,81 @@ export function HomeClient({ email, profile }: HomeClientProps) {
       </main>
     </div>
   )
+}
+
+function CampaignRow({ campaign }: { campaign: AthleteCampaignSummary }) {
+  const isValidated = campaign.planningStatus === "validated"
+  const isClosed = campaign.status === "closed"
+  const ctaLabel = isValidated
+    ? "Voir mon planning"
+    : campaign.hasResponded
+      ? "Modifier ma réponse"
+      : isClosed
+        ? "Voir"
+        : "Répondre"
+
+  return (
+    <li>
+      <Link
+        href={`/campaign/${campaign.id}`}
+        className="flex flex-col gap-2 rounded-md border p-3 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">
+              {campaign.startDate} → {campaign.endDate}
+            </span>
+            <CampaignStatusBadge campaign={campaign} />
+          </div>
+          {campaign.trainingLocation && (
+            <p className="truncate text-xs text-muted-foreground">
+              {campaign.trainingLocation}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {campaign.groupName}
+            {campaign.hasResponded && campaign.respondedAt && (
+              <span className="ml-2 inline-flex items-center gap-1 text-emerald-600">
+                <CheckCircle2 className="h-3 w-3" />
+                Répondu le {formatDate(campaign.respondedAt)}
+              </span>
+            )}
+          </p>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-blue-600">
+          {ctaLabel}
+          <ArrowRight className="h-4 w-4" />
+        </span>
+      </Link>
+    </li>
+  )
+}
+
+function CampaignStatusBadge({ campaign }: { campaign: AthleteCampaignSummary }) {
+  if (campaign.planningStatus === "validated") {
+    return <Badge className="bg-green-600 text-white">Planning validé</Badge>
+  }
+  if (campaign.status === "closed") {
+    return <Badge variant="secondary">Fermée</Badge>
+  }
+  if (campaign.hasResponded) {
+    return <Badge className="bg-blue-600 text-white">Réponse envoyée</Badge>
+  }
+  return (
+    <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-700">
+      À remplir
+    </Badge>
+  )
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })
+  } catch {
+    return iso
+  }
 }

@@ -5,7 +5,7 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { getSession } from "@/lib/firebase/auth"
 import { encryptAddress } from "@/lib/utils/encryption"
 import { readAthleteProfile } from "@/lib/server/profile-service"
-import { readCampaignIndex } from "@/lib/server/indexes"
+import { readCampaignIndex, addAthleteMembership } from "@/lib/server/indexes"
 import { sendDeletionConfirmation } from "@/lib/utils/email"
 import { addressSchema } from "@/lib/types/address"
 import { dayKeys, migrateWeeklySchedule } from "@/lib/types/schedule"
@@ -136,6 +136,10 @@ export async function getCampaignForAthlete(
     if (!athleteDoc.exists) {
       return { error: "Vous ne faites pas partie de ce groupe." }
     }
+
+    // Self-heal: legacy athletes joined before the membership index existed
+    // get backfilled the first time they open a campaign.
+    addAthleteMembership(uid, managerUid, groupId).catch(() => {})
 
     const athleteData = athleteDoc.data()!
 
