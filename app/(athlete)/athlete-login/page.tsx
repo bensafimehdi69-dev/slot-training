@@ -109,7 +109,7 @@ export default function AthleteLoginPage() {
     }
 
     try {
-      const result = await sendAthleteMagicLink(email)
+      const result = await sendAthleteMagicLink(email, redirectUrl)
       if (result.error) {
         toast.error(result.error)
         setLoading(false)

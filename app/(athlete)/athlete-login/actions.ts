@@ -8,6 +8,17 @@ import { checkRateLimit, formatRetryAfter, getClientIp } from "@/lib/server/rate
 const emailSchema = z.string().trim().toLowerCase().email().max(254)
 const idTokenSchema = z.string().min(20).max(8192)
 
+// Same-origin path: starts with `/`, not `//` or `/\` (would be interpreted as
+// protocol-relative and could redirect off-site). Mirrors `isSafeRedirect`
+// in the client page so we can't accept a redirect the page would refuse.
+const redirectSchema = z
+  .string()
+  .max(2048)
+  .refine(
+    (v) => v.startsWith("/") && !v.startsWith("//") && !v.startsWith("/\\"),
+    "Chemin de redirection invalide.",
+  )
+
 function esc(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -17,9 +28,14 @@ function esc(value: string): string {
     .replace(/'/g, "&#39;")
 }
 
-export async function sendAthleteMagicLink(email: unknown) {
+export async function sendAthleteMagicLink(email: unknown, redirect?: unknown) {
   const parsed = emailSchema.safeParse(email)
   if (!parsed.success) return { error: "Email invalide." }
+  const parsedRedirect = redirect === undefined || redirect === null
+    ? null
+    : redirectSchema.safeParse(redirect).success
+      ? (redirect as string)
+      : null
 
   // Same double-bucket pattern as the join magic link — protects Resend
   // reputation and prevents email bombing.
@@ -41,8 +57,16 @@ export async function sendAthleteMagicLink(email: unknown) {
     return { error: `Trop de tentatives. Réessayez dans ${formatRetryAfter(ipRl.retryAfterMs)}.` }
   }
 
+  // Encode email + redirect into the URL so the post-Firebase landing on
+  // /athlete-login can complete the sign-in even when the user clicks the
+  // link from a different browser/device than where they typed their email
+  // (Gmail mobile, in-app browser, etc.). Without this, the page falls back
+  // to localStorage which is per-browser.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  const params = new URLSearchParams({ email: parsed.data })
+  if (parsedRedirect) params.set("redirect", parsedRedirect)
   const actionCodeSettings = {
-    url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/athlete-login`,
+    url: `${appUrl}/athlete-login?${params.toString()}`,
     handleCodeInApp: true,
   }
 
