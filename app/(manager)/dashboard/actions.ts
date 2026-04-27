@@ -3,7 +3,7 @@
 import { randomUUID } from "crypto"
 import { z } from "zod"
 import { requireManager } from "@/lib/firebase/auth"
-import { adminDb } from "@/lib/firebase/admin"
+import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { decryptAddress } from "@/lib/utils/encryption"
 import { optimizeSlots } from "@/lib/utils/optimizer"
 import {
@@ -28,6 +28,30 @@ import type { Campaign } from "@/lib/types/campaign"
 // intentionally keep this permissive but bounded — just enough to reject
 // empty strings, absurdly long input, and path-traversal attempts.
 const firestoreId = z.string().min(1).max(128).regex(/^[^/]+$/, "Identifiant invalide.")
+
+/**
+ * Generate a Firebase one-click sign-in link that lands the athlete on
+ * \`finalPath\` (e.g. \`/campaign/abc\`) without prompting them to type their
+ * email again. The athlete-login page reads the email from the URL params
+ * (\`?email=...\`) on top of localStorage, so the round-trip works even from
+ * a fresh browser. Falls back to a plain link if Firebase fails — the
+ * athlete will still get to the page, just via the normal magic-link form.
+ */
+async function buildAuthenticatedLink(
+  email: string,
+  finalPath: string
+): Promise<string> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  try {
+    return await adminAuth.generateSignInWithEmailLink(email, {
+      url: `${appUrl}/athlete-login?redirect=${encodeURIComponent(finalPath)}&email=${encodeURIComponent(email)}`,
+      handleCodeInApp: true,
+    })
+  } catch (error) {
+    console.error("[AUTH LINK] generateSignInWithEmailLink failed:", error instanceof Error ? error.message : "unknown")
+    return `${appUrl}${finalPath}`
+  }
+}
 
 const groupNameSchema = z.string().trim().min(1, "Le nom du groupe est requis.").max(80)
 
@@ -374,17 +398,20 @@ export async function createCampaign(groupId: string, formData: FormData) {
     .collection("athletes")
     .get()
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
   await Promise.allSettled(
-    athletesSnapshot.docs.map((athleteDoc) => {
+    athletesSnapshot.docs.map(async (athleteDoc) => {
       const athlete = athleteDoc.data()
-      if (!athlete.email) return Promise.resolve()
+      if (!athlete.email) return
+      const responseLink = await buildAuthenticatedLink(
+        athlete.email,
+        `/campaign/${campaignRef.id}`
+      )
       return sendCampaignNotification(athlete.email, athlete.firstName || "Athlete", {
         trainingLocation: input.trainingLocationFormatted,
         startDate: input.startDate,
         endDate: input.endDate,
         deadline: input.deadline,
-        responseLink: `${appUrl}/campaign/${campaignRef.id}`,
+        responseLink,
       })
     })
   )
@@ -498,17 +525,20 @@ export async function updateCampaign(
     .collection("athletes")
     .get()
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
   await Promise.allSettled(
-    athletesSnapshot.docs.map((athleteDoc) => {
+    athletesSnapshot.docs.map(async (athleteDoc) => {
       const athlete = athleteDoc.data()
-      if (!athlete.email) return Promise.resolve()
+      if (!athlete.email) return
+      const responseLink = await buildAuthenticatedLink(
+        athlete.email,
+        `/campaign/${parsedCampaignId.data}`
+      )
       return sendCampaignUpdatedNotification(athlete.email, athlete.firstName || "Athlete", {
         trainingLocation: input.trainingLocationFormatted,
         startDate: input.startDate,
         endDate: input.endDate,
         deadline: input.deadline,
-        responseLink: `${appUrl}/campaign/${parsedCampaignId.data}`,
+        responseLink,
       })
     })
   )
@@ -717,9 +747,7 @@ export async function validatePlanning(groupId: string, campaignId: string) {
   const optimResult = campaign.optimizationResult
 
   if (optimResult) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const athletesSnapshot = await basePath.collection("athletes").get()
-    const athleteMap = new Map(athletesSnapshot.docs.map((d) => [d.id, d.data()]))
 
     // Group sessions by athlete so each athlete receives a SINGLE email
     // listing every session they've been assigned this week — collective
@@ -825,11 +853,17 @@ export async function validatePlanning(groupId: string, campaignId: string) {
       if (!info.email) continue
       const sessions = sessionsByAthlete.get(athleteDoc.id) ?? []
       tasks.push(
-        sendPlanningNotification(info.email, info.firstName || "Athlete", {
-          sessions,
-          trainingLocation: campaign.trainingLocation.formatted,
-          planningLink: `${appUrl}/campaign/${campaignId}`,
-        })
+        (async () => {
+          const planningLink = await buildAuthenticatedLink(
+            info.email,
+            `/campaign/${campaignId}`
+          )
+          return sendPlanningNotification(info.email, info.firstName || "Athlete", {
+            sessions,
+            trainingLocation: campaign.trainingLocation.formatted,
+            planningLink,
+          })
+        })()
       )
     }
     await Promise.allSettled(tasks)

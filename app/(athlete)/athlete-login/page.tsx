@@ -48,8 +48,19 @@ export default function AthleteLoginPage() {
     async function checkMagicLink() {
       if (isSignInWithEmailLink(auth, window.location.href)) {
         setVerifying(true)
-        const storedEmail = localStorage.getItem("athlete_login_email")
-        const storedRedirect = localStorage.getItem("athlete_login_redirect")
+        // Two ways the email reaches this page:
+        // 1. One-click flow from a campaign / planning email — the email is
+        //    encoded in the magic link URL itself (\`?email=...\`), so the
+        //    athlete never had to type it on this device.
+        // 2. Two-step flow — the athlete asked for a magic link earlier and
+        //    we cached their email + intended redirect in localStorage.
+        const params = new URLSearchParams(window.location.search)
+        const urlEmail = params.get("email")
+        const urlRedirect = params.get("redirect")
+        const storedEmail =
+          urlEmail || localStorage.getItem("athlete_login_email")
+        const storedRedirect =
+          urlRedirect || localStorage.getItem("athlete_login_redirect")
 
         if (!storedEmail) {
           toast.error("Veuillez saisir votre email pour compléter la connexion.")
