@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -43,6 +43,8 @@ export function CampaignEditDialog({
   onSaved,
 }: CampaignEditDialogProps) {
   const [saving, setSaving] = useState(false)
+  // Synchronous lock against double-submit while React propagates disabled.
+  const savingRef = useRef(false)
   const [timeRangeStart, setTimeRangeStart] = useState(campaign.timeRangeStart || "08:00")
   const [timeRangeEnd, setTimeRangeEnd] = useState(campaign.timeRangeEnd || "20:00")
   const [trainingLocation, setTrainingLocation] = useState<AddressWithCoords | null>(
@@ -74,25 +76,31 @@ export function CampaignEditDialog({
       : new Date(campaign.deadline as unknown as string).toISOString().slice(0, 10)
 
   async function handleSubmit(formData: FormData) {
+    if (savingRef.current) return
     if (!trainingLocation) {
       toast.error("Sélectionnez un lieu d'entraînement sur la carte.")
       return
     }
+    savingRef.current = true
     setSaving(true)
-    formData.set("timeRangeStart", timeRangeStart)
-    formData.set("timeRangeEnd", timeRangeEnd)
-    formData.set("trainingLocationFormatted", trainingLocation.formatted)
-    formData.set("trainingLocationLat", String(trainingLocation.lat))
-    formData.set("trainingLocationLng", String(trainingLocation.lng))
-    formData.set("availableSlots", JSON.stringify(availableSlots))
-    const result = await updateCampaign(groupId, campaign.id, formData)
-    setSaving(false)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Campagne mise à jour. Les athlètes ont été notifiés.")
-      onOpenChange(false)
-      onSaved()
+    try {
+      formData.set("timeRangeStart", timeRangeStart)
+      formData.set("timeRangeEnd", timeRangeEnd)
+      formData.set("trainingLocationFormatted", trainingLocation.formatted)
+      formData.set("trainingLocationLat", String(trainingLocation.lat))
+      formData.set("trainingLocationLng", String(trainingLocation.lng))
+      formData.set("availableSlots", JSON.stringify(availableSlots))
+      const result = await updateCampaign(groupId, campaign.id, formData)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success("Campagne mise à jour. Les athlètes ont été notifiés.")
+        onOpenChange(false)
+        onSaved()
+      }
+    } finally {
+      savingRef.current = false
+      setSaving(false)
     }
   }
 

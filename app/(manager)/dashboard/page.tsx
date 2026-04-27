@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Plus, Users, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
   const [creatingGroup, setCreatingGroup] = useState(false)
+  // Synchronous lock against double-submit (state propagates to disabled
+  // one render late, so fast double-clicks would slip through).
+  const creatingGroupRef = useRef(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [autoExpandDone, setAutoExpandDone] = useState(false)
 
@@ -54,17 +57,22 @@ export default function DashboardPage() {
 
   const handleCreateGroup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (creatingGroup) return
+    if (creatingGroupRef.current) return
+    creatingGroupRef.current = true
     setCreatingGroup(true)
-    const formData = new FormData(e.currentTarget)
-    const result = await createGroup(formData)
-    setCreatingGroup(false)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Groupe créé avec succès.")
-      setCreateGroupOpen(false)
-      loadGroups()
+    try {
+      const formData = new FormData(e.currentTarget)
+      const result = await createGroup(formData)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success("Groupe créé avec succès.")
+        setCreateGroupOpen(false)
+        loadGroups()
+      }
+    } finally {
+      creatingGroupRef.current = false
+      setCreatingGroup(false)
     }
   }
 

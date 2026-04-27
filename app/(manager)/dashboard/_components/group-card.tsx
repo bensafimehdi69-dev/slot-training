@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 import {
   Users,
@@ -57,32 +57,47 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
   const [editOpen, setEditOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Synchronous locks so a fast double-click can't fire the action twice
+  // while React is still propagating the disabled state.
+  const editingRef = useRef(false)
+  const deletingRef = useRef(false)
 
   const handleEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (editing) return
+    if (editingRef.current) return
+    editingRef.current = true
     setEditing(true)
-    const formData = new FormData(e.currentTarget)
-    const result = await updateGroup(group.id, formData)
-    setEditing(false)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Groupe modifié.")
-      setEditOpen(false)
-      onRefresh()
+    try {
+      const formData = new FormData(e.currentTarget)
+      const result = await updateGroup(group.id, formData)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success("Groupe modifié.")
+        setEditOpen(false)
+        onRefresh()
+      }
+    } finally {
+      editingRef.current = false
+      setEditing(false)
     }
   }
 
   const handleDelete = async () => {
+    if (deletingRef.current) return
+    deletingRef.current = true
     setDeleting(true)
-    const result = await deleteGroup(group.id)
-    setDeleting(false)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Groupe supprimé.")
-      onRefresh()
+    try {
+      const result = await deleteGroup(group.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success("Groupe supprimé.")
+        onRefresh()
+      }
+    } finally {
+      deletingRef.current = false
+      setDeleting(false)
     }
   }
 
