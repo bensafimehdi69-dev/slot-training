@@ -19,7 +19,7 @@ import { StepProgress } from "@/components/custom/step-progress"
 import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete-map"
 import { AthleteAvailabilityGrid } from "@/components/custom/athlete-availability-grid"
 import type { ConstraintCell, ConstraintsGrid } from "@/lib/types/profile"
-import { Timer, CheckCircle, Shield } from "lucide-react"
+import { Timer, Shield } from "lucide-react"
 import { toast } from "sonner"
 import type { AddressWithCoords } from "@/lib/types/address"
 
@@ -154,29 +154,10 @@ export function JoinForm({
       return
     }
 
-    toast.success("Inscription terminée !")
-    setStep(7)
-    setLoading(false)
-  }
-
-  // Completion screen
-  if (step === 7) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <div className="mb-4 flex justify-center">
-              <CheckCircle className="h-16 w-16 text-green-600" />
-            </div>
-            <CardTitle>Inscription terminée !</CardTitle>
-            <CardDescription>
-              Votre profil a été créé. Vous recevrez un email lorsqu&apos;une
-              campagne d&apos;entraînement sera lancée.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    )
+    toast.success("Inscription terminée ! Redirection…")
+    // Full-page navigation so the freshly-set session cookie is picked up by
+    // the proxy (router.push wouldn't re-issue a request).
+    window.location.href = "/home"
   }
 
   return (
