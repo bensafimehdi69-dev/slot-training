@@ -5,7 +5,6 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { createSessionCookie } from "@/lib/firebase/auth"
 import { writeAthleteProfile } from "@/lib/server/profile-service"
 import { readInviteIndex, addAthleteMembership } from "@/lib/server/indexes"
-import { checkRateLimit, formatRetryAfter, getClientIp } from "@/lib/server/rate-limit"
 import { addressSchema } from "@/lib/types/address"
 
 const firestoreId = z.string().min(1).max(128).regex(/^[^/]+$/, "Identifiant invalide.")
@@ -29,20 +28,6 @@ const onboardingDataSchema = z.object({
   clubAddress: addressSchema.nullable(),
   constraintsGrid: constraintsGridSchema,
 })
-
-/**
- * Minimal HTML escape for user-supplied strings interpolated into email
- * templates. Keeps the single-file boundary — this helper is also defined
- * in `lib/utils/email.ts`; a shared util could be extracted in a later pass.
- */
-function esc(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
-}
 
 export async function validateInviteToken(groupId: string, token: string) {
   const parsedGroupId = firestoreId.safeParse(groupId)
@@ -73,62 +58,6 @@ export async function validateInviteToken(groupId: string, token: string) {
       groupName: groupDoc.data()!.name as string,
       managerUid: index.managerUid,
     },
-  }
-}
-
-export async function sendMagicLink(email: unknown) {
-  const parsed = emailSchema.safeParse(email)
-  if (!parsed.success) return { error: "Email invalide." }
-
-  // Double rate limit: per-email (so one attacker can't spam a single
-  // inbox) AND per-IP (so one attacker can't spam many inboxes). Both
-  // windows must allow the request. Resend is the main concern — rate
-  // violations there can get our sender domain blacklisted.
-  const ip = await getClientIp()
-  const emailRl = await checkRateLimit({
-    key: `magic-link:email:${parsed.data}`,
-    max: 3,
-    windowMs: 60 * 60 * 1000, // 3 per hour per email
-  })
-  if (!emailRl.allowed) {
-    return { error: `Trop d'envois pour cet email. Réessayez dans ${formatRetryAfter(emailRl.retryAfterMs)}.` }
-  }
-  const ipRl = await checkRateLimit({
-    key: `magic-link:ip:${ip}`,
-    max: 10,
-    windowMs: 60 * 60 * 1000, // 10 per hour per IP
-  })
-  if (!ipRl.allowed) {
-    return { error: `Trop de tentatives. Réessayez dans ${formatRetryAfter(ipRl.retryAfterMs)}.` }
-  }
-
-  const actionCodeSettings = {
-    url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/join/verify`,
-    handleCodeInApp: true,
-  }
-
-  try {
-    const link = await adminAuth.generateSignInWithEmailLink(parsed.data, actionCodeSettings)
-
-    const { Resend } = await import("resend")
-    const resend = new Resend(process.env.RESEND_API_KEY)
-
-    await resend.emails.send({
-      from: "Slot Training <noreply@slot-training.mbapps.cloud>",
-      to: parsed.data,
-      subject: "Vérifiez votre email - Slot Training",
-      html: `
-        <h2>Bienvenue sur Slot Training !</h2>
-        <p>Cliquez sur le bouton ci-dessous pour vérifier votre email et compléter votre profil :</p>
-        <p><a href="${esc(link)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Vérifier mon email</a></p>
-        <p>Ce lien est valable pendant 1 heure.</p>
-      `,
-    })
-
-    return { success: true }
-  } catch (error) {
-    console.error("[MAGIC LINK] sendMagicLink failed:", error instanceof Error ? error.message : "unknown")
-    return { error: "Impossible d'envoyer l'email. Veuillez réessayer." }
   }
 }
 

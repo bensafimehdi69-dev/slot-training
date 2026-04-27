@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { isSignInWithEmailLink, signInWithEmailLink } from "firebase/auth"
+import { useState } from "react"
+import { signInWithEmailAndPassword } from "firebase/auth"
 import { auth } from "@/lib/firebase/client"
-import { createAthleteSession, sendAthleteMagicLink } from "./actions"
+import { createAthleteSession } from "./actions"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Timer, Mail, Loader2 } from "lucide-react"
+import { Timer } from "lucide-react"
 import { toast } from "sonner"
 
 // Same-origin relative path only: starts with `/`, is not `//...` or `/\...`
@@ -28,14 +28,11 @@ function isSafeRedirect(value: string | null): value is string {
 
 export default function AthleteLoginPage() {
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
-  const [linkSent, setLinkSent] = useState(false)
-  const [verifying, setVerifying] = useState(false)
 
   // Read ?redirect=... once, lazily on first client render. Keeps the page
-  // statically prerenderable (useSearchParams would force a Suspense wrapper)
-  // and avoids the React 19 set-state-in-effect warning that comes from
-  // reading in useEffect.
+  // statically prerenderable (useSearchParams would force a Suspense wrapper).
   const [redirectUrl] = useState<string | null>(() => {
     if (typeof window === "undefined") return null
     const params = new URLSearchParams(window.location.search)
@@ -43,118 +40,40 @@ export default function AthleteLoginPage() {
     return isSafeRedirect(raw) ? raw : null
   })
 
-  // Check if arriving from a magic link
-  useEffect(() => {
-    async function checkMagicLink() {
-      if (isSignInWithEmailLink(auth, window.location.href)) {
-        setVerifying(true)
-        // Two ways the email reaches this page:
-        // 1. One-click flow from a campaign / planning email — the email is
-        //    encoded in the magic link URL itself (\`?email=...\`), so the
-        //    athlete never had to type it on this device.
-        // 2. Two-step flow — the athlete asked for a magic link earlier and
-        //    we cached their email + intended redirect in localStorage.
-        const params = new URLSearchParams(window.location.search)
-        const urlEmail = params.get("email")
-        const urlRedirect = params.get("redirect")
-        const storedEmail =
-          urlEmail || localStorage.getItem("athlete_login_email")
-        const storedRedirect =
-          urlRedirect || localStorage.getItem("athlete_login_redirect")
-
-        if (!storedEmail) {
-          toast.error("Veuillez saisir votre email pour compléter la connexion.")
-          setVerifying(false)
-          return
-        }
-
-        try {
-          const result = await signInWithEmailLink(
-            auth,
-            storedEmail,
-            window.location.href
-          )
-          const idToken = await result.user.getIdToken()
-          await createAthleteSession(idToken)
-
-          localStorage.removeItem("athlete_login_email")
-          localStorage.removeItem("athlete_login_redirect")
-
-          window.location.href = isSafeRedirect(storedRedirect)
-            ? storedRedirect
-            : "/home"
-          return
-        } catch {
-          toast.error("La vérification a échoué. Le lien est peut-être expiré.")
-        }
-        setVerifying(false)
-      }
-    }
-
-    checkMagicLink()
-  }, [])
-
-  async function handleSendLink() {
-    if (!email) {
-      toast.error("Veuillez saisir votre email.")
+  async function handleLogin() {
+    if (!email || !password) {
+      toast.error("Veuillez saisir votre email et votre mot de passe.")
       return
     }
 
     setLoading(true)
-
-    // Store email and redirect in localStorage
-    localStorage.setItem("athlete_login_email", email)
-    if (redirectUrl) {
-      localStorage.setItem("athlete_login_redirect", redirectUrl)
-    }
-
     try {
-      const result = await sendAthleteMagicLink(email, redirectUrl)
+      const credential = await signInWithEmailAndPassword(auth, email, password)
+      const idToken = await credential.user.getIdToken()
+      const result = await createAthleteSession(idToken)
       if (result.error) {
         toast.error(result.error)
         setLoading(false)
         return
       }
-      setLinkSent(true)
-    } catch {
-      toast.error("Impossible d'envoyer l'email.")
+      window.location.href = redirectUrl ?? "/home"
+    } catch (error: unknown) {
+      const code = (error as { code?: string }).code
+      if (
+        code === "auth/invalid-credential" ||
+        code === "auth/wrong-password" ||
+        code === "auth/user-not-found"
+      ) {
+        toast.error("Email ou mot de passe incorrect.")
+      } else if (code === "auth/invalid-email") {
+        toast.error("Adresse email invalide.")
+      } else if (code === "auth/too-many-requests") {
+        toast.error("Trop de tentatives. Réessayez plus tard.")
+      } else {
+        toast.error("Connexion impossible. Veuillez réessayer.")
+      }
+      setLoading(false)
     }
-    setLoading(false)
-  }
-
-  if (verifying) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="space-y-4 text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-muted-foreground">Connexion en cours...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (linkSent) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <div className="mb-4 flex justify-center">
-              <Mail className="h-16 w-16 text-blue-600" />
-            </div>
-            <CardTitle>Vérifiez votre email</CardTitle>
-            <CardDescription>
-              Un lien de connexion a été envoyé à{" "}
-              <span className="font-medium text-foreground">{email}</span>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Cliquez sur le lien dans l&apos;email pour vous connecter.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
   }
 
   return (
@@ -164,15 +83,15 @@ export default function AthleteLoginPage() {
           <div className="mb-4 flex justify-center">
             <Timer className="h-10 w-10 text-blue-600" />
           </div>
-          <CardTitle>Connexion Athlète</CardTitle>
+          <CardTitle>Espace athlète</CardTitle>
           <CardDescription>
-            Connectez-vous avec votre email pour accéder à votre campagne.
+            Connectez-vous pour accéder à vos campagnes.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Votre adresse email</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -181,18 +100,34 @@ export default function AthleteLoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="votre@email.com"
                 required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Mot de passe</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSendLink()
+                  if (e.key === "Enter") handleLogin()
                 }}
               />
             </div>
             <Button
               className="w-full"
-              onClick={handleSendLink}
-              disabled={loading || !email}
+              onClick={handleLogin}
+              disabled={loading || !email || !password}
             >
-              {loading ? "Envoi en cours..." : "Recevoir un lien de connexion"}
+              {loading ? "Connexion en cours..." : "Se connecter"}
             </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Pas encore de compte ? Demandez un lien d&apos;invitation à votre
+              entraîneur.
+            </p>
           </div>
         </CardContent>
       </Card>

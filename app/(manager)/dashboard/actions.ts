@@ -3,7 +3,7 @@
 import { randomUUID } from "crypto"
 import { z } from "zod"
 import { requireManager } from "@/lib/firebase/auth"
-import { adminAuth, adminDb } from "@/lib/firebase/admin"
+import { adminDb } from "@/lib/firebase/admin"
 import { decryptAddress } from "@/lib/utils/encryption"
 import { optimizeSlots } from "@/lib/utils/optimizer"
 import {
@@ -30,27 +30,13 @@ import type { Campaign } from "@/lib/types/campaign"
 const firestoreId = z.string().min(1).max(128).regex(/^[^/]+$/, "Identifiant invalide.")
 
 /**
- * Generate a Firebase one-click sign-in link that lands the athlete on
- * \`finalPath\` (e.g. \`/campaign/abc\`) without prompting them to type their
- * email again. The athlete-login page reads the email from the URL params
- * (\`?email=...\`) on top of localStorage, so the round-trip works even from
- * a fresh browser. Falls back to a plain link if Firebase fails — the
- * athlete will still get to the page, just via the normal magic-link form.
+ * Build the absolute athlete-facing URL for an email body. The athlete will
+ * be redirected to /athlete-login by the proxy if not already signed in,
+ * and bounced back to `finalPath` after entering their password.
  */
-async function buildAuthenticatedLink(
-  email: string,
-  finalPath: string
-): Promise<string> {
+function buildAthleteLink(finalPath: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-  try {
-    return await adminAuth.generateSignInWithEmailLink(email, {
-      url: `${appUrl}/athlete-login?redirect=${encodeURIComponent(finalPath)}&email=${encodeURIComponent(email)}`,
-      handleCodeInApp: true,
-    })
-  } catch (error) {
-    console.error("[AUTH LINK] generateSignInWithEmailLink failed:", error instanceof Error ? error.message : "unknown")
-    return `${appUrl}${finalPath}`
-  }
+  return `${appUrl}${finalPath}`
 }
 
 const groupNameSchema = z.string().trim().min(1, "Le nom du groupe est requis.").max(80)
@@ -402,10 +388,7 @@ export async function createCampaign(groupId: string, formData: FormData) {
     athletesSnapshot.docs.map(async (athleteDoc) => {
       const athlete = athleteDoc.data()
       if (!athlete.email) return
-      const responseLink = await buildAuthenticatedLink(
-        athlete.email,
-        `/campaign/${campaignRef.id}`
-      )
+      const responseLink = buildAthleteLink(`/campaign/${campaignRef.id}`)
       return sendCampaignNotification(athlete.email, athlete.firstName || "Athlete", {
         trainingLocation: input.trainingLocationFormatted,
         startDate: input.startDate,
@@ -529,10 +512,7 @@ export async function updateCampaign(
     athletesSnapshot.docs.map(async (athleteDoc) => {
       const athlete = athleteDoc.data()
       if (!athlete.email) return
-      const responseLink = await buildAuthenticatedLink(
-        athlete.email,
-        `/campaign/${parsedCampaignId.data}`
-      )
+      const responseLink = buildAthleteLink(`/campaign/${parsedCampaignId.data}`)
       return sendCampaignUpdatedNotification(athlete.email, athlete.firstName || "Athlete", {
         trainingLocation: input.trainingLocationFormatted,
         startDate: input.startDate,
@@ -854,10 +834,7 @@ export async function validatePlanning(groupId: string, campaignId: string) {
       const sessions = sessionsByAthlete.get(athleteDoc.id) ?? []
       tasks.push(
         (async () => {
-          const planningLink = await buildAuthenticatedLink(
-            info.email,
-            `/campaign/${campaignId}`
-          )
+          const planningLink = buildAthleteLink(`/campaign/${campaignId}`)
           return sendPlanningNotification(info.email, info.firstName || "Athlete", {
             sessions,
             trainingLocation: campaign.trainingLocation.formatted,
