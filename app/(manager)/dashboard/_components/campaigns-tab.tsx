@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -49,6 +49,11 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  // Synchronous lock against double-submit. The `creating` state propagates
+  // to the disabled prop one render late — fast double-clicks (and Enter
+  // mashing) can fire two submits before the DOM reflects the disabled state.
+  // The ref flips synchronously, so the second handler call exits immediately.
+  const creatingRef = useRef(false)
   const [timeRangeStart, setTimeRangeStart] = useState("08:00")
   const [timeRangeEnd, setTimeRangeEnd] = useState("20:00")
   const [trainingLocation, setTrainingLocation] = useState<AddressWithCoords | null>(null)
@@ -67,27 +72,35 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
   }, [loadCampaigns])
 
   const handleCreateCampaign = async (formData: FormData) => {
+    if (creatingRef.current) return
     if (!trainingLocation) {
       toast.error("Sélectionnez un lieu d'entraînement sur la carte.")
       return
     }
+    creatingRef.current = true
     setCreating(true)
-    formData.set("timeRangeStart", timeRangeStart)
-    formData.set("timeRangeEnd", timeRangeEnd)
-    formData.set("trainingLocationFormatted", trainingLocation.formatted)
-    formData.set("trainingLocationLat", String(trainingLocation.lat))
-    formData.set("trainingLocationLng", String(trainingLocation.lng))
-    formData.set("availableSlots", JSON.stringify(availableSlots))
-    const result = await createCampaign(group.id, formData)
-    setCreating(false)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Campagne créée. Les athlètes ont été notifiés par email.")
-      setCreateOpen(false)
-      setTrainingLocation(null)
-      setAvailableSlots(createDefaultAvailableSlots())
-      loadCampaigns()
+    try {
+      formData.set("timeRangeStart", timeRangeStart)
+      formData.set("timeRangeEnd", timeRangeEnd)
+      formData.set("trainingLocationFormatted", trainingLocation.formatted)
+      formData.set("trainingLocationLat", String(trainingLocation.lat))
+      formData.set("trainingLocationLng", String(trainingLocation.lng))
+      formData.set("availableSlots", JSON.stringify(availableSlots))
+      const result = await createCampaign(group.id, formData)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(
+          "Campagne créée. Les athlètes ont été notifiés par email.",
+        )
+        setCreateOpen(false)
+        setTrainingLocation(null)
+        setAvailableSlots(createDefaultAvailableSlots())
+        loadCampaigns()
+      }
+    } finally {
+      creatingRef.current = false
+      setCreating(false)
     }
   }
 
