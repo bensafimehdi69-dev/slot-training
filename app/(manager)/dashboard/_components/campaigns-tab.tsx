@@ -208,7 +208,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
             </DialogHeader>
             <form action={handleCreateCampaign} className="flex min-h-0 flex-1 flex-col">
               <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-0 sm:py-4 sm:pr-1">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="startDate">{t("startDate")}</Label>
                     <Input id="startDate" name="startDate" type="date" required />
@@ -222,7 +222,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
                   <Label htmlFor="deadline">{t("deadline")}</Label>
                   <Input id="deadline" name="deadline" type="date" required />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label>{t("timeRangeStart")}</Label>
                     <Select value={timeRangeStart} onValueChange={setTimeRangeStart}>
@@ -340,6 +340,9 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
               campaign={campaign}
               responders={campaign.responders}
               onRefresh={loadCampaigns}
+              onLocalRemove={(id) =>
+                setCampaigns((prev) => prev.filter((c) => c.id !== id))
+              }
             />
           ))}
         </div>

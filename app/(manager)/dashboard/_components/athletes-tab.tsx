@@ -124,38 +124,54 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
           {t("noAthletes")}
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {athletes.map((athlete) => (
             <div
               key={athlete.id}
-              className="flex items-center justify-between gap-2 rounded-lg border p-3"
+              // Single-line athlete row: name + email truncate to share the
+              // remaining space, status pill and trash button stay on the
+              // right. On a 360px screen the email gets clipped before the
+              // pill — that's the deliberate trade-off for fitting one row.
+              className="flex items-center gap-2 rounded-md border px-2 py-1.5"
             >
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {athlete.firstName} {athlete.lastName}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">{athlete.email}</p>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {athlete.hasProfile ? (
-                    <Badge className="bg-green-600 text-white text-xs">{t("profileComplete")}</Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-xs">{t("profilePending")}</Badge>
-                  )}
-                  {athlete.gdprConsent && (
-                    <Badge variant="secondary" className="text-xs">{t("gdprBadge")}</Badge>
-                  )}
-                </div>
+              <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+                <p className="truncate text-sm font-medium">
+                  {athlete.firstName} {athlete.lastName}
+                </p>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {athlete.email}
+                </p>
               </div>
+              {athlete.hasProfile ? (
+                <span
+                  className="shrink-0 inline-block h-2 w-2 rounded-full bg-green-600"
+                  aria-label={t("profileComplete")}
+                  title={t("profileComplete")}
+                />
+              ) : (
+                <span
+                  className="shrink-0 inline-block h-2 w-2 rounded-full border border-muted-foreground/40"
+                  aria-label={t("profilePending")}
+                  title={t("profilePending")}
+                />
+              )}
+              {athlete.gdprConsent && (
+                <Badge
+                  variant="secondary"
+                  className="shrink-0 px-1.5 py-0 text-[10px] leading-4"
+                >
+                  {t("gdprBadge")}
+                </Badge>
+              )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
                     aria-label={t("removeAthlete")}
                   >
-                    <Trash2 className="h-4 w-4 text-red-500" />
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>

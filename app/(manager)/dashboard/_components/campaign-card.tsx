@@ -58,9 +58,13 @@ interface CampaignCardProps {
   // optional only as a defensive default for future callers.
   responders?: CampaignResponder[]
   onRefresh: () => void
+  // Optimistic removal — the parent drops the campaign from its list
+  // immediately so the card disappears the instant the manager confirms,
+  // without waiting on the server round-trip + refetch.
+  onLocalRemove?: (campaignId: string) => void
 }
 
-export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: CampaignCardProps) {
+export function CampaignCard({ groupId, campaign, responders = [], onRefresh, onLocalRemove }: CampaignCardProps) {
   const t = useTranslations("campaigns")
   const tp = useTranslations("planning")
   const tc = useTranslations("common")
@@ -123,13 +127,17 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
 
   const handleDelete = async () => {
     setDeleting(true)
+    // Drop the card from the list immediately; if the server rejects the
+    // delete we surface the error and trigger a refresh that resurrects
+    // the card with its real state.
+    onLocalRemove?.(campaign.id)
     const result = await deleteCampaign(groupId, campaign.id)
     setDeleting(false)
     if (result.error) {
       toast.error(result.error)
+      onRefresh()
     } else {
       toast.success(t("campaignDeleted"))
-      onRefresh()
     }
   }
 
