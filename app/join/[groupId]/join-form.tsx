@@ -18,6 +18,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { StepProgress } from "@/components/custom/step-progress"
 import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete-map"
 import { AthleteAvailabilityGrid } from "@/components/custom/athlete-availability-grid"
+import { AvatarPicker } from "@/components/custom/avatar-picker"
+import { setAthleteAvatar } from "@/lib/actions/profile"
 import type { ConstraintCell, ConstraintsGrid } from "@/lib/types/profile"
 import { Timer, Shield } from "lucide-react"
 import { toast } from "sonner"
@@ -49,9 +51,11 @@ export function JoinForm({
   const [passwordConfirm, setPasswordConfirm] = useState("")
   const [idToken, setIdToken] = useState("")
 
-  // Step 3: Name
+  // Step 3: Name + optional avatar (uploaded after onboarding finishes so
+  // the session cookie is already in place).
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
+  const [avatar, setAvatar] = useState<File | null>(null)
 
   // Step 4: Home address
   const [homeAddress, setHomeAddress] = useState<AddressWithCoords | null>(null)
@@ -155,6 +159,18 @@ export function JoinForm({
       toast.error(result.error)
       setLoading(false)
       return
+    }
+
+    // Upload the optional avatar before navigating away. Failure is logged
+    // but doesn't block the redirect — the athlete can re-upload from
+    // their profile.
+    if (avatar) {
+      const avatarFormData = new FormData()
+      avatarFormData.set("file", avatar)
+      const avatarResult = await setAthleteAvatar(avatarFormData)
+      if (avatarResult.error) {
+        toast.error(`Profil créé mais photo non envoyée : ${avatarResult.error}`)
+      }
     }
 
     toast.success(t("successDone"))
@@ -270,6 +286,15 @@ export function JoinForm({
 
           {step === 3 && (
             <div className="space-y-4">
+              <div className="flex flex-col items-center gap-2">
+                <AvatarPicker
+                  name={`${firstName} ${lastName}`}
+                  size={72}
+                  ariaLabel="Photo de profil"
+                  onChange={setAvatar}
+                />
+                <p className="text-xs text-muted-foreground">{t("step3AvatarOptional")}</p>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="firstName">{t("step3FirstName")}</Label>
                 <Input

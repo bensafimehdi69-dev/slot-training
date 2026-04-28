@@ -75,28 +75,44 @@ export function AvatarUpload({
     }
   }
 
+  // Once a photo is set, the avatar itself becomes the click target and the
+  // camera badge disappears — the photo is its own affordance. Without a
+  // photo, the badge shows so the user knows they can upload.
+  const hasPhoto = Boolean(displayedSrc)
+  const interactive = !readOnly
+
   return (
     <div className={cn("relative inline-block", className)}>
-      <Avatar src={displayedSrc} name={name} size={size} alt={ariaLabel ?? name} />
-      {!readOnly && (
+      <button
+        type="button"
+        disabled={!interactive || uploading}
+        onClick={() => interactive && inputRef.current?.click()}
+        className={cn(
+          "block rounded-full",
+          interactive && "cursor-pointer",
+          uploading && "opacity-70",
+        )}
+        aria-label={ariaLabel ?? "Changer la photo"}
+      >
+        <Avatar src={displayedSrc} name={name} size={size} alt={ariaLabel ?? name} />
+      </button>
+      {interactive && (
         <>
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => inputRef.current?.click()}
-            className={cn(
-              "absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full",
-              "border border-white bg-blue-600 text-white shadow",
-              "hover:bg-blue-700 disabled:bg-blue-400",
-            )}
-            aria-label={ariaLabel ?? "Changer la photo"}
-          >
-            {uploading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Camera className="h-3.5 w-3.5" />
-            )}
-          </button>
+          {(uploading || !hasPhoto) && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full",
+                "border border-white bg-blue-600 text-white shadow",
+              )}
+            >
+              {uploading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Camera className="h-3.5 w-3.5" />
+              )}
+            </span>
+          )}
           <input
             ref={inputRef}
             type="file"

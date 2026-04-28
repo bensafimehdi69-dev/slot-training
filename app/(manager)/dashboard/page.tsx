@@ -17,9 +17,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { getGroups, createGroup, runScheduledCampaignTasks } from "./actions"
+import { getGroups, createGroup, runScheduledCampaignTasks, setGroupAvatar } from "./actions"
 import { GroupCard } from "./_components/group-card"
 import { NotificationsToggle } from "@/components/custom/notifications-toggle"
+import { AvatarPicker } from "@/components/custom/avatar-picker"
 import type { Group } from "@/lib/types/group"
 
 export default function DashboardPage() {
@@ -34,6 +35,11 @@ export default function DashboardPage() {
   const creatingGroupRef = useRef(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [autoExpandDone, setAutoExpandDone] = useState(false)
+  // Optional avatar picked in the New Group dialog. Held locally so it
+  // survives until the create call returns the new group id, then uploaded
+  // via setGroupAvatar.
+  const [newGroupAvatar, setNewGroupAvatar] = useState<File | null>(null)
+  const [groupNameDraft, setGroupNameDraft] = useState("")
 
   const loadGroups = useCallback(async () => {
     const result = await getGroups()
@@ -105,11 +111,25 @@ export default function DashboardPage() {
       const result = await createGroup(formData)
       if (result.error) {
         toast.error(result.error)
-      } else {
-        toast.success(t("groupCreated"))
-        setCreateGroupOpen(false)
-        loadGroups()
+        return
       }
+      // Group created — if the manager picked a photo in the dialog, fire
+      // the avatar upload now that we have the new id. Failure here is
+      // surfaced as a toast but doesn't roll back the group creation; the
+      // photo can be re-added later from the group card.
+      if (result.data?.id && newGroupAvatar) {
+        const avatarFormData = new FormData()
+        avatarFormData.set("file", newGroupAvatar)
+        const avatarResult = await setGroupAvatar(result.data.id, avatarFormData)
+        if (avatarResult.error) {
+          toast.error(`Groupe créé mais photo non envoyée : ${avatarResult.error}`)
+        }
+      }
+      toast.success(t("groupCreated"))
+      setCreateGroupOpen(false)
+      setNewGroupAvatar(null)
+      setGroupNameDraft("")
+      loadGroups()
     } finally {
       creatingGroupRef.current = false
       setCreatingGroup(false)
@@ -140,7 +160,18 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <NotificationsToggle />
-          <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
+          <Dialog
+            open={createGroupOpen}
+            onOpenChange={(open) => {
+              setCreateGroupOpen(open)
+              // Discard the staged avatar + name draft when the dialog
+              // closes without submitting, so the next open starts empty.
+              if (!open) {
+                setNewGroupAvatar(null)
+                setGroupNameDraft("")
+              }
+            }}
+          >
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
@@ -154,9 +185,24 @@ export default function DashboardPage() {
             </DialogHeader>
             <form onSubmit={handleCreateGroup}>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">{t("groupNameLabel")}</Label>
-                  <Input id="name" name="name" placeholder={t("groupNamePlaceholder")} required />
+                <div className="flex items-start gap-4">
+                  <AvatarPicker
+                    name={groupNameDraft || undefined}
+                    size={64}
+                    ariaLabel="Photo du groupe"
+                    onChange={setNewGroupAvatar}
+                  />
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="name">{t("groupNameLabel")}</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      placeholder={t("groupNamePlaceholder")}
+                      required
+                      value={groupNameDraft}
+                      onChange={(e) => setGroupNameDraft(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
               <DialogFooter>
