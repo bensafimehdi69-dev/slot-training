@@ -1,7 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
-import { useLocale } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import { Globe, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,6 +21,7 @@ import { setLocale } from "@/lib/actions/locale"
  * server components re-render with new messages.
  */
 export function LanguagePicker({ className }: { className?: string }) {
+  const tc = useTranslations("common")
   const locale = useLocale() as Locale
   const [pending, startTransition] = useTransition()
 
@@ -43,7 +44,7 @@ export function LanguagePicker({ className }: { className?: string }) {
           size="sm"
           className={className}
           disabled={pending}
-          aria-label="Language"
+          aria-label={tc("language")}
         >
           <Globe className="mr-2 h-4 w-4" />
           {localeNames[locale]}

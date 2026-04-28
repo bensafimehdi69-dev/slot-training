@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -27,6 +28,7 @@ interface DailyPlanningViewProps {
  * full week at a glance and can spot empty days that may need a follow-up.
  */
 export function DailyPlanningView({ dailyPlannings }: DailyPlanningViewProps) {
+  const tp = useTranslations("planning")
   if (dailyPlannings.length === 0) return null
 
   const totalSessions = dailyPlannings.reduce(
@@ -40,7 +42,7 @@ export function DailyPlanningView({ dailyPlannings }: DailyPlanningViewProps) {
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-blue-600" />
-          Planning par jour ({totalSessions} séance(s))
+          {tp("perDayTitle", { count: totalSessions })}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -53,6 +55,7 @@ export function DailyPlanningView({ dailyPlannings }: DailyPlanningViewProps) {
 }
 
 function DayBlock({ planning }: { planning: DailyPlanning }) {
+  const tp = useTranslations("planning")
   const hasAny =
     planning.endOfDaySession !== null || planning.morningSessions.length > 0
 
@@ -62,7 +65,7 @@ function DayBlock({ planning }: { planning: DailyPlanning }) {
         <p className="font-medium">{planning.day}</p>
         {!hasAny && (
           <span className="text-xs italic text-muted-foreground">
-            Aucune séance plannable
+            {tp("noSession")}
           </span>
         )}
       </div>
@@ -90,8 +93,9 @@ function SessionRow({
   session: DailySession
   window: "morning" | "end-of-day"
 }) {
+  const tp = useTranslations("planning")
   const Icon = window === "morning" ? Sunrise : Moon
-  const windowLabel = window === "morning" ? "Matin" : "Fin de journée"
+  const windowLabel = window === "morning" ? tp("morning") : tp("endOfDay")
 
   return (
     <div className="rounded-md bg-muted/50 px-3 py-2">
@@ -110,7 +114,7 @@ function SessionRow({
         {session.type === "collective" ? (
           <Badge className="shrink-0 bg-blue-600 text-white">
             <Users className="mr-1 h-3 w-3" />
-            Coll. {session.athletes.length}
+            {tp("collective")} {session.athletes.length}
           </Badge>
         ) : (
           <Badge
@@ -118,7 +122,7 @@ function SessionRow({
             className="shrink-0 border-blue-300 bg-blue-50 text-blue-700"
           >
             <User className="mr-1 h-3 w-3" />
-            Indiv.
+            {tp("individual")}
           </Badge>
         )}
       </div>

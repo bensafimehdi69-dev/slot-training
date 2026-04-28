@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,6 +43,8 @@ export function CampaignEditDialog({
   campaign,
   onSaved,
 }: CampaignEditDialogProps) {
+  const t = useTranslations("campaigns")
+  const tc = useTranslations("common")
   const [saving, setSaving] = useState(false)
   // Synchronous lock against double-submit while React propagates disabled.
   const savingRef = useRef(false)
@@ -78,7 +81,7 @@ export function CampaignEditDialog({
   async function handleSubmit(formData: FormData) {
     if (savingRef.current) return
     if (!trainingLocation) {
-      toast.error("Sélectionnez un lieu d'entraînement sur la carte.")
+      toast.error(t("selectLocationError"))
       return
     }
     savingRef.current = true
@@ -94,7 +97,7 @@ export function CampaignEditDialog({
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success("Campagne mise à jour. Les athlètes ont été notifiés.")
+        toast.success(t("campaignUpdated"))
         onOpenChange(false)
         onSaved()
       }
@@ -119,17 +122,14 @@ export function CampaignEditDialog({
         }}
       >
         <DialogHeader className="border-b p-4 sm:border-b-0 sm:p-0">
-          <DialogTitle>Modifier la campagne</DialogTitle>
-          <DialogDescription>
-            Toute modification réinitialise l&apos;optimisation et envoie un email
-            de mise à jour aux athlètes du groupe.
-          </DialogDescription>
+          <DialogTitle>{t("editTitle")}</DialogTitle>
+          <DialogDescription>{t("editDescription")}</DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-0 sm:py-4 sm:pr-1">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-startDate">Date de début</Label>
+                <Label htmlFor="edit-startDate">{t("startDate")}</Label>
                 <Input
                   id="edit-startDate"
                   name="startDate"
@@ -139,7 +139,7 @@ export function CampaignEditDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-endDate">Date de fin</Label>
+                <Label htmlFor="edit-endDate">{t("endDate")}</Label>
                 <Input
                   id="edit-endDate"
                   name="endDate"
@@ -150,7 +150,7 @@ export function CampaignEditDialog({
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-deadline">Date limite de réponse</Label>
+              <Label htmlFor="edit-deadline">{t("deadline")}</Label>
               <Input
                 id="edit-deadline"
                 name="deadline"
@@ -161,44 +161,41 @@ export function CampaignEditDialog({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Heure début plage</Label>
+                <Label>{t("timeRangeStart")}</Label>
                 <Select value={timeRangeStart} onValueChange={setTimeRangeStart}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {startTimeOptions.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    {startTimeOptions.map((time) => (
+                      <SelectItem key={time} value={time}>{time}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Heure fin plage</Label>
+                <Label>{t("timeRangeEnd")}</Label>
                 <Select value={timeRangeEnd} onValueChange={setTimeRangeEnd}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {endTimeOptions.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    {endTimeOptions.map((time) => (
+                      <SelectItem key={time} value={time}>{time}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <AddressAutocompleteMap
-              label="Lieu d'entraînement"
+              label={t("trainingLocation")}
               value={trainingLocation}
               onChange={setTrainingLocation}
               required
             />
             <div className="space-y-2">
-              <Label>Créneaux disponibles entraîneur + salle</Label>
-              <p className="text-xs text-muted-foreground">
-                Touchez les créneaux indisponibles. Seules les cases vertes
-                seront proposées comme séances.
-              </p>
+              <Label>{t("availableSlots")}</Label>
+              <p className="text-xs text-muted-foreground">{t("availableSlotsHint")}</p>
               <ConstraintsTapGrid
                 value={availableSlots}
                 onChange={setAvailableSlots}
@@ -212,7 +209,7 @@ export function CampaignEditDialog({
               className="w-full sm:w-auto"
             >
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Enregistrer
+              {tc("save")}
             </Button>
           </DialogFooter>
         </form>

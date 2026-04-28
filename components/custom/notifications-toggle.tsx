@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { Bell, BellOff, BellRing, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export function NotificationsToggle({ className }: Props) {
+  const t = useTranslations("notifications")
   const [support, setSupport] = useState<NotificationSupportStatus | null>(null)
   const [enabled, setEnabled] = useState<boolean>(false)
   const [busy, setBusy] = useState(false)
@@ -57,7 +59,7 @@ export function NotificationsToggle({ className }: Props) {
         description: body,
         action: url
           ? {
-              label: "Ouvrir",
+              label: t("open"),
               onClick: () => {
                 window.location.href = url
               },
@@ -74,9 +76,7 @@ export function NotificationsToggle({ className }: Props) {
       const token = await requestPushToken()
       if (!token) {
         // Most common reason: user just denied at the OS prompt.
-        toast.error(
-          "Permission refusée. Activez les notifications pour ce site dans les réglages de votre navigateur."
-        )
+        toast.error(t("permissionDenied"))
         const status = await checkNotificationSupport()
         setSupport(status)
         return
@@ -88,7 +88,7 @@ export function NotificationsToggle({ className }: Props) {
       }
       window.localStorage.setItem(STORAGE_KEY, token)
       setEnabled(true)
-      toast.success("Notifications activées sur cet appareil.")
+      toast.success(t("enabledOnDevice"))
     } finally {
       setBusy(false)
     }
@@ -103,7 +103,7 @@ export function NotificationsToggle({ className }: Props) {
         window.localStorage.removeItem(STORAGE_KEY)
       }
       setEnabled(false)
-      toast.success("Notifications désactivées sur cet appareil.")
+      toast.success(t("disabledOnDevice"))
     } finally {
       setBusy(false)
     }
@@ -122,7 +122,7 @@ export function NotificationsToggle({ className }: Props) {
         }
       >
         <BellOff className="h-4 w-4" />
-        Notifications non supportées sur ce navigateur
+        {t("unsupported")}
       </div>
     )
   }
@@ -142,7 +142,7 @@ export function NotificationsToggle({ className }: Props) {
         }
       >
         <BellOff className="h-4 w-4" />
-        Notifications bloquées — autorisez-les dans les réglages du navigateur
+        {t("blocked")}
       </div>
     )
   }
@@ -161,7 +161,7 @@ export function NotificationsToggle({ className }: Props) {
         ) : (
           <BellRing className="mr-2 h-4 w-4 text-blue-600" />
         )}
-        Notifications activées
+        {t("enabled")}
       </Button>
     )
   }
@@ -179,7 +179,7 @@ export function NotificationsToggle({ className }: Props) {
       ) : (
         <Bell className="mr-2 h-4 w-4" />
       )}
-      Activer les notifications
+      {t("enable")}
     </Button>
   )
 }

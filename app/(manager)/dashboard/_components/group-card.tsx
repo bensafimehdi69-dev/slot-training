@@ -131,7 +131,7 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
           <div className="flex items-center gap-1">
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="Modifier le groupe">
+                <Button variant="ghost" size="sm" aria-label={tc("edit")}>
                   <Pencil className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </DialogTrigger>
@@ -167,7 +167,7 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
                   variant="ghost"
                   size="sm"
                   disabled={deleting}
-                  aria-label="Supprimer le groupe"
+                  aria-label={tc("delete")}
                 >
                   {deleting ? (
                     <Loader2 className="h-4 w-4 animate-spin text-red-500" />

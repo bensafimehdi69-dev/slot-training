@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -46,6 +47,7 @@ interface CampaignsTabProps {
 }
 
 export function CampaignsTab({ group }: CampaignsTabProps) {
+  const t = useTranslations("campaigns")
   const [campaigns, setCampaigns] = useState<ManagerCampaign[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
@@ -119,11 +121,11 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
   const handleCreateCampaign = async (formData: FormData) => {
     if (creatingRef.current) return
     if (!trainingLocation) {
-      toast.error("Sélectionnez un lieu d'entraînement sur la carte.")
+      toast.error(t("selectLocationError"))
       return
     }
     if (athletes.length > 0 && selectedAthleteIds.size === 0) {
-      toast.error("Sélectionnez au moins un athlète destinataire.")
+      toast.error(t("selectAtLeastOneAthlete"))
       return
     }
     creatingRef.current = true
@@ -143,9 +145,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success(
-          "Campagne créée. Les athlètes ont été notifiés par email.",
-        )
+        toast.success(t("campaignCreated"))
         setCreateOpen(false)
         setTrainingLocation(null)
         setAvailableSlots(createDefaultAvailableSlots())
@@ -171,13 +171,13 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">
-          {campaigns.length} campagne(s)
+          {t("tabTitle", { count: campaigns.length })}
         </p>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button size="sm">
               <Plus className="h-4 w-4 mr-2" />
-              Nouvelle campagne
+              {t("newCampaign")}
             </Button>
           </DialogTrigger>
           <DialogContent
@@ -203,66 +203,62 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
             }}
           >
             <DialogHeader className="border-b p-4 sm:border-b-0 sm:p-0">
-              <DialogTitle>Créer une campagne</DialogTitle>
-              <DialogDescription>
-                Définissez la période et les paramètres de la campagne.
-              </DialogDescription>
+              <DialogTitle>{t("createTitle")}</DialogTitle>
+              <DialogDescription>{t("createDescription")}</DialogDescription>
             </DialogHeader>
             <form action={handleCreateCampaign} className="flex min-h-0 flex-1 flex-col">
               <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-0 sm:py-4 sm:pr-1">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="startDate">Date de début</Label>
+                    <Label htmlFor="startDate">{t("startDate")}</Label>
                     <Input id="startDate" name="startDate" type="date" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="endDate">Date de fin</Label>
+                    <Label htmlFor="endDate">{t("endDate")}</Label>
                     <Input id="endDate" name="endDate" type="date" required />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="deadline">Date limite de réponse</Label>
+                  <Label htmlFor="deadline">{t("deadline")}</Label>
                   <Input id="deadline" name="deadline" type="date" required />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Heure début plage</Label>
+                    <Label>{t("timeRangeStart")}</Label>
                     <Select value={timeRangeStart} onValueChange={setTimeRangeStart}>
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {startTimeOptions.map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        {startTimeOptions.map((time) => (
+                          <SelectItem key={time} value={time}>{time}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Heure fin plage</Label>
+                    <Label>{t("timeRangeEnd")}</Label>
                     <Select value={timeRangeEnd} onValueChange={setTimeRangeEnd}>
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {endTimeOptions.map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        {endTimeOptions.map((time) => (
+                          <SelectItem key={time} value={time}>{time}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
                 <AddressAutocompleteMap
-                  label="Lieu d'entraînement"
+                  label={t("trainingLocation")}
                   value={trainingLocation}
                   onChange={setTrainingLocation}
                   required
                 />
                 <div className="space-y-2">
-                  <Label>Créneaux disponibles entraîneur + salle</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Touchez les créneaux indisponibles (coach absent, salle fermée…). Seules les cases vertes seront proposées comme séances. Par défaut, tout est dispo.
-                  </p>
+                  <Label>{t("availableSlots")}</Label>
+                  <p className="text-xs text-muted-foreground">{t("availableSlotsHint")}</p>
                   <ConstraintsTapGrid
                     value={availableSlots}
                     onChange={setAvailableSlots}
@@ -270,27 +266,25 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <Label>Athlètes destinataires</Label>
+                    <Label>{t("targetAthletes")}</Label>
                     {athletes.length > 0 && (
                       <button
                         type="button"
                         onClick={toggleAll}
                         className="text-xs font-medium text-primary hover:underline"
                       >
-                        {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                        {allSelected ? t("deselectAll") : t("selectAll")}
                       </button>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Par défaut, tous les athlètes du groupe reçoivent la campagne. Décochez ceux à exclure.
-                  </p>
+                  <p className="text-xs text-muted-foreground">{t("targetAthletesHint")}</p>
                   {athletesLoading ? (
                     <div className="flex justify-center py-4">
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     </div>
                   ) : athletes.length === 0 ? (
                     <p className="text-xs italic text-muted-foreground">
-                      Aucun athlète dans ce groupe pour le moment.
+                      {t("noAthletesInGroup")}
                     </p>
                   ) : (
                     <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-2">
@@ -321,7 +315,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
                   className="w-full sm:w-auto"
                 >
                   {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Créer la campagne
+                  {t("createCampaign")}
                 </Button>
               </DialogFooter>
             </form>
@@ -335,7 +329,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
         </div>
       ) : campaigns.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-6">
-          Aucune campagne. Créez une campagne pour commencer à collecter les disponibilités.
+          {t("noCampaigns")}
         </p>
       ) : (
         <div className="space-y-3">

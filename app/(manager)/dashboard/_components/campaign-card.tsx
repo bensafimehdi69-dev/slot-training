@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import {
   CalendarDays,
   MapPin,
@@ -60,6 +61,9 @@ interface CampaignCardProps {
 }
 
 export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: CampaignCardProps) {
+  const t = useTranslations("campaigns")
+  const tp = useTranslations("planning")
+  const tc = useTranslations("common")
   const [respondersOpen, setRespondersOpen] = useState(false)
   const [closing, setClosing] = useState(false)
   const [optimizing, setOptimizing] = useState(false)
@@ -83,7 +87,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success("Campagne finalisée.")
+      toast.success(t("campaignFinalized"))
       onRefresh()
     }
   }
@@ -95,7 +99,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success("Optimisation terminée.")
+      toast.success(t("optimizationDone"))
       setShowResult(true)
       onRefresh()
     }
@@ -108,7 +112,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success("Planning validé. Les athlètes ont été notifiés par email.")
+      toast.success(tp("validated"))
       onRefresh()
     }
   }
@@ -120,7 +124,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success("Campagne supprimée. Les athlètes ont été notifiés.")
+      toast.success(t("campaignDeleted"))
       onRefresh()
     }
   }
@@ -132,22 +136,22 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success("Planning rejeté.")
+      toast.success(tp("rejected"))
       onRefresh()
     }
   }
 
   const statusBadge = () => {
     if (campaign.planningStatus === "validated") {
-      return <Badge className="bg-green-600 text-white">Validé</Badge>
+      return <Badge className="bg-green-600 text-white">{t("statusValidated")}</Badge>
     }
     if (campaign.planningStatus === "rejected") {
-      return <Badge variant="destructive">Rejeté</Badge>
+      return <Badge variant="destructive">{t("statusRejected")}</Badge>
     }
     if (campaign.status === "closed") {
-      return <Badge variant="secondary">Finalisée</Badge>
+      return <Badge variant="secondary">{t("statusClosed")}</Badge>
     }
-    return <Badge>Active</Badge>
+    return <Badge>{t("statusActive")}</Badge>
   }
 
   return (
@@ -159,7 +163,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">
-                  {campaign.startDate} au {campaign.endDate}
+                  {t("rangeFromTo", { start: campaign.startDate, end: campaign.endDate })}
                 </span>
                 {statusBadge()}
               </div>
@@ -171,10 +175,12 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span>
-                  Plage : {campaign.timeRangeStart} - {campaign.timeRangeEnd}
+                  {t("timeRange", { start: campaign.timeRangeStart, end: campaign.timeRangeEnd })}
                 </span>
                 <span>
-                  Limite : {new Date(campaign.deadline).toLocaleDateString("fr-FR")}
+                  {t("deadlineShort", {
+                    date: new Date(campaign.deadline).toLocaleDateString(),
+                  })}
                 </span>
                 <button
                   type="button"
@@ -187,12 +193,14 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
                   ) : (
                     <ChevronRight className="h-3 w-3" />
                   )}
-                  {respondedCount} / {targetCount} rempli{targetCount > 1 ? "s" : ""}
+                  {targetCount > 1
+                    ? t("responseCountPlural", { responded: respondedCount, target: targetCount })
+                    : t("responseCount", { responded: respondedCount, target: targetCount })}
                 </button>
               </div>
               {campaign.status === "active" && respondedCount > 0 && (
                 <p className="text-xs italic text-muted-foreground">
-                  Finalisez la campagne pour lancer l&apos;optimisation.
+                  {t("finalizeToOptimize")}
                 </p>
               )}
               {respondersOpen && responders.length > 0 && (
@@ -214,7 +222,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
                           {fullName}
                         </span>
                         {!r.hasResponded && (
-                          <span className="text-muted-foreground">— en attente</span>
+                          <span className="text-muted-foreground">— {t("responderPending")}</span>
                         )}
                       </li>
                     )
@@ -234,27 +242,26 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
                       variant="outline"
                       size="sm"
                       disabled={closing}
-                      aria-label="Finaliser la campagne"
+                      aria-label={t("finalize")}
                     >
                       {closing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Lock className="h-4 w-4" />
                       )}
-                      <span className="ml-1 hidden sm:inline">Finaliser</span>
+                      <span className="ml-1 hidden sm:inline">{t("finalize")}</span>
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Finaliser cette campagne ?</AlertDialogTitle>
+                      <AlertDialogTitle>{t("finalizeTitle")}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Les athlètes ne pourront plus répondre. Vous pourrez
-                        ensuite lancer l&apos;optimisation.
+                        {t("finalizeDescription")}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Annuler</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleClose}>Finaliser</AlertDialogAction>
+                      <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClose}>{t("finalize")}</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -264,14 +271,14 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
                   size="sm"
                   onClick={handleOptimize}
                   disabled={optimizing}
-                  aria-label="Lancer l'optimisation"
+                  aria-label={t("optimize")}
                 >
                   {optimizing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Play className="h-4 w-4" />
                   )}
-                  <span className="ml-1 hidden sm:inline">Optimiser</span>
+                  <span className="ml-1 hidden sm:inline">{t("optimize")}</span>
                 </Button>
               )}
               {campaign.optimizationResult && (
@@ -280,7 +287,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
                   size="sm"
                   onClick={() => setShowResult(!showResult)}
                 >
-                  {showResult ? "Masquer" : "Voir le résultat"}
+                  {showResult ? t("hideResult") : t("viewResult")}
                 </Button>
               )}
               <DropdownMenu>
@@ -288,7 +295,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
                   <Button
                     variant="ghost"
                     size="sm"
-                    aria-label="Plus d'actions"
+                    aria-label={tc("edit")}
                     disabled={deleting}
                   >
                     {deleting ? (
@@ -301,7 +308,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onSelect={() => setEditOpen(true)}>
                     <Pencil className="mr-2 h-4 w-4" />
-                    Modifier
+                    {tc("edit")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -309,7 +316,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
                     onSelect={() => setDeleteConfirmOpen(true)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Supprimer
+                    {tc("delete")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -319,20 +326,16 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
               >
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Supprimer cette campagne ?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Toutes les réponses seront effacées et un email d&apos;annulation
-                      sera envoyé aux athlètes du groupe. Cette action est
-                      irréversible.
-                    </AlertDialogDescription>
+                    <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
+                    <AlertDialogDescription>{t("deleteDescription")}</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleDelete}
                       className="bg-destructive text-white hover:bg-destructive/90"
                     >
-                      Supprimer
+                      {tc("delete")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

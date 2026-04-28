@@ -1,13 +1,9 @@
-import { AppHeader } from "@/components/custom/app-header"
-import { HeroSection } from "@/components/custom/hero-section"
+import { redirect } from "next/navigation"
 
+// The bare URL has no marketing landing — anyone hitting / is bounced to the
+// manager sign-in. Authenticated managers are routed onwards by the (manager)
+// layout; athletes are redirected from /login to /athlete-login by the proxy
+// when they don't have a manager session.
 export default function Home() {
-  return (
-    <div className="min-h-screen bg-white">
-      <AppHeader />
-      <main className="container mx-auto px-4">
-        <HeroSection />
-      </main>
-    </div>
-  )
+  redirect("/login")
 }

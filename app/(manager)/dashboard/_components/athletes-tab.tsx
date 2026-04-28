@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { Copy, RefreshCw, Trash2, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,6 +29,8 @@ interface AthletesTabProps {
 }
 
 export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
+  const t = useTranslations("athletes")
+  const tc = useTranslations("common")
   const [athletes, setAthletes] = useState<GroupAthlete[]>([])
   const [loading, setLoading] = useState(true)
   const [regenerating, setRegenerating] = useState(false)
@@ -50,7 +53,7 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
   const copyInviteLink = () => {
     if (!inviteLink) return
     navigator.clipboard.writeText(inviteLink)
-    toast.success("Lien d'invitation copié.")
+    toast.success(t("linkCopied"))
   }
 
   const handleRegenerate = async () => {
@@ -60,17 +63,17 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success("Nouveau lien d'invitation généré.")
+      toast.success(t("linkRegenerated"))
       onRefresh()
     }
   }
 
-  const handleRemoveAthlete = async (athleteId: string, name: string) => {
+  const handleRemoveAthlete = async (athleteId: string) => {
     const result = await removeAthlete(group.id, athleteId)
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success(`${name} retiré du groupe.`)
+      toast.success(t("athleteRemoved"))
       setAthletes((prev) => prev.filter((a) => a.id !== athleteId))
     }
   }
@@ -78,14 +81,14 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label className="text-sm font-medium">Lien d&apos;invitation</Label>
+        <Label className="text-sm font-medium">{t("inviteLink")}</Label>
         <div className="flex gap-2">
           <Input value={inviteLink} readOnly className="min-w-0 text-xs font-mono" />
           <Button
             variant="outline"
             size="sm"
             onClick={copyInviteLink}
-            aria-label="Copier le lien d'invitation"
+            aria-label={t("copyLink")}
           >
             <Copy className="h-4 w-4" />
           </Button>
@@ -94,7 +97,7 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
             size="sm"
             onClick={handleRegenerate}
             disabled={regenerating}
-            aria-label="Régénérer le lien d'invitation"
+            aria-label={t("regenerateLink")}
           >
             {regenerating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -104,7 +107,9 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Expire le {new Date(group.inviteTokenExpiresAt).toLocaleDateString("fr-FR")}
+          {t("linkExpiresOn", {
+            date: new Date(group.inviteTokenExpiresAt).toLocaleDateString(),
+          })}
         </p>
       </div>
 
@@ -116,11 +121,10 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
         </div>
       ) : athletes.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-6">
-          Aucun athlète dans ce groupe. Partagez le lien d&apos;invitation.
+          {t("noAthletes")}
         </p>
       ) : (
         <div className="space-y-2">
-          <p className="text-sm font-medium">{athletes.length} athlète(s)</p>
           {athletes.map((athlete) => (
             <div
               key={athlete.id}
@@ -135,12 +139,12 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {athlete.hasProfile ? (
-                    <Badge className="bg-green-600 text-white text-xs">Profil complet</Badge>
+                    <Badge className="bg-green-600 text-white text-xs">{t("profileComplete")}</Badge>
                   ) : (
-                    <Badge variant="outline" className="text-xs">En attente</Badge>
+                    <Badge variant="outline" className="text-xs">{t("profilePending")}</Badge>
                   )}
                   {athlete.gdprConsent && (
-                    <Badge variant="secondary" className="text-xs">RGPD</Badge>
+                    <Badge variant="secondary" className="text-xs">{t("gdprBadge")}</Badge>
                   )}
                 </div>
               </div>
@@ -149,32 +153,22 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    aria-label={`Retirer ${athlete.firstName} ${athlete.lastName} du groupe`}
+                    aria-label={t("removeAthlete")}
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Retirer {athlete.firstName} {athlete.lastName} ?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      L&apos;athlète sera retiré du groupe. Ses réponses aux campagnes
-                      existantes resteront enregistrées.
-                    </AlertDialogDescription>
+                    <AlertDialogTitle>{t("removeAthleteTitle")}</AlertDialogTitle>
+                    <AlertDialogDescription>{t("removeAthleteDescription")}</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={() =>
-                        handleRemoveAthlete(
-                          athlete.id,
-                          `${athlete.firstName} ${athlete.lastName}`
-                        )
-                      }
+                      onClick={() => handleRemoveAthlete(athlete.id)}
                     >
-                      Retirer
+                      {t("removeAthlete")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

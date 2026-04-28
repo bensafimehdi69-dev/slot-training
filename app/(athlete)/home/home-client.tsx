@@ -203,15 +203,16 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
 }
 
 function CampaignRow({ campaign }: { campaign: AthleteCampaignSummary }) {
+  const t = useTranslations("athleteHome")
   const isValidated = campaign.planningStatus === "validated"
   const isClosed = campaign.status === "closed"
   const ctaLabel = isValidated
-    ? "Voir mon planning"
+    ? t("viewPlanning")
     : campaign.hasResponded
-      ? "Modifier ma réponse"
+      ? t("editResponse")
       : isClosed
-        ? "Voir"
-        : "Répondre"
+        ? t("viewOnly")
+        : t("respond")
 
   return (
     <li>
@@ -236,7 +237,7 @@ function CampaignRow({ campaign }: { campaign: AthleteCampaignSummary }) {
             {campaign.hasResponded && campaign.respondedAt && (
               <span className="ml-2 inline-flex items-center gap-1 text-emerald-600">
                 <CheckCircle2 className="h-3 w-3" />
-                Répondu le {formatDate(campaign.respondedAt)}
+                {t("respondedOn", { date: formatDate(campaign.respondedAt) })}
               </span>
             )}
           </p>
@@ -251,25 +252,26 @@ function CampaignRow({ campaign }: { campaign: AthleteCampaignSummary }) {
 }
 
 function CampaignStatusBadge({ campaign }: { campaign: AthleteCampaignSummary }) {
+  const t = useTranslations("athleteHome")
   if (campaign.planningStatus === "validated") {
-    return <Badge className="bg-green-600 text-white">Planning validé</Badge>
+    return <Badge className="bg-green-600 text-white">{t("statusValidated")}</Badge>
   }
   if (campaign.status === "closed") {
-    return <Badge variant="secondary">Finalisée</Badge>
+    return <Badge variant="secondary">{t("statusFinalized")}</Badge>
   }
   if (campaign.hasResponded) {
-    return <Badge className="bg-blue-600 text-white">Réponse envoyée</Badge>
+    return <Badge className="bg-blue-600 text-white">{t("statusResponded")}</Badge>
   }
   return (
     <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-700">
-      À remplir
+      {t("statusToFill")}
     </Badge>
   )
 }
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("fr-FR", {
+    return new Date(iso).toLocaleDateString(undefined, {
       day: "numeric",
       month: "short",
       year: "numeric",
