@@ -372,6 +372,12 @@ export async function getCampaigns(groupId: string) {
             calculatedAt:
               (rawResult.calculatedAt as { toDate?: () => Date } | undefined)?.toDate?.() ??
               new Date(),
+            // Pass-through for the temporary morning-scheduler diagnostics
+            // surfaced in the UI; an array of strings, dropped silently if
+            // the Firestore doc was written before the field existed.
+            debugMorning: Array.isArray(rawResult.debugMorning)
+              ? (rawResult.debugMorning as string[])
+              : undefined,
           } as Campaign["optimizationResult"])
         : null,
       planningStatus: data.planningStatus ?? "pending",
