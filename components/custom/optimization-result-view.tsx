@@ -83,6 +83,8 @@ function computeAthleteVolume(result: OptimizationResult): {
   }
 }
 
+type OptimizationResultRole = "owner" | "viewer"
+
 interface OptimizationResultViewProps {
   result: OptimizationResult
   planningStatus: string
@@ -90,6 +92,10 @@ interface OptimizationResultViewProps {
   onReject: () => void
   isValidating: boolean
   isRejecting: boolean
+  // When the role is "viewer" the Validate / Reject buttons are hidden;
+  // the view falls back to a status badge so the spectator still sees
+  // whether the planning was validated or rejected.
+  role?: OptimizationResultRole
 }
 
 export function OptimizationResultView({
@@ -99,7 +105,9 @@ export function OptimizationResultView({
   onReject,
   isValidating,
   isRejecting,
+  role = "owner",
 }: OptimizationResultViewProps) {
+  const isViewer = role === "viewer"
   const tp = useTranslations("planning")
   const tcamp = useTranslations("campaigns")
   const tc = useTranslations("common")
@@ -164,7 +172,7 @@ export function OptimizationResultView({
 
       <Separator />
 
-      {planningStatus === "pending" && (
+      {planningStatus === "pending" && !isViewer && (
         <div className="flex gap-3">
           <Button
             onClick={onValidate}

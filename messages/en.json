@@ -84,7 +84,21 @@
     "autoFinalizedSingle": "1 campaign auto-finalized (deadline passed).",
     "autoFinalizedMany": "{count} campaigns auto-finalized (deadline passed).",
     "remindersSentSingle": "1 reminder sent to athletes who haven't replied yet.",
-    "remindersSentMany": "{count} reminders sent to athletes who haven't replied yet."
+    "remindersSentMany": "{count} reminders sent to athletes who haven't replied yet.",
+    "viewerBadge": "Viewer",
+    "share": "Share"
+  },
+  "share": {
+    "title": "Share \"{name}\"",
+    "description": "Give read-only access to another staff member. They can see campaigns and athletes but cannot edit anything.",
+    "emailLabel": "Manager email",
+    "emailPlaceholder": "member@team.com",
+    "add": "Add",
+    "added": "Access granted.",
+    "removed": "Access revoked.",
+    "currentViewers": "Current access ({count})",
+    "none": "Nobody yet.",
+    "hint": "The person must already have a manager account."
   },
   "athletes": {
     "title": "Athletes",

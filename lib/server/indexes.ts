@@ -26,6 +26,12 @@ const CAMPAIGN_INDEX = "campaignIndex"
 // the other reverse-index collections, this is admin-only (deny-all client
 // rules).
 const ATHLETE_MEMBERSHIPS = "athleteMemberships"
+// staffShares/{viewerUid} stores the (ownerUid, groupId) tuples of every
+// group a manager has been granted read-only access to. Lets a viewer list
+// "shared with me" groups in a single read instead of scanning every other
+// manager's groups. Same admin-only access pattern as the other reverse
+// indexes.
+const STAFF_SHARES = "staffShares"
 
 export interface InviteIndexEntry {
   managerUid: string
@@ -162,6 +168,7 @@ export async function deleteIndexesForGroup(
 
   const groupSnap = await groupRef.get()
   const inviteToken = groupSnap.data()?.inviteToken as string | undefined
+  const viewerUids = (groupSnap.data()?.viewerUids as string[] | undefined) ?? []
 
   const campaignsSnap = await groupRef.collection("campaigns").get()
   const campaignIds = campaignsSnap.docs.map((d) => d.id)
@@ -171,5 +178,66 @@ export async function deleteIndexesForGroup(
   const batch = adminDb.batch()
   if (inviteToken) batch.delete(adminDb.collection(INVITE_INDEX).doc(inviteToken))
   for (const id of campaignIds) batch.delete(adminDb.collection(CAMPAIGN_INDEX).doc(id))
+  // Drop the share entry from every viewer's reverse index so a deleted
+  // group no longer appears in their dashboard.
+  for (const viewerUid of viewerUids) {
+    batch.delete(
+      adminDb
+        .collection(STAFF_SHARES).doc(viewerUid)
+        .collection("groups").doc(groupId)
+    )
+  }
   await batch.commit()
+}
+
+export interface StaffShare {
+  ownerUid: string
+  groupId: string
+  addedAt: Date
+}
+
+/**
+ * List every group a manager has been granted read-only access to. One
+ * Firestore read per call regardless of how many owners shared with them.
+ */
+export async function readStaffShares(viewerUid: string): Promise<StaffShare[]> {
+  const snap = await adminDb
+    .collection(STAFF_SHARES).doc(viewerUid)
+    .collection("groups")
+    .get()
+  return snap.docs.flatMap((doc) => {
+    const data = doc.data()
+    if (typeof data.ownerUid !== "string") return []
+    return [{
+      ownerUid: data.ownerUid,
+      groupId: doc.id,
+      addedAt: data.addedAt?.toDate?.() ?? new Date(0),
+    }]
+  })
+}
+
+/**
+ * Add the (ownerUid, groupId) tuple to the viewer's share index. Idempotent
+ * — safe to call from a re-share even if the viewer is already there.
+ */
+export async function writeStaffShare(
+  viewerUid: string,
+  ownerUid: string,
+  groupId: string
+): Promise<void> {
+  await adminDb
+    .collection(STAFF_SHARES).doc(viewerUid)
+    .collection("groups").doc(groupId)
+    .set({ ownerUid, addedAt: new Date() }, { merge: true })
+}
+
+export async function deleteStaffShare(
+  viewerUid: string,
+  groupId: string
+): Promise<void> {
+  await adminDb
+    .collection(STAFF_SHARES).doc(viewerUid)
+    .collection("groups").doc(groupId)
+    .delete()
+    .catch(() => {})
 }

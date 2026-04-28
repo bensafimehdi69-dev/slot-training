@@ -49,6 +49,7 @@ import {
   deleteCampaign,
 } from "../actions"
 import type { Campaign, CampaignResponder } from "@/lib/types/campaign"
+import type { GroupRole } from "@/lib/types/group"
 
 interface CampaignCardProps {
   groupId: string
@@ -57,6 +58,10 @@ interface CampaignCardProps {
   // useEffect. Always provided in the dashboard flow; the parameter is kept
   // optional only as a defensive default for future callers.
   responders?: CampaignResponder[]
+  // Role of the current viewer relative to the parent group. "viewer"
+  // collapses the card to read-only: response count + result view, but no
+  // finalize / optimize / validate / reject / edit / delete buttons.
+  role?: GroupRole
   onRefresh: () => void
   // Optimistic removal — the parent drops the campaign from its list
   // immediately so the card disappears the instant the manager confirms,
@@ -64,7 +69,15 @@ interface CampaignCardProps {
   onLocalRemove?: (campaignId: string) => void
 }
 
-export function CampaignCard({ groupId, campaign, responders = [], onRefresh, onLocalRemove }: CampaignCardProps) {
+export function CampaignCard({
+  groupId,
+  campaign,
+  responders = [],
+  role = "owner",
+  onRefresh,
+  onLocalRemove,
+}: CampaignCardProps) {
+  const isViewer = role === "viewer"
   const t = useTranslations("campaigns")
   const tp = useTranslations("planning")
   const tc = useTranslations("common")
@@ -257,7 +270,16 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh, on
                 (Modifier / Supprimer) collapse into a kebab so the row fits a
                 360px screen without truncation. */}
             <div className="flex shrink-0 items-center gap-2">
-              {campaign.status === "active" && (
+              {campaign.optimizationResult && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowResult(!showResult)}
+                >
+                  {showResult ? t("hideResult") : t("viewResult")}
+                </Button>
+              )}
+              {!isViewer && campaign.status === "active" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
@@ -296,7 +318,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh, on
                   </AlertDialogContent>
                 </AlertDialog>
               )}
-              {campaign.status === "closed" && !campaign.optimizationResult && (
+              {!isViewer && campaign.status === "closed" && !campaign.optimizationResult && (
                 <Button
                   size="sm"
                   onClick={handleOptimize}
@@ -311,15 +333,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh, on
                   <span className="ml-1 hidden sm:inline">{t("optimize")}</span>
                 </Button>
               )}
-              {campaign.optimizationResult && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowResult(!showResult)}
-                >
-                  {showResult ? t("hideResult") : t("viewResult")}
-                </Button>
-              )}
+              {!isViewer && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -350,6 +364,8 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh, on
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
+              {!isViewer && (
               <AlertDialog
                 open={deleteConfirmOpen}
                 onOpenChange={setDeleteConfirmOpen}
@@ -370,6 +386,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh, on
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+              )}
             </div>
           </div>
 
@@ -391,6 +408,7 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh, on
                 onReject={handleReject}
                 isValidating={validating}
                 isRejecting={rejecting}
+                role={role}
               />
             </>
           )}

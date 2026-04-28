@@ -20,26 +20,60 @@ service cloud.firestore {
       }
 
       match /groups/{groupId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
+        // A "viewer" is any manager whose UID is listed in this group's
+        // viewerUids array. They can read every doc under the group's
+        // sub-tree but cannot write — defense-in-depth on top of the
+        // server actions which already enforce the same rule.
+        function isOwner() { return request.auth != null && request.auth.uid == uid; }
+        function isViewer() {
+          return request.auth != null
+            && resource != null
+            && resource.data.viewerUids is list
+            && request.auth.uid in resource.data.viewerUids;
+        }
+
+        allow read: if isOwner() || isViewer();
+        allow write: if isOwner();
 
         match /athletes/{athleteId} {
-          allow read, write: if request.auth != null && request.auth.uid == uid;
+          // Look up the parent group's viewerUids via get() so child
+          // collections inherit read access without duplicating the array.
+          function parentIsViewer() {
+            let group = get(/databases/$(database)/documents/managers/$(uid)/groups/$(groupId));
+            return request.auth != null
+              && group.data.viewerUids is list
+              && request.auth.uid in group.data.viewerUids;
+          }
+          allow read: if isOwner() || parentIsViewer();
+          allow write: if isOwner();
         }
 
         match /campaigns/{campaignId} {
-          allow read, write: if request.auth != null && request.auth.uid == uid;
+          function parentIsViewer() {
+            let group = get(/databases/$(database)/documents/managers/$(uid)/groups/$(groupId));
+            return request.auth != null
+              && group.data.viewerUids is list
+              && request.auth.uid in group.data.viewerUids;
+          }
+          allow read: if isOwner() || parentIsViewer();
+          allow write: if isOwner();
 
-          // Responses: the manager can read all responses in their own
-          // campaigns; an athlete may only write their own response
-          // document (docId == their uid). Previously any authenticated
-          // user could create or overwrite any response document.
+          // Responses: the manager (and now any viewer) can read all
+          // responses in their group's campaigns; an athlete may only
+          // write their own response document (docId == their uid).
           match /responses/{responseId} {
-            allow read: if request.auth != null && request.auth.uid == uid;
+            function grandparentIsViewer() {
+              let group = get(/databases/$(database)/documents/managers/$(uid)/groups/$(groupId));
+              return request.auth != null
+                && group.data.viewerUids is list
+                && request.auth.uid in group.data.viewerUids;
+            }
+            allow read: if isOwner() || grandparentIsViewer();
             allow write: if request.auth != null && request.auth.uid == responseId;
           }
 
           match /travelTimes/{cacheId} {
-            allow read, write: if request.auth != null && request.auth.uid == uid;
+            allow read, write: if isOwner();
           }
         }
       }
@@ -65,6 +99,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /athleteMemberships/{athleteUid} {
+      allow read, write: if false;
+    }
+    // staffShares: server-only. The Admin SDK populates a per-viewer-uid
+    // sub-tree pointing at owned groups. Never exposed to clients.
+    match /staffShares/{viewerUid}/{document=**} {
       allow read, write: if false;
     }
 

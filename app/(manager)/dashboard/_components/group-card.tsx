@@ -9,8 +9,12 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Eye,
+  Share2,
 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { AvatarUpload } from "@/components/custom/avatar-upload"
+import { ShareGroupDialog } from "./share-group-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -65,6 +69,11 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
   const [editOpen, setEditOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  // A viewer's read-only view: hide the edit / delete / share affordances
+  // and disable avatar upload. The card still expands to show campaigns
+  // and athletes, just no action buttons.
+  const isViewer = group.role === "viewer"
   // Synchronous locks so a fast double-click can't fire the action twice
   // while React is still propagating the disabled state.
   const editingRef = useRef(false)
@@ -129,6 +138,7 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
             ariaLabel="Changer la photo du groupe"
             onUpload={(formData) => setGroupAvatar(group.id, formData)}
             onUploaded={onRefresh}
+            readOnly={isViewer}
             className="mr-3"
           />
           {/* Keyboard-accessible expand/collapse toggle. */}
@@ -140,7 +150,18 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
             className="flex flex-1 items-center gap-3 text-left"
           >
             <div className="min-w-0">
-              <CardTitle className="text-lg">{group.name}</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-lg">{group.name}</CardTitle>
+                {isViewer && (
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] leading-4 text-amber-800"
+                  >
+                    <Eye className="mr-0.5 h-2.5 w-2.5" />
+                    {t("viewerBadge")}
+                  </Badge>
+                )}
+              </div>
               <CardDescription>
                 {t("createdOn", {
                   date: new Date(group.createdAt).toLocaleDateString(),
@@ -149,6 +170,17 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
             </div>
           </button>
           <div className="flex items-center gap-1">
+            {!isViewer && (
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={t("share")}
+                onClick={() => setShareOpen(true)}
+              >
+                <Share2 className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            )}
+            {!isViewer && (
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="sm" aria-label={tc("edit")}>
@@ -181,6 +213,8 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
                 </form>
               </DialogContent>
             </Dialog>
+            )}
+            {!isViewer && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -213,6 +247,7 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            )}
             {isExpanded ? (
               <ChevronUp className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
             ) : (
@@ -221,6 +256,13 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
           </div>
         </div>
       </CardHeader>
+
+      <ShareGroupDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        groupId={group.id}
+        groupName={group.name}
+      />
 
       {isExpanded && (
         // Reduced horizontal padding on mobile so the nested campaign cards
