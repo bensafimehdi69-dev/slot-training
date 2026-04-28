@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { auth } from "@/lib/firebase/client"
 import { registerManager } from "../actions"
+import { setManagerAvatar } from "@/app/(manager)/dashboard/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,12 +14,17 @@ import { Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { useTranslations } from "next-intl"
+import { AvatarPicker } from "@/components/custom/avatar-picker"
 
 export default function RegisterPage() {
   const t = useTranslations("auth")
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [name, setName] = useState("")
+  // Optional avatar staged in the form; uploaded after the session is
+  // established so setManagerAvatar can use the auth cookie.
+  const [avatar, setAvatar] = useState<File | null>(null)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -44,6 +50,20 @@ export default function RegisterPage() {
         body: JSON.stringify({ idToken }),
       })
       if (!res.ok) throw new Error("Session creation failed")
+
+      // Upload the optional avatar AFTER the session cookie is set so the
+      // server action can resolve the manager from the session. Failure
+      // doesn't block the redirect — the manager can re-upload from the
+      // dashboard header.
+      if (avatar) {
+        const avatarFormData = new FormData()
+        avatarFormData.set("file", avatar)
+        const avatarResult = await setManagerAvatar(avatarFormData)
+        if (avatarResult.error) {
+          toast.error(`Compte créé mais photo non envoyée : ${avatarResult.error}`)
+        }
+      }
+
       router.push("/dashboard")
       router.refresh()
     } catch {
@@ -60,6 +80,15 @@ export default function RegisterPage() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex flex-col items-center gap-2">
+            <AvatarPicker
+              name={name}
+              size={72}
+              ariaLabel="Photo de profil"
+              onChange={setAvatar}
+            />
+            <p className="text-xs text-muted-foreground">{t("avatarOptional")}</p>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="name">{t("fullName")}</Label>
             <Input
@@ -67,6 +96,8 @@ export default function RegisterPage() {
               name="name"
               autoComplete="name"
               required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
           </div>
           <div className="space-y-2">
