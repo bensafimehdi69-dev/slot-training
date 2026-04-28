@@ -49,6 +49,17 @@ export function OptimizationResultView({
         <DailyPlanningView dailyPlannings={result.dailyPlannings} />
       )}
 
+      {result.debugMorning && result.debugMorning.length > 0 && (
+        <details className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs">
+          <summary className="cursor-pointer font-medium text-amber-900">
+            Diag matin (debug)
+          </summary>
+          <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-amber-900">
+            {result.debugMorning.join("\n")}
+          </pre>
+        </details>
+      )}
+
       <Separator />
 
       {planningStatus === "pending" && (
