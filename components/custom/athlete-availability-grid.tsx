@@ -80,69 +80,66 @@ export function AthleteAvailabilityGrid({
   }
 
   return (
-    <div className="overflow-x-auto">
-      {/* Wider min-w + 44px cells in mobile so the 3-state cycle is taggable
-          with a thumb. Hour column is sticky so it stays visible while the
-          7 day columns scroll horizontally. */}
-      <div className="min-w-[560px]">
-        <div className="grid grid-cols-[3rem_repeat(7,minmax(0,1fr))] gap-1">
-          <div className="sticky left-0 z-10 bg-background text-xs font-medium text-muted-foreground" />
-          {DAYS.map((day) => (
-            <div key={day} className="text-center text-xs font-medium">
-              {day}
-            </div>
-          ))}
+    <div>
+      {/* Width-fitted grid: 32px hour column + 7 equal day columns, no
+          horizontal scroll. Cells are 28px tall — smaller than iOS's 44px
+          recommendation but the trade-off is intentional so all 7 days +
+          16 hours fit without scrolling. */}
+      <div className="grid grid-cols-[2rem_repeat(7,minmax(0,1fr))] gap-0.5">
+        <div className="text-[10px] font-medium text-muted-foreground" />
+        {DAYS.map((day) => (
+          <div key={day} className="text-center text-[10px] font-medium">
+            {day}
+          </div>
+        ))}
 
-          {HOURS.map((hour, hourIdx) => (
-            <React.Fragment key={`row-${hour}`}>
-              <div className="sticky left-0 z-10 flex items-center justify-end bg-background pr-1 text-xs text-muted-foreground">
-                {hour}
-              </div>
-              {DAYS.map((_, dayIdx) => {
-                const state = grid[dayIdx][hourIdx]
-                return (
-                  <button
-                    key={`${dayIdx}-${hourIdx}`}
-                    type="button"
-                    onClick={() => cycle(dayIdx, hourIdx)}
-                    aria-label={`${DAYS[dayIdx]} ${hour} – ${cellLabel(state)}`}
-                    className={cn(
-                      "flex h-11 items-center justify-center rounded-sm border text-[10px] font-medium transition-colors sm:h-8",
-                      cellClass(state)
-                    )}
-                  >
-                    {cellText(state)}
-                  </button>
-                )
-              })}
-            </React.Fragment>
-          ))}
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-sm border border-green-300 bg-green-200" />
-            Disponible
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
-              s
+        {HOURS.map((hour, hourIdx) => (
+          <React.Fragment key={`row-${hour}`}>
+            <div className="flex items-center justify-end pr-1 text-[10px] text-muted-foreground">
+              {hour}
             </div>
-            À l&apos;école (school)
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
-              h
-            </div>
-            À la maison (home)
-          </div>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Touchez une case pour cycler entre les 3 états. Indiquer "school" ou
-          "home" sur les heures occupées permet à l&apos;optimiseur de calculer
-          votre temps de trajet exact vers l&apos;entraînement.
-        </p>
+            {DAYS.map((_, dayIdx) => {
+              const state = grid[dayIdx][hourIdx]
+              return (
+                <button
+                  key={`${dayIdx}-${hourIdx}`}
+                  type="button"
+                  onClick={() => cycle(dayIdx, hourIdx)}
+                  aria-label={`${DAYS[dayIdx]} ${hour} – ${cellLabel(state)}`}
+                  className={cn(
+                    "flex h-7 items-center justify-center rounded-sm border text-[9px] font-medium transition-colors",
+                    cellClass(state)
+                  )}
+                >
+                  {cellText(state)}
+                </button>
+              )
+            })}
+          </React.Fragment>
+        ))}
       </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <div className="h-3 w-3 rounded-sm border border-green-300 bg-green-200" />
+          Disponible
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
+            s
+          </div>
+          École
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
+            h
+          </div>
+          Maison
+        </div>
+      </div>
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        Touchez pour cycler : Disponible → École → Maison.
+      </p>
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useTranslations } from "next-intl"
-import { submitCampaignResponse, deleteAthleteData } from "./actions"
+import { submitCampaignResponse } from "./actions"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,18 +14,6 @@ import {
 } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { StepProgress } from "@/components/custom/step-progress"
 import { ScheduleGrid } from "@/components/custom/schedule-grid"
 import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete-map"
@@ -35,7 +23,6 @@ import {
   CheckCircle,
   CalendarClock,
   MapPin,
-  Trash2,
   ArrowLeft,
   ArrowRight,
   Clock,
@@ -284,9 +271,6 @@ function PlanningView({
             </div>
           </div>
 
-          <Separator />
-
-          <DeleteDataSection campaignId={campaignId} />
         </CardContent>
       </Card>
     </div>
@@ -429,8 +413,7 @@ function CampaignForm({
 
   // Save the draft on every change so a tab close, an app switch on mobile,
   // or an accidental browser back-button never costs the athlete their
-  // 3-step input. Cleared after a successful submit (see handleSubmit) and
-  // when the athlete deletes their data (see DeleteDataSection).
+  // 3-step input. Cleared after a successful submit (see handleSubmit).
   useEffect(() => {
     if (existingResponse) return
     if (typeof window === "undefined") return
@@ -524,10 +507,6 @@ function CampaignForm({
             <Button asChild className="w-full">
               <Link href="/home">{t("backToHome")}</Link>
             </Button>
-
-            <Separator />
-
-            <DeleteDataSection campaignId={campaignId} />
           </CardContent>
         </Card>
       </div>
@@ -550,7 +529,6 @@ function CampaignForm({
             <Button asChild className="w-full">
               <Link href="/home">{t("backToHome")}</Link>
             </Button>
-            <DeleteDataSection campaignId={campaignId} />
           </CardContent>
         </Card>
       </div>
@@ -691,87 +669,8 @@ function CampaignForm({
               </div>
             </div>
           )}
-
-          <Separator className="my-4" />
-
-          <DeleteDataSection campaignId={campaignId} />
         </CardContent>
       </Card>
-    </div>
-  )
-}
-
-// GDPR Delete Section
-function DeleteDataSection({ campaignId }: { campaignId: string }) {
-  const t = useTranslations("athleteCampaign")
-  const tc = useTranslations("common")
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [deleted, setDeleted] = useState(false)
-
-  async function handleDelete() {
-    setDeleting(true)
-    const result = await deleteAthleteData(campaignId)
-
-    if (result.error) {
-      toast.error(result.error)
-      setDeleting(false)
-      setShowConfirm(false)
-      return
-    }
-
-    // Wipe any local draft for this campaign too — keeping it would let a
-    // re-render quietly resurrect data the athlete just asked us to delete.
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(`campaign-draft:${campaignId}`)
-      } catch {
-        // ignore
-      }
-    }
-    setDeleted(true)
-    setDeleting(false)
-    toast.success(t("dataDeleted"))
-  }
-
-  if (deleted) {
-    return (
-      <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-center text-sm text-green-800">
-        {t("dataDeletedClose")}
-      </div>
-    )
-  }
-
-  return (
-    <div className="pt-2">
-      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <AlertDialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            {t("deleteSection")}
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("deleteConfirmTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("deleteConfirmDescription")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? t("submitting") : tc("delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

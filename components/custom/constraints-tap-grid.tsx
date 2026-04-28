@@ -32,53 +32,50 @@ export function ConstraintsTapGrid({
   }
 
   return (
-    <div className="overflow-x-auto">
-      {/* min-w widens the inner grid past the viewport on mobile so each cell
-          stays at a comfortable ~44px tap target instead of being squeezed.
-          The container scrolls horizontally; the hour column is sticky so the
-          user always knows which row they're tapping. */}
-      <div className="min-w-[560px]">
-        <div className="grid grid-cols-[3rem_repeat(7,minmax(0,1fr))] gap-1">
-          {/* Header */}
-          <div className="sticky left-0 z-10 bg-background text-xs font-medium text-muted-foreground" />
-          {DAYS.map((day) => (
-            <div key={day} className="text-center text-xs font-medium">
-              {day}
+    <div>
+      {/* The grid fits the viewport width: 32px hour column + 7 equal day
+          columns. Cells are 28px tall so the full 07h–22h range stays visible
+          on a phone without vertical scroll inside the dialog. Smaller than
+          the 44px iOS target — accepted trade-off so the manager sees all
+          days at once. */}
+      <div className="grid grid-cols-[2rem_repeat(7,minmax(0,1fr))] gap-0.5">
+        <div className="text-[10px] font-medium text-muted-foreground" />
+        {DAYS.map((day) => (
+          <div key={day} className="text-center text-[10px] font-medium">
+            {day}
+          </div>
+        ))}
+
+        {HOURS.map((hour, hourIdx) => (
+          <React.Fragment key={`row-${hour}`}>
+            <div className="flex items-center justify-end pr-1 text-[10px] text-muted-foreground">
+              {hour}
             </div>
-          ))}
+            {DAYS.map((_, dayIdx) => (
+              <button
+                key={`${dayIdx}-${hourIdx}`}
+                type="button"
+                onClick={() => toggle(dayIdx, hourIdx)}
+                className={cn(
+                  "h-7 rounded-sm border transition-colors",
+                  grid[dayIdx][hourIdx]
+                    ? "border-green-300 bg-green-200 hover:bg-green-300"
+                    : "border-gray-200 bg-gray-100 hover:bg-gray-200"
+                )}
+              />
+            ))}
+          </React.Fragment>
+        ))}
+      </div>
 
-          {/* Grid rows */}
-          {HOURS.map((hour, hourIdx) => (
-            <React.Fragment key={`row-${hour}`}>
-              <div className="sticky left-0 z-10 flex items-center justify-end bg-background pr-1 text-xs text-muted-foreground">
-                {hour}
-              </div>
-              {DAYS.map((_, dayIdx) => (
-                <button
-                  key={`${dayIdx}-${hourIdx}`}
-                  type="button"
-                  onClick={() => toggle(dayIdx, hourIdx)}
-                  className={cn(
-                    "h-11 rounded-sm border transition-colors sm:h-8",
-                    grid[dayIdx][hourIdx]
-                      ? "border-green-300 bg-green-200 hover:bg-green-300"
-                      : "border-gray-200 bg-gray-100 hover:bg-gray-200"
-                  )}
-                />
-              ))}
-            </React.Fragment>
-          ))}
+      <div className="mt-2 flex items-center gap-4 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <div className="h-3 w-3 rounded-sm border border-green-300 bg-green-200" />
+          Disponible
         </div>
-
-        <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-sm border border-green-300 bg-green-200" />
-            Disponible
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-sm border border-gray-200 bg-gray-100" />
-            Indisponible
-          </div>
+        <div className="flex items-center gap-1">
+          <div className="h-3 w-3 rounded-sm border border-gray-200 bg-gray-100" />
+          Indisponible
         </div>
       </div>
     </div>

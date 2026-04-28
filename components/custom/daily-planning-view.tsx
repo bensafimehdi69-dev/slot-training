@@ -109,59 +109,58 @@ function SessionRow({
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   return (
-    <div className="rounded-md bg-muted/50 px-3 py-2">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="text-[10px] font-medium uppercase text-muted-foreground sm:text-xs">
-            {windowLabel}
-          </span>
-          <span className="text-sm font-medium">
-            {session.startTime} – {session.endTime}
-          </span>
-        </div>
+    <div className="rounded-md bg-muted/50 px-2 py-1.5">
+      {/* One-line layout: icon, time, badge and the athlete chips all share
+          the same row and only wrap when the viewport gets too narrow. The
+          window label ("Matin"/"Fin de journée") was dropped — the icon
+          conveys the same information without consuming horizontal space. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <Icon
+          className="h-4 w-4 shrink-0 text-muted-foreground"
+          aria-label={windowLabel}
+        />
+        <span className="text-sm font-medium whitespace-nowrap">
+          {session.startTime}–{session.endTime}
+        </span>
         {session.type === "collective" ? (
-          <Badge className="shrink-0 bg-blue-600 text-white">
-            <Users className="mr-1 h-3 w-3" />
+          <Badge className="shrink-0 bg-blue-600 px-1.5 py-0 text-[10px] leading-4 text-white">
+            <Users className="mr-0.5 h-2.5 w-2.5" />
             {tp("collective")} {session.athletes.length}
           </Badge>
         ) : (
           <Badge
             variant="outline"
-            className="shrink-0 border-blue-300 bg-blue-50 text-blue-700"
+            className="shrink-0 border-blue-300 bg-blue-50 px-1.5 py-0 text-[10px] leading-4 text-blue-700"
           >
-            <User className="mr-1 h-3 w-3" />
+            <User className="mr-0.5 h-2.5 w-2.5" />
             {tp("individual")}
           </Badge>
         )}
-      </div>
-      <ul className="mt-1.5 flex flex-wrap gap-x-1.5 gap-y-1">
         {session.athletes.map((athlete) => {
           const isOpen = expandedId === athlete.athleteId
           return (
-            <li key={athlete.athleteId}>
-              <button
-                type="button"
-                onClick={() =>
-                  setExpandedId((cur) =>
-                    cur === athlete.athleteId ? null : athlete.athleteId
-                  )
-                }
-                className="inline-flex items-center gap-1 rounded-md border border-transparent bg-background/60 px-2 py-0.5 text-xs font-medium text-foreground hover:border-blue-300 hover:bg-blue-50"
-                aria-expanded={isOpen}
-                aria-controls={`detail-${session.startTime}-${athlete.athleteId}`}
-              >
-                {isOpen ? (
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                )}
-                {athlete.firstName}
-              </button>
-            </li>
+            <button
+              key={athlete.athleteId}
+              type="button"
+              onClick={() =>
+                setExpandedId((cur) =>
+                  cur === athlete.athleteId ? null : athlete.athleteId
+                )
+              }
+              className="inline-flex items-center gap-0.5 rounded-md border border-transparent bg-background/60 px-1.5 py-0.5 text-[11px] font-medium text-foreground hover:border-blue-300 hover:bg-blue-50"
+              aria-expanded={isOpen}
+              aria-controls={`detail-${session.startTime}-${athlete.athleteId}`}
+            >
+              {isOpen ? (
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-3 w-3 text-muted-foreground" />
+              )}
+              {athlete.firstName}
+            </button>
           )
         })}
-      </ul>
+      </div>
       {expandedId &&
         (() => {
           const a = session.athletes.find((x) => x.athleteId === expandedId)

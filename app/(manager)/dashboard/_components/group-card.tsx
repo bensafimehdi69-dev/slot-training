@@ -52,9 +52,14 @@ interface GroupCardProps {
   isExpanded: boolean
   onToggle: () => void
   onRefresh: () => void
+  // Optimistic removal: parent drops the group from local state immediately
+  // when the manager confirms deletion, so the card disappears without
+  // waiting on the server round-trip + refetch. The actual server delete
+  // still happens in the background.
+  onLocalRemove?: (groupId: string) => void
 }
 
-export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardProps) {
+export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemove }: GroupCardProps) {
   const t = useTranslations("managerDashboard")
   const tc = useTranslations("common")
   const [editOpen, setEditOpen] = useState(false)
@@ -90,13 +95,17 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
     if (deletingRef.current) return
     deletingRef.current = true
     setDeleting(true)
+    // Drop the card from the list immediately. If the server delete fails
+    // we surface the error and trigger a refresh which will resurrect the
+    // card with its real state.
+    onLocalRemove?.(group.id)
     try {
       const result = await deleteGroup(group.id)
       if (result.error) {
         toast.error(result.error)
+        onRefresh()
       } else {
         toast.success(t("groupDeleted"))
-        onRefresh()
       }
     } finally {
       deletingRef.current = false
@@ -170,9 +179,9 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
                   aria-label={tc("delete")}
                 >
                   {deleting ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   ) : (
-                    <Trash2 className="h-4 w-4 text-red-500" />
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
                   )}
                 </Button>
               </AlertDialogTrigger>

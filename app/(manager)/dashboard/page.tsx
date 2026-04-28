@@ -49,10 +49,17 @@ export default function DashboardPage() {
     loadGroups()
   }, [loadGroups])
 
-  // Lazy cron: every time the manager opens the dashboard, run housekeeping.
-  // Closes campaigns whose deadline has passed and emails non-responders 48h
-  // before the deadline. Idempotent server-side via lastReminderSentAt.
+  // Lazy cron: housekeeping runs once per browser session. Closes campaigns
+  // whose deadline has passed and emails non-responders 48h before the
+  // deadline. Idempotent server-side via lastReminderSentAt, but skipping
+  // the round-trip on subsequent dashboard visits within the same session
+  // shaves one cold-start hit off every navigation.
   useEffect(() => {
+    if (typeof window === "undefined") return
+    const SESSION_KEY = "slot-training:scheduled-tasks-ran"
+    if (window.sessionStorage.getItem(SESSION_KEY)) return
+    window.sessionStorage.setItem(SESSION_KEY, "1")
+
     let cancelled = false
     runScheduledCampaignTasks().then((result) => {
       if (cancelled || !result.data) return
@@ -63,7 +70,6 @@ export default function DashboardPage() {
             ? t("autoFinalizedSingle")
             : t("autoFinalizedMany", { count: closedCount })
         )
-        // Refresh so the newly-closed campaigns show their updated status.
         loadGroups()
       }
       if (remindersSentCount > 0) {
@@ -77,7 +83,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [loadGroups])
+  }, [loadGroups, t])
 
   // Auto-expand the first group on initial load. Separated from loadGroups()
   // so we don't re-expand after every refresh (the previous implementation
@@ -119,14 +125,12 @@ export default function DashboardPage() {
     })
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    )
-  }
-
+  // Always render the header immediately so the manager sees structure
+  // (title, notifications toggle, "Nouveau groupe" button) without waiting
+  // for the groups query — the loader is now scoped to the body where the
+  // groups list will appear. On cold-start of the App Hosting container
+  // this drops the perceived latency significantly compared to a full-page
+  // spinner.
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -167,7 +171,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {groups.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : groups.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Users className="h-12 w-12 text-muted-foreground mb-4" />
@@ -183,6 +191,9 @@ export default function DashboardPage() {
               isExpanded={expandedGroups.has(group.id)}
               onToggle={() => toggleGroup(group.id)}
               onRefresh={loadGroups}
+              onLocalRemove={(id) =>
+                setGroups((prev) => prev.filter((g) => g.id !== id))
+              }
             />
           ))}
         </div>
