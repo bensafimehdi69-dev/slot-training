@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import {
   dayKeys,
   dayLabels,
+  dayLabelsShort,
   type DayKey,
   type ScheduleSlot,
   type SlotLocation,
@@ -98,8 +99,10 @@ export function ScheduleGrid({
       >
         <div className="text-[10px] font-medium text-muted-foreground" />
         {dayKeys.map((day) => (
-          <div key={day} className="text-center text-[10px] font-medium">
-            {dayLabels[day]}
+          // 3-letter abbreviation so the 7 column headers don't run into
+          // each other on a phone width.
+          <div key={day} className="px-0.5 text-center text-[10px] font-medium">
+            {dayLabelsShort[day]}
           </div>
         ))}
 
