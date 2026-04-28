@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
+import { NextIntlClientProvider } from "next-intl"
+import { getLocale, getMessages } from "next-intl/server"
 import { Toaster } from "sonner"
+import { isRtl, type Locale } from "@/lib/i18n/config"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -33,12 +36,21 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // next-intl resolves the active locale from the cookie (set by the
+  // language picker) or Accept-Language fallback — see lib/i18n/request.ts.
+  // Async because we need it before render to set <html dir>.
+  const locale = (await getLocale()) as Locale
+  const messages = await getMessages()
+  const dir = isRtl(locale) ? "rtl" : "ltr"
+
   return (
-    <html lang="fr">
+    <html lang={locale} dir={dir}>
       <body className={inter.className}>
-        {children}
-        <Toaster richColors position="top-right" />
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          {children}
+          <Toaster richColors position="top-right" />
+        </NextIntlClientProvider>
       </body>
     </html>
   )

@@ -27,6 +27,7 @@ import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete
 import { AthleteAvailabilityGrid } from "@/components/custom/athlete-availability-grid"
 import { LogoutButton } from "@/components/custom/logout-button"
 import { NotificationsToggle } from "@/components/custom/notifications-toggle"
+import { LanguagePicker } from "@/components/custom/language-picker"
 import { saveAthleteProfile } from "@/lib/actions/profile"
 import type { AddressWithCoords } from "@/lib/types/address"
 import type { ConstraintsGrid } from "@/lib/types/profile"
@@ -76,17 +77,18 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b bg-white">
+    <div className="min-h-screen">
+      <header className="glass glass-sticky sticky top-0 z-40">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2 font-bold text-xl">
             <Timer className="h-6 w-6 text-blue-600" />
             Slot Training
           </div>
           <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-            <span className="max-w-[160px] truncate text-sm text-muted-foreground sm:max-w-none">
+            <span className="hidden max-w-[160px] truncate text-sm text-muted-foreground sm:inline sm:max-w-none">
               {email}
             </span>
+            <LanguagePicker />
             <LogoutButton />
           </div>
         </div>

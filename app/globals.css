@@ -121,6 +121,73 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    /* Soft gradient backdrop so the translucent Liquid-Glass surfaces have
+       something to blur. On a flat off-white, backdrop-filter is invisible.
+       Three subtle radial bumps in brand-blue + a warm tint give a gentle
+       depth without fighting content. */
+    background:
+      radial-gradient(60rem 40rem at 0% 0%, rgba(37, 99, 235, 0.07), transparent 60%),
+      radial-gradient(50rem 35rem at 100% 0%, rgba(99, 102, 241, 0.07), transparent 60%),
+      radial-gradient(70rem 50rem at 50% 100%, rgba(236, 72, 153, 0.05), transparent 60%),
+      #f6f8fb;
+    background-attachment: fixed;
+  }
+  html[dir="rtl"] body {
+    /* Mirror the gradient hot-spots for RTL so the visual weight matches
+       the reading direction. Subtle but keeps the layout balanced. */
+    background:
+      radial-gradient(60rem 40rem at 100% 0%, rgba(37, 99, 235, 0.07), transparent 60%),
+      radial-gradient(50rem 35rem at 0% 0%, rgba(99, 102, 241, 0.07), transparent 60%),
+      radial-gradient(70rem 50rem at 50% 100%, rgba(236, 72, 153, 0.05), transparent 60%),
+      #f6f8fb;
+    background-attachment: fixed;
+  }
+}
+
+/* ----- Liquid Glass utility layer -----
+ *
+ * Apple's iOS 26 / macOS Tahoe surfaces are translucent panes with a soft
+ * specular highlight (light inner border on top, slight shadow underneath).
+ * These helper classes produce that look without forcing every component
+ * to relearn the recipe.
+ *
+ * Use:
+ *   <div class="glass">                                       basic surface
+ *   <div class="glass glass-strong">         heavier blur + opacity (cards)
+ *   <header class="glass glass-sticky">                       top app bars
+ */
+@layer utilities {
+  .glass {
+    background-color: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    /* Inner highlight on the top edge + a soft drop-shadow below = depth. */
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.8),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 8px 24px -8px rgba(15, 23, 42, 0.08);
+  }
+  .glass-strong {
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+  }
+  .glass-sticky {
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  }
+  /* Fallback for browsers without backdrop-filter — keeps things readable
+     instead of revealing a near-transparent surface. */
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass,
+    .glass-strong,
+    .glass-sticky {
+      background-color: rgba(255, 255, 255, 0.92);
+    }
   }
 }

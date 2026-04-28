@@ -1,4 +1,9 @@
 import type { NextConfig } from "next"
+import createNextIntlPlugin from "next-intl/plugin"
+
+// Points next-intl at our request-config so it can read messages + locale
+// without any explicit wiring at the page level.
+const withNextIntl = createNextIntlPlugin("./lib/i18n/request.ts")
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["firebase-admin"],
@@ -15,4 +20,4 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+export default withNextIntl(nextConfig)
