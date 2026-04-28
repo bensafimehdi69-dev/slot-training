@@ -265,7 +265,6 @@
     "open": "Open"
   },
   "travel": {
-    "byFoot": "On foot {minutes} min",
     "byCar": "By car {minutes} min"
   },
   "joinForm": {
@@ -365,7 +364,7 @@
       "sessionTypeCollective": "collective",
       "sessionTypeIndividual": "individual",
       "departureTime": "Departure time",
-      "estimatedTravelPair": "Estimated travel: on foot {walking} min, by car {driving} min",
+      "estimatedTravelDriving": "Estimated travel: by car {driving} min",
       "estimatedTravel": "Estimated travel: {minutes} min",
       "departureAddress": "Departure address",
       "trainingLocation": "Training location",

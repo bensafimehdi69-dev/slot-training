@@ -289,11 +289,8 @@ export async function optimizeSlots(
   }
 
   // Per-day plannings, with ad-hoc duration adjustments: collective sessions
-  // try to extend to 2h, individuals run at 60min (or 45 fallback). The
-  // debug sink collects per-day diagnostic strings so the UI can show why a
-  // morning session was or wasn't produced.
-  const debugMorning: string[] = []
-  const dailyPlannings = await buildDailyPlannings(results, athletes, config, debugMorning)
+  // try to extend to 2h, individuals run at 60min (or 45 fallback).
+  const dailyPlannings = await buildDailyPlannings(results, athletes, config)
 
   // Legacy aggregated view, derived from dailyPlannings, kept so the existing
   // dashboard / planning emails keep rendering during the UI migration.
@@ -310,7 +307,6 @@ export async function optimizeSlots(
     individualSlots,
     allSlots: results.slice(0, 5),
     calculatedAt: new Date(),
-    debugMorning,
   }
 }
 
@@ -380,11 +376,16 @@ async function checkAthleteForSlot(
     }
   }
 
-  const worstTravel = Math.max(travel.walkingMinutes, travel.drivingMinutes)
+  // Use the fastest mode for feasibility. Walking time can be unrealistic
+  // for far destinations (Google returns multi-hour walks for 20+ km),
+  // and athletes pick whichever mode actually works for them. Both modes
+  // are surfaced to the UI separately so the athlete still sees the slower
+  // option if they care.
+  const travelMinutes = Math.min(travel.walkingMinutes, travel.drivingMinutes)
   const availableFromMinutes = departure.availableFromTime
     ? timeToMinutes(departure.availableFromTime)
     : 0
-  const arrivalMinutes = availableFromMinutes + worstTravel
+  const arrivalMinutes = availableFromMinutes + travelMinutes
   const slotStartMinutes = timeToMinutes(slotStart)
   const requiredArrivalMinutes =
     availableFromMinutes > 0
@@ -397,8 +398,8 @@ async function checkAthleteForSlot(
       firstName: athlete.firstName,
       lastName: athlete.lastName,
       available: false,
-      reason: `Trajet depuis ${departure.label} : à pied ${travel.walkingMinutes} min, en voiture ${travel.drivingMinutes} min — arrivée estimée ${minutesToTime(arrivalMinutes)}`,
-      travelMinutes: worstTravel,
+      reason: `Trajet depuis ${departure.label} : ${travel.drivingMinutes} min en voiture — arrivée estimée ${minutesToTime(arrivalMinutes)}`,
+      travelMinutes: travelMinutes,
       walkingMinutes: travel.walkingMinutes,
       drivingMinutes: travel.drivingMinutes,
     }
@@ -421,16 +422,18 @@ async function checkAthleteForSlot(
       config.campaignId
     )
     if (returnTravel) {
-      const worstReturn = Math.max(returnTravel.walkingMinutes, returnTravel.drivingMinutes)
-      const reachByMinutes = slotEndMinutes + CHANGING_BUFFER_MINUTES + worstReturn
+      // Mirror the outbound choice: fastest mode wins for feasibility, both
+      // shown to the athlete for context.
+      const returnMinutes = Math.min(returnTravel.walkingMinutes, returnTravel.drivingMinutes)
+      const reachByMinutes = slotEndMinutes + CHANGING_BUFFER_MINUTES + returnMinutes
       if (reachByMinutes > returnInfo.mustArriveByMinutes) {
         return {
           athleteId: athlete.athleteId,
           firstName: athlete.firstName,
           lastName: athlete.lastName,
           available: false,
-          reason: `Trajet retour vers ${returnInfo.label} : à pied ${returnTravel.walkingMinutes} min, en voiture ${returnTravel.drivingMinutes} min — n'arrive pas avant ${minutesToTime(returnInfo.mustArriveByMinutes)}`,
-          travelMinutes: worstTravel,
+          reason: `Trajet retour vers ${returnInfo.label} : ${returnTravel.drivingMinutes} min en voiture — n'arrive pas avant ${minutesToTime(returnInfo.mustArriveByMinutes)}`,
+          travelMinutes: travelMinutes,
           walkingMinutes: travel.walkingMinutes,
           drivingMinutes: travel.drivingMinutes,
         }
@@ -443,13 +446,11 @@ async function checkAthleteForSlot(
     firstName: athlete.firstName,
     lastName: athlete.lastName,
     available: true,
-    travelMinutes: worstTravel,
+    travelMinutes: travelMinutes,
     walkingMinutes: travel.walkingMinutes,
     drivingMinutes: travel.drivingMinutes,
     departureAddress: departure.label,
-    departureTime: minutesToTime(
-      slotStartMinutes - worstTravel - CHANGING_BUFFER_MINUTES
-    ),
+    departureTime: minutesToTime(slotStartMinutes - travelMinutes - CHANGING_BUFFER_MINUTES),
   }
 }
 
@@ -468,8 +469,7 @@ async function checkAthleteForSlot(
 async function buildDailyPlannings(
   results: SlotResult[],
   athletes: AthleteData[],
-  config: CampaignConfig,
-  debugSink?: string[]
+  config: CampaignConfig
 ): Promise<DailyPlanning[]> {
   const out: DailyPlanning[] = []
   for (const day of dayKeys) {
@@ -536,8 +536,7 @@ async function buildDailyPlannings(
       const individuals = await scheduleMorningIndividualsAtFlexibleDuration(
         day,
         athletes,
-        config,
-        debugSink
+        config
       )
       morningSessions.push(...individuals)
     }
@@ -680,8 +679,7 @@ async function buildIndividualSession(
 async function scheduleMorningIndividualsAtFlexibleDuration(
   day: DayKey,
   athletes: AthleteData[],
-  config: CampaignConfig,
-  debugSink?: string[]
+  config: CampaignConfig
 ): Promise<DailySession[]> {
   type Option = { startTime: string; endTime: string; duration: number; info: AthleteSlotInfo }
 
@@ -724,31 +722,6 @@ async function scheduleMorningIndividualsAtFlexibleDuration(
   for (const athlete of athletes) {
     const options60 = await findOptions(athlete, INDIVIDUAL_DURATION_MINUTES)
     perAthlete.push({ athlete, options60 })
-  }
-  const summary =
-    `${day} window=[${minutesToTime(windowStartMinutes)}-${minutesToTime(windowEndMinutes)}] ` +
-    `slots=${slotStarts.length} options60=[${perAthlete
-      .map((p) => `${p.athlete.firstName}:${p.options60.length}`)
-      .join(", ")}]`
-  console.info(`[OPTIMIZER] ${config.campaignId} ${summary}`)
-  debugSink?.push(summary)
-
-  // For each athlete with no 60-min options, capture the reason from the
-  // first 6 slot starts so we can tell whether departure / overlap / travel /
-  // return is the blocker.
-  for (const { athlete, options60 } of perAthlete) {
-    if (options60.length > 0) continue
-    const reasons: string[] = []
-    for (const startTime of slotStarts.slice(0, 6)) {
-      const endStr = minutesToTime(timeToMinutes(startTime) + INDIVIDUAL_DURATION_MINUTES)
-      const info = await checkAthleteForSlot(athlete, day, startTime, endStr, config)
-      if (!info.available) {
-        reasons.push(`${startTime}:${info.reason ?? "?"}`)
-      }
-    }
-    const line = `${day} ${athlete.firstName}: ${reasons.join(" | ")}`
-    console.info(`[OPTIMIZER] ${config.campaignId} ${line}`)
-    debugSink?.push(line)
   }
   // Least flexible first — athletes with fewer 60-min options (0 included)
   // are scheduled before flexible ones so a constrained athlete doesn't
