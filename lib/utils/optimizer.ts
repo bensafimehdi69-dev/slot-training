@@ -292,6 +292,18 @@ export async function optimizeSlots(
   // try to extend to 2h, individuals run at 60min (or 45 fallback).
   const dailyPlannings = await buildDailyPlannings(results, athletes, config)
 
+  // Lightweight telemetry: log a per-day summary when no morning session was
+  // produced. Surfaces in Cloud Run logs and lets us tell apart "the data
+  // genuinely has no morning availability" from "the algo missed a slot".
+  for (const planning of dailyPlannings) {
+    if (planning.morningSessions.length === 0) {
+      console.info(
+        `[OPTIMIZER] ${config.campaignId} ${planning.day}: 0 morning sessions ` +
+          `(end-of-day=${planning.endOfDaySession ? planning.endOfDaySession.startTime : "none"})`
+      )
+    }
+  }
+
   // Legacy aggregated view, derived from dailyPlannings, kept so the existing
   // dashboard / planning emails keep rendering during the UI migration.
   results.sort((a, b) => {
@@ -710,13 +722,17 @@ async function scheduleMorningIndividualsAtFlexibleDuration(
   }
 
   // Pre-compute 60-min options for every athlete so we can sort by least
-  // flexible first. 45-min is computed lazily as a fallback.
+  // flexible first. Athletes with zero 60-min options stay in the list so
+  // they still get a chance at the 45-min fallback below — dropping them
+  // here was a bug that ruled them out before that fallback could run.
   const perAthlete: Array<{ athlete: AthleteData; options60: Option[] }> = []
   for (const athlete of athletes) {
     const options60 = await findOptions(athlete, INDIVIDUAL_DURATION_MINUTES)
-    if (options60.length === 0) continue
     perAthlete.push({ athlete, options60 })
   }
+  // Least flexible first — athletes with fewer 60-min options (0 included)
+  // are scheduled before flexible ones so a constrained athlete doesn't
+  // lose their only window to one with many alternatives.
   perAthlete.sort((a, b) => a.options60.length - b.options60.length)
 
   const occupied: Array<{ start: number; end: number }> = []
