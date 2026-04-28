@@ -95,6 +95,9 @@
     "emailPlaceholder": "member@team.com",
     "add": "Add",
     "added": "Access granted.",
+    "invited": "Invitation sent to {email}.",
+    "inviteCancelled": "Invitation cancelled.",
+    "pendingBadge": "Pending",
     "removed": "Access revoked.",
     "currentViewers": "Current access ({count})",
     "none": "Nobody yet.",
@@ -348,6 +351,17 @@
     "feature4Desc": "From 3 hours of coordination down to under 15 minutes."
   },
   "emails": {
+    "staffInvitation": {
+      "subject": "Invitation to join \"{group}\"",
+      "title": "Invitation to a training group",
+      "intro": "{inviter} invites you to join \"{group}\" as a viewer (read-only).",
+      "loginCta": "You already have a manager account. Sign in to access the group.",
+      "createCta": "Create your manager account to access the group.",
+      "loginButton": "Sign in",
+      "createButton": "Create my account",
+      "expiry": "This link expires in 30 days.",
+      "footer": "If you weren't expecting this invitation, you can ignore it."
+    },
     "campaignCreated": {
       "subject": "New training campaign - {start} to {end}",
       "greeting": "Hi {name},",

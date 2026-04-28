@@ -3,7 +3,7 @@
 import { randomUUID } from "crypto"
 import { z } from "zod"
 import { requireManager } from "@/lib/firebase/auth"
-import { adminDb } from "@/lib/firebase/admin"
+import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { decryptAddress } from "@/lib/utils/encryption"
 import { optimizeSlots } from "@/lib/utils/optimizer"
 import {
@@ -23,10 +23,16 @@ import {
   readStaffShares,
   writeStaffShare,
   deleteStaffShare,
+  writeStaffInvite,
+  readStaffInvite,
+  deleteStaffInvite,
+  listPendingInvitesForGroup,
+  type StaffInvite,
 } from "@/lib/server/indexes"
 import { sendPushToUsers } from "@/lib/server/push"
 import { saveAvatar } from "@/lib/server/avatar-storage"
 import { resolveGroupAccess } from "@/lib/server/group-access"
+import { sendStaffInvitationNotification } from "@/lib/utils/email"
 import { defaultLocale, locales, type Locale } from "@/lib/i18n/config"
 
 /**
@@ -332,15 +338,21 @@ export async function getGroupViewers(
 }
 
 /**
- * Grant read-only access to the group to the manager whose email is given.
- * Owner-only. The target must already have a manager account — there's no
- * email-invite flow yet (deliberate scope cut for v1: avoids onboarding
- * tokens, role choice during signup, etc.).
+ * Grant read-only access to the group to whoever owns the given email.
+ *
+ * Two paths depending on whether the email already has a manager account:
+ *   - account exists  → add the UID to viewerUids + staffShares index,
+ *     return { added: true }. The viewer will see the group on their
+ *     next dashboard load.
+ *   - no account yet  → mint a staffInvites token, send the recipient an
+ *     email with a link to /invite-staff/{token} where they can either
+ *     log in (if it's actually their email) or create a manager account.
+ *     Return { invited: true } so the dialog can show "envoyé, en attente".
  */
 export async function addGroupViewer(
   groupId: string,
   rawEmail: string
-): Promise<{ success?: boolean; error?: string }> {
+): Promise<{ added?: boolean; invited?: boolean; error?: string }> {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
@@ -356,6 +368,7 @@ export async function addGroupViewer(
     .collection("groups").doc(parsedId.data)
   const groupSnap = await groupRef.get()
   if (!groupSnap.exists) return { error: "Groupe introuvable." }
+  const groupName = (groupSnap.data()?.name as string | undefined) ?? ""
 
   // Look up the target manager by email. Email is stored on the manager doc
   // (set at registration) so a simple where-equals query is enough.
@@ -364,33 +377,128 @@ export async function addGroupViewer(
     .where("email", "==", email)
     .limit(1)
     .get()
-  if (targetSnap.empty) {
-    return {
-      error:
-        "Aucun manager n'a ce compte. Demande-lui de s'inscrire d'abord, puis réessaie.",
+
+  if (!targetSnap.empty) {
+    // Direct path: target already has a manager account → grant access now.
+    const targetUid = targetSnap.docs[0].id
+
+    if (targetUid === manager.uid) {
+      return { error: "Tu es déjà propriétaire de ce groupe." }
     }
-  }
-  const targetUid = targetSnap.docs[0].id
 
-  if (targetUid === manager.uid) {
-    return { error: "Tu es déjà propriétaire de ce groupe." }
+    const existing = (groupSnap.data()?.viewerUids as string[] | undefined) ?? []
+    if (existing.includes(targetUid)) {
+      return { error: "Cette personne a déjà accès au groupe." }
+    }
+
+    const { FieldValue } = await import("firebase-admin/firestore")
+    await groupRef.update({
+      viewerUids: FieldValue.arrayUnion(targetUid),
+    })
+    await writeStaffShare(targetUid, manager.uid, parsedId.data)
+
+    revalidatePath("/dashboard")
+    return { added: true }
   }
 
-  const existing = (groupSnap.data()?.viewerUids as string[] | undefined) ?? []
-  if (existing.includes(targetUid)) {
-    return { error: "Cette personne a déjà accès au groupe." }
+  // Invitation path: no manager account yet. Mint a single-use token,
+  // store it in staffInvites and email a link to /invite-staff/{token}.
+  const inviterName =
+    typeof groupSnap.data()?.name === "string"
+      ? ((await adminDb.collection("managers").doc(manager.uid).get()).data()?.name as string) ?? ""
+      : ""
+
+  // Reject duplicate pending invites for the same email + group, otherwise
+  // every retry would spam the recipient's inbox.
+  const existingInvites = await listPendingInvitesForGroup(manager.uid, parsedId.data)
+  if (existingInvites.some((i) => i.email === email)) {
+    return { error: "Une invitation est déjà en attente pour cet email." }
   }
 
-  // Atomic update on the group doc + corresponding entry in the viewer's
-  // share index. We don't run them in a transaction — both writes are
-  // idempotent on retry, and the resolveGroupAccess helper double-checks
-  // both sides if the index drifts.
-  const { FieldValue } = await import("firebase-admin/firestore")
-  await groupRef.update({
-    viewerUids: FieldValue.arrayUnion(targetUid),
+  const token = randomUUID()
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+  await writeStaffInvite({
+    token,
+    email,
+    ownerUid: manager.uid,
+    groupId: parsedId.data,
+    groupName,
+    createdAt: new Date(),
+    expiresAt,
   })
-  await writeStaffShare(targetUid, manager.uid, parsedId.data)
 
+  const inviteLink = buildAthleteLink(`/invite-staff/${token}`)
+  // Pre-flight check on Firebase Auth: the email may already exist there
+  // even without a managers/{uid} doc (e.g. an athlete account). Surface
+  // that to the email template so we can prompt "log in" instead of
+  // "create account".
+  let alreadyHasAccount = false
+  try {
+    await adminAuth.getUserByEmail(email)
+    alreadyHasAccount = true
+  } catch {
+    // user-not-found — leave alreadyHasAccount = false so the email
+    // prompts account creation.
+  }
+  await sendStaffInvitationNotification(email, inviterName, undefined, {
+    groupName,
+    inviteLink,
+    alreadyHasAccount,
+  })
+
+  revalidatePath("/dashboard")
+  return { invited: true }
+}
+
+export interface PendingStaffInvite {
+  token: string
+  email: string
+  expiresAt: string // ISO so the action result is plain JSON
+}
+
+/** Owner-only: list pending invites for the group's share dialog. */
+export async function getGroupInvites(
+  groupId: string
+): Promise<{ data?: PendingStaffInvite[]; error?: string }> {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+  const parsedId = firestoreId.safeParse(groupId)
+  if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
+
+  const invites: StaffInvite[] = await listPendingInvitesForGroup(
+    manager.uid,
+    parsedId.data
+  )
+  return {
+    data: invites.map((i) => ({
+      token: i.token,
+      email: i.email,
+      expiresAt: i.expiresAt.toISOString(),
+    })),
+  }
+}
+
+/** Owner-only: cancel a pending invite. */
+export async function cancelGroupInvite(
+  groupId: string,
+  token: string
+): Promise<{ success?: boolean; error?: string }> {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+  const parsedId = firestoreId.safeParse(groupId)
+  if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
+  const parsedToken = z.string().min(20).max(200).safeParse(token)
+  if (!parsedToken.success) return { error: "Jeton invalide." }
+
+  // Confirm the invite belongs to this owner + group before deleting it,
+  // so a malicious manager can't cancel someone else's invite by guessing
+  // the token (UUID makes that statistically impossible, but defense in
+  // depth is cheap here).
+  const invite = await readStaffInvite(parsedToken.data)
+  if (!invite || invite.ownerUid !== manager.uid || invite.groupId !== parsedId.data) {
+    return { error: "Invitation introuvable." }
+  }
+  await deleteStaffInvite(parsedToken.data)
   revalidatePath("/dashboard")
   return { success: true }
 }

@@ -32,6 +32,11 @@ const ATHLETE_MEMBERSHIPS = "athleteMemberships"
 // manager's groups. Same admin-only access pattern as the other reverse
 // indexes.
 const STAFF_SHARES = "staffShares"
+// staffInvites/{token} stores a pending email invite to share a group with
+// someone who doesn't have a manager account yet. Each entry carries the
+// owner + group + recipient email + expiry. Single-use: deleted on accept
+// (or on the owner cancelling, or on the next stale-cleanup pass).
+const STAFF_INVITES = "staffInvites"
 
 export interface InviteIndexEntry {
   managerUid: string
@@ -240,4 +245,79 @@ export async function deleteStaffShare(
     .collection("groups").doc(groupId)
     .delete()
     .catch(() => {})
+}
+
+export interface StaffInvite {
+  token: string
+  email: string
+  ownerUid: string
+  groupId: string
+  groupName: string
+  createdAt: Date
+  expiresAt: Date
+}
+
+export async function writeStaffInvite(invite: StaffInvite): Promise<void> {
+  await adminDb.collection(STAFF_INVITES).doc(invite.token).set({
+    email: invite.email,
+    ownerUid: invite.ownerUid,
+    groupId: invite.groupId,
+    groupName: invite.groupName,
+    createdAt: invite.createdAt,
+    expiresAt: invite.expiresAt,
+  })
+}
+
+export async function readStaffInvite(token: string): Promise<StaffInvite | null> {
+  const snap = await adminDb.collection(STAFF_INVITES).doc(token).get()
+  if (!snap.exists) return null
+  const data = snap.data()!
+  if (
+    typeof data.email !== "string" ||
+    typeof data.ownerUid !== "string" ||
+    typeof data.groupId !== "string"
+  ) {
+    return null
+  }
+  return {
+    token,
+    email: data.email,
+    ownerUid: data.ownerUid,
+    groupId: data.groupId,
+    groupName: typeof data.groupName === "string" ? data.groupName : "",
+    createdAt: data.createdAt?.toDate?.() ?? new Date(0),
+    expiresAt: data.expiresAt?.toDate?.() ?? new Date(0),
+  }
+}
+
+export async function deleteStaffInvite(token: string): Promise<void> {
+  await adminDb.collection(STAFF_INVITES).doc(token).delete().catch(() => {})
+}
+
+/**
+ * Pending invites for one (owner, group). Used by the share dialog to show
+ * "envoyé, en attente" entries next to the active viewers.
+ */
+export async function listPendingInvitesForGroup(
+  ownerUid: string,
+  groupId: string
+): Promise<StaffInvite[]> {
+  const snap = await adminDb
+    .collection(STAFF_INVITES)
+    .where("ownerUid", "==", ownerUid)
+    .where("groupId", "==", groupId)
+    .get()
+  return snap.docs.flatMap((doc) => {
+    const data = doc.data()
+    if (typeof data.email !== "string") return []
+    return [{
+      token: doc.id,
+      email: data.email,
+      ownerUid,
+      groupId,
+      groupName: typeof data.groupName === "string" ? data.groupName : "",
+      createdAt: data.createdAt?.toDate?.() ?? new Date(0),
+      expiresAt: data.expiresAt?.toDate?.() ?? new Date(0),
+    }]
+  })
 }

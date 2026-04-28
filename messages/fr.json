@@ -95,6 +95,9 @@
     "emailPlaceholder": "membre@equipe.com",
     "add": "Ajouter",
     "added": "Accès accordé.",
+    "invited": "Invitation envoyée à {email}.",
+    "inviteCancelled": "Invitation annulée.",
+    "pendingBadge": "En attente",
     "removed": "Accès retiré.",
     "currentViewers": "Accès actuels ({count})",
     "none": "Personne pour l'instant.",
@@ -348,6 +351,17 @@
     "feature4Desc": "De 3 heures de coordination à moins de 15 minutes."
   },
   "emails": {
+    "staffInvitation": {
+      "subject": "Invitation à rejoindre le groupe « {group} »",
+      "title": "Invitation à un groupe d'entraînement",
+      "intro": "{inviter} vous invite à rejoindre le groupe « {group} » en tant que spectateur (lecture seule).",
+      "loginCta": "Vous avez déjà un compte manager. Connectez-vous pour accéder au groupe.",
+      "createCta": "Créez votre compte manager pour accéder au groupe.",
+      "loginButton": "Se connecter",
+      "createButton": "Créer mon compte",
+      "expiry": "Ce lien expire dans 30 jours.",
+      "footer": "Si vous n'attendiez pas cette invitation, vous pouvez l'ignorer."
+    },
     "campaignCreated": {
       "subject": "Nouvelle campagne d'entraînement - {start} au {end}",
       "greeting": "Bonjour {name},",
