@@ -320,8 +320,11 @@ export async function optimizeSlots(
   }
 
   // Per-day plannings, with ad-hoc duration adjustments: collective sessions
-  // try to extend to 2h, individuals run at 60min (or 45 fallback).
-  const dailyPlannings = await buildDailyPlannings(results, athletes, cfg)
+  // try to extend to 2h, individuals run at 60min (or 45 fallback). The
+  // debug sink collects per-day diagnostic lines that the UI surfaces in a
+  // collapsible panel — handy for tuning the heuristics on real campaigns.
+  const debugMorning: string[] = []
+  const dailyPlannings = await buildDailyPlannings(results, athletes, cfg, debugMorning)
 
   // Legacy aggregated view, derived from dailyPlannings, kept so the existing
   // dashboard / planning emails keep rendering during the UI migration.
@@ -338,6 +341,7 @@ export async function optimizeSlots(
     individualSlots,
     allSlots: results.slice(0, 5),
     calculatedAt: new Date(),
+    debugMorning,
   }
 }
 
@@ -486,7 +490,8 @@ async function checkAthleteForSlot(
 async function buildDailyPlannings(
   results: SlotResult[],
   athletes: AthleteData[],
-  config: CampaignConfig
+  config: CampaignConfig,
+  debugSink?: string[]
 ): Promise<DailyPlanning[]> {
   // Each day is independent — Promise.all runs them concurrently. The travel
   // cache is shared across days, so concurrent fetches for the same pair may
@@ -522,7 +527,7 @@ async function buildDailyPlannings(
         }
       }
 
-      const morningSessions = await scheduleMorningSessions(day, athletes, config)
+      const morningSessions = await scheduleMorningSessions(day, athletes, config, debugSink)
 
       return {
         day: dayLabel,
@@ -671,7 +676,8 @@ const INDIVIDUAL_GROUP_MAX_ATHLETES = 4
 async function scheduleMorningSessions(
   day: DayKey,
   athletes: AthleteData[],
-  config: CampaignConfig
+  config: CampaignConfig,
+  debugSink?: string[]
 ): Promise<DailySession[]> {
   // Slot starts in the morning window, bounded by the campaign's own
   // timeRangeStart. Step matches the main pass (15 min) so the per-day
@@ -739,6 +745,18 @@ async function scheduleMorningSessions(
     if (pool90.length === 0 && pool60.length === 0 && pool45.length === 0) continue
     slots.push({ startTime, pool90, pool60, pool45 })
   }
+
+  // Per-day summary: how many slots had any availability and the peak pool
+  // size at each duration. Tells us at a glance whether the algo had room
+  // to work or the data was simply too tight.
+  const peak = (pool: keyof Pick<SlotInfo, "pool90" | "pool60" | "pool45">) =>
+    slots.reduce((m, s) => Math.max(m, s[pool].length), 0)
+  const summary =
+    `${day} morning: viableSlots=${slots.length} ` +
+    `peak90=${peak("pool90")} peak60=${peak("pool60")} peak45=${peak("pool45")} ` +
+    `athletes=${athletes.length}`
+  console.info(`[OPTIMIZER] ${config.campaignId} ${summary}`)
+  debugSink?.push(summary)
 
   const occupied: Array<{ start: number; end: number }> = []
   const placedIds = new Set<string>()
@@ -855,8 +873,25 @@ async function scheduleMorningSessions(
           : undefined,
     })
 
+    const placedLine =
+      `${day} placed ${best.slot.startTime}-${minutesToTime(endMinutes)} ` +
+      `${best.type} (${duration}min) [${finalAthletes.map((a) => a.firstName).join(", ")}]`
+    console.info(`[OPTIMIZER] ${config.campaignId} ${placedLine}`)
+    debugSink?.push(placedLine)
+
     finalAthletes.forEach((a) => placedIds.add(a.athleteId))
     occupied.push({ start: timeToMinutes(best.slot.startTime), end: endMinutes })
+  }
+
+  // Anyone left unplaced — surfaces athletes whose schedule never lined up
+  // with a feasible morning slot. Useful to spot tight schedules early.
+  const unplacedNames = athletes
+    .filter((a) => !placedIds.has(a.athleteId))
+    .map((a) => a.firstName)
+  if (unplacedNames.length > 0) {
+    const line = `${day} unplaced: ${unplacedNames.join(", ")}`
+    console.info(`[OPTIMIZER] ${config.campaignId} ${line}`)
+    debugSink?.push(line)
   }
 
   return sessions.sort(

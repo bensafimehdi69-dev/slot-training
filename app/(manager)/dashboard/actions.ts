@@ -372,6 +372,12 @@ export async function getCampaigns(groupId: string) {
             calculatedAt:
               (rawResult.calculatedAt as { toDate?: () => Date } | undefined)?.toDate?.() ??
               new Date(),
+            // Pass-through for the morning scheduler diagnostics — the
+            // OptimizationResultView shows them in a collapsible panel so
+            // we can inspect the algo's behaviour on real campaigns.
+            debugMorning: Array.isArray(rawResult.debugMorning)
+              ? (rawResult.debugMorning as string[])
+              : undefined,
           } as Campaign["optimizationResult"])
         : null,
       planningStatus: data.planningStatus ?? "pending",

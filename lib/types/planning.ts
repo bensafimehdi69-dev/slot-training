@@ -86,4 +86,10 @@ export interface OptimizationResult {
   individualSlots: IndividualSlot[]
   allSlots: SlotResult[]
   calculatedAt: Date
+  // Per-day diagnostic strings produced by the morning scheduler. One line
+  // per day summarising the pools evaluated, then one line per session
+  // placed (or per athlete left unplaced). Surfaced in the UI as a
+  // collapsible panel — useful when tuning the greedy heuristics with
+  // larger groups.
+  debugMorning?: string[]
 }
