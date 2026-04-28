@@ -79,6 +79,10 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
 
   const respondedCount = responders.filter((r) => r.hasResponded).length
   const targetCount = responders.length
+  // True only while the campaign still accepts the click — once it's been
+  // finalized (status = "closed") the prominent variant is no longer useful.
+  const allResponded =
+    targetCount > 0 && respondedCount === targetCount && campaign.status === "active"
 
   const handleClose = async () => {
     setClosing(true)
@@ -198,10 +202,15 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
                     : t("responseCount", { responded: respondedCount, target: targetCount })}
                 </button>
               </div>
-              {campaign.status === "active" && respondedCount > 0 && (
+              {campaign.status === "active" && respondedCount > 0 && !allResponded && (
                 <p className="text-xs italic text-muted-foreground">
                   {t("finalizeToOptimize")}
                 </p>
+              )}
+              {allResponded && (
+                <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-800">
+                  {t("allRespondedBanner")}
+                </div>
               )}
               {respondersOpen && responders.length > 0 && (
                 <ul className="mt-1 space-y-1 rounded-md border bg-muted/30 p-2">
@@ -239,17 +248,25 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
-                      variant="outline"
+                      // Default (filled) variant pops once everyone has responded so
+                      // the manager's next action is visually obvious; outline keeps
+                      // the dashboard quiet while replies are still trickling in.
+                      variant={allResponded ? "default" : "outline"}
                       size="sm"
                       disabled={closing}
                       aria-label={t("finalize")}
+                      className={
+                        allResponded
+                          ? "bg-green-600 text-white shadow-sm hover:bg-green-700"
+                          : undefined
+                      }
                     >
                       {closing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Lock className="h-4 w-4" />
                       )}
-                      <span className="ml-1 hidden sm:inline">{t("finalize")}</span>
+                      <span className="ml-1 sm:inline">{t("finalize")}</span>
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>

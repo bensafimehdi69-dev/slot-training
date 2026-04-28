@@ -149,6 +149,7 @@
     "responseCount": "{responded} / {target} rempli",
     "responseCountPlural": "{responded} / {target} remplis",
     "finalizeToOptimize": "Finalisez la campagne pour lancer l'optimisation.",
+    "allRespondedBanner": "Tous les athlètes ont répondu — vous pouvez finaliser la campagne.",
     "responderPending": "en attente"
   },
   "planning": {

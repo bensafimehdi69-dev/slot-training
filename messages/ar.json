@@ -149,6 +149,7 @@
     "responseCount": "{responded} / {target} أجابوا",
     "responseCountPlural": "{responded} / {target} أجابوا",
     "finalizeToOptimize": "أنهِ الحملة لإطلاق التحسين.",
+    "allRespondedBanner": "أجاب جميع الرياضيين — يمكنك إنهاء الحملة.",
     "responderPending": "في الانتظار"
   },
   "planning": {

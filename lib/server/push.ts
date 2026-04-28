@@ -76,20 +76,20 @@ export async function sendPushToUser(
   const tokens = snap.docs.map((d) => d.id)
   const messaging = getMessaging()
 
+  // Data-only payload: no top-level `notification` and no `webpush.notification`.
+  // When either is set, Chrome's FCM SW auto-displays the notif AND fires
+  // `onBackgroundMessage` — the user ends up with two identical popups. By
+  // shipping a data-only message, only our SW handler renders the notification,
+  // so we get exactly one.
+  const data: Record<string, string> = {
+    title: payload.title,
+    body: payload.body,
+  }
+  if (payload.url) data.url = payload.url
+
   const response = await messaging.sendEachForMulticast({
     tokens,
-    notification: {
-      title: payload.title,
-      body: payload.body,
-    },
-    data: payload.url ? { url: payload.url } : undefined,
-    webpush: {
-      fcmOptions: payload.url ? { link: payload.url } : undefined,
-      notification: {
-        icon: "/icon.svg",
-        badge: "/icon.svg",
-      },
-    },
+    data,
   })
 
   let pruned = 0
