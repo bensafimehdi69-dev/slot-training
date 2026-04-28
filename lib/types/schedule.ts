@@ -17,6 +17,18 @@ export const dayLabels: Record<DayKey, string> = {
   samedi: "Samedi",
 }
 
+// 3-letter abbreviations for narrow grid headers (the schedule grid has 7
+// columns on a phone screen, so the full names overlap).
+export const dayLabelsShort: Record<DayKey, string> = {
+  dimanche: "Dim",
+  lundi: "Lun",
+  mardi: "Mar",
+  mercredi: "Mer",
+  jeudi: "Jeu",
+  vendredi: "Ven",
+  samedi: "Sam",
+}
+
 // Week starts on Sunday (Saudi/Gulf convention) and ends on Saturday — the
 // order here drives every column header in the schedule grid and every loop
 // in the optimiser.
