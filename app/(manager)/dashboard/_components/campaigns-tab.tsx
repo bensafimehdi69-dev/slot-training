@@ -47,6 +47,9 @@ interface CampaignsTabProps {
 }
 
 export function CampaignsTab({ group }: CampaignsTabProps) {
+  // Read-only role: hide the "New campaign" button + every per-card action
+  // (handled inside CampaignCard via the same group.role).
+  const isViewer = group.role === "viewer"
   const t = useTranslations("campaigns")
   const [campaigns, setCampaigns] = useState<ManagerCampaign[]>([])
   const [loading, setLoading] = useState(true)
@@ -192,6 +195,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
         <p className="text-sm font-medium">
           {t("tabTitle", { count: campaigns.length })}
         </p>
+        {!isViewer && (
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button size="sm">
@@ -340,6 +344,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
             </form>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {loading ? (
@@ -358,6 +363,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
               groupId={group.id}
               campaign={campaign}
               responders={campaign.responders}
+              role={group.role}
               onRefresh={loadCampaigns}
               onLocalRemove={(id) =>
                 setCampaigns((prev) => prev.filter((c) => c.id !== id))

@@ -84,7 +84,21 @@
     "autoFinalizedSingle": "1 campagne finalisée automatiquement (deadline dépassée).",
     "autoFinalizedMany": "{count} campagnes finalisées automatiquement (deadline dépassée).",
     "remindersSentSingle": "1 rappel envoyé aux athlètes n'ayant pas encore répondu.",
-    "remindersSentMany": "{count} rappels envoyés aux athlètes n'ayant pas encore répondu."
+    "remindersSentMany": "{count} rappels envoyés aux athlètes n'ayant pas encore répondu.",
+    "viewerBadge": "Spectateur",
+    "share": "Partager"
+  },
+  "share": {
+    "title": "Partager « {name} »",
+    "description": "Donne un accès en lecture seule à un autre membre du staff. Il pourra voir les campagnes et les athlètes, sans pouvoir modifier quoi que ce soit.",
+    "emailLabel": "Email du manager",
+    "emailPlaceholder": "membre@equipe.com",
+    "add": "Ajouter",
+    "added": "Accès accordé.",
+    "removed": "Accès retiré.",
+    "currentViewers": "Accès actuels ({count})",
+    "none": "Personne pour l'instant.",
+    "hint": "La personne doit déjà avoir un compte manager."
   },
   "athletes": {
     "title": "Athlètes",

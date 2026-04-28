@@ -20,9 +20,13 @@ import {
   writeCampaignIndex,
   deleteCampaignIndex,
   deleteIndexesForGroup,
+  readStaffShares,
+  writeStaffShare,
+  deleteStaffShare,
 } from "@/lib/server/indexes"
 import { sendPushToUsers } from "@/lib/server/push"
 import { saveAvatar } from "@/lib/server/avatar-storage"
+import { resolveGroupAccess } from "@/lib/server/group-access"
 import { defaultLocale, locales, type Locale } from "@/lib/i18n/config"
 
 /**
@@ -49,7 +53,7 @@ async function fetchAthleteLocales(uids: string[]): Promise<Map<string, Locale>>
   return map
 }
 import { revalidatePath } from "next/cache"
-import type { Group, GroupAthlete } from "@/lib/types/group"
+import type { Group, GroupAthlete, GroupViewer } from "@/lib/types/group"
 import type { Campaign, CampaignResponder, ManagerCampaign } from "@/lib/types/campaign"
 
 // Firestore doc IDs are strings of ≤1500 bytes with a limited charset. We
@@ -119,19 +123,55 @@ export async function getGroups() {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
-  const snapshot = await adminDb
-    .collection("managers").doc(manager.uid)
-    .collection("groups")
-    .orderBy("createdAt", "desc")
-    .get()
+  // Owned groups + shared (read-only) groups, fetched in parallel. The
+  // shared list comes from the staffShares reverse index — one read per
+  // share, no scanning of every owner's groups.
+  const [ownedSnap, shares] = await Promise.all([
+    adminDb
+      .collection("managers").doc(manager.uid)
+      .collection("groups")
+      .orderBy("createdAt", "desc")
+      .get(),
+    readStaffShares(manager.uid),
+  ])
 
-  const groups: Group[] = snapshot.docs.map((doc) => ({
+  const ownedGroups: Group[] = ownedSnap.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate(),
     inviteTokenExpiresAt: doc.data().inviteTokenExpiresAt?.toDate(),
+    role: "owner",
+    ownerUid: manager.uid,
   })) as Group[]
 
+  // Resolve each shared group from the actual owner's tree. We tolerate
+  // stale share entries (group deleted) by filtering out missing docs.
+  const sharedDocs = await Promise.all(
+    shares.map((s) =>
+      adminDb
+        .collection("managers").doc(s.ownerUid)
+        .collection("groups").doc(s.groupId)
+        .get()
+        .then((snap) => ({ snap, ownerUid: s.ownerUid }))
+    )
+  )
+  const sharedGroups: Group[] = sharedDocs.flatMap(({ snap, ownerUid }) => {
+    if (!snap.exists) return []
+    const data = snap.data()!
+    return [
+      {
+        id: snap.id,
+        ...data,
+        createdAt: data.createdAt?.toDate(),
+        inviteTokenExpiresAt: data.inviteTokenExpiresAt?.toDate(),
+        role: "viewer",
+        ownerUid,
+      } as Group,
+    ]
+  })
+
+  // Owned first, shared after — viewers usually focus on what they own.
+  const groups = [...ownedGroups, ...sharedGroups]
   return { data: groups }
 }
 
@@ -247,6 +287,143 @@ export async function setManagerAvatar(
   }
 }
 
+// ============ GROUP SHARING (read-only viewers) ============
+
+const emailSchema = z.string().trim().toLowerCase().email()
+
+/**
+ * Resolve current viewers of a group as a rich list (uid + name + email +
+ * avatar). Owner-only — viewers don't see who else has access.
+ */
+export async function getGroupViewers(
+  groupId: string
+): Promise<{ data?: GroupViewer[]; error?: string }> {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const parsedId = firestoreId.safeParse(groupId)
+  if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
+
+  const groupSnap = await adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedId.data)
+    .get()
+  if (!groupSnap.exists) return { error: "Groupe introuvable." }
+
+  const viewerUids = (groupSnap.data()?.viewerUids as string[] | undefined) ?? []
+  if (viewerUids.length === 0) return { data: [] }
+
+  const docs = await adminDb.getAll(
+    ...viewerUids.map((uid) => adminDb.collection("managers").doc(uid))
+  )
+  const viewers: GroupViewer[] = docs.flatMap((doc) => {
+    if (!doc.exists) return []
+    const data = doc.data()!
+    return [
+      {
+        uid: doc.id,
+        name: typeof data.name === "string" ? data.name : "",
+        email: typeof data.email === "string" ? data.email : "",
+        avatarUrl: typeof data.avatarUrl === "string" ? data.avatarUrl : undefined,
+      },
+    ]
+  })
+  return { data: viewers }
+}
+
+/**
+ * Grant read-only access to the group to the manager whose email is given.
+ * Owner-only. The target must already have a manager account — there's no
+ * email-invite flow yet (deliberate scope cut for v1: avoids onboarding
+ * tokens, role choice during signup, etc.).
+ */
+export async function addGroupViewer(
+  groupId: string,
+  rawEmail: string
+): Promise<{ success?: boolean; error?: string }> {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const parsedId = firestoreId.safeParse(groupId)
+  if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
+
+  const parsedEmail = emailSchema.safeParse(rawEmail)
+  if (!parsedEmail.success) return { error: "Email invalide." }
+  const email = parsedEmail.data
+
+  const groupRef = adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedId.data)
+  const groupSnap = await groupRef.get()
+  if (!groupSnap.exists) return { error: "Groupe introuvable." }
+
+  // Look up the target manager by email. Email is stored on the manager doc
+  // (set at registration) so a simple where-equals query is enough.
+  const targetSnap = await adminDb
+    .collection("managers")
+    .where("email", "==", email)
+    .limit(1)
+    .get()
+  if (targetSnap.empty) {
+    return {
+      error:
+        "Aucun manager n'a ce compte. Demande-lui de s'inscrire d'abord, puis réessaie.",
+    }
+  }
+  const targetUid = targetSnap.docs[0].id
+
+  if (targetUid === manager.uid) {
+    return { error: "Tu es déjà propriétaire de ce groupe." }
+  }
+
+  const existing = (groupSnap.data()?.viewerUids as string[] | undefined) ?? []
+  if (existing.includes(targetUid)) {
+    return { error: "Cette personne a déjà accès au groupe." }
+  }
+
+  // Atomic update on the group doc + corresponding entry in the viewer's
+  // share index. We don't run them in a transaction — both writes are
+  // idempotent on retry, and the resolveGroupAccess helper double-checks
+  // both sides if the index drifts.
+  const { FieldValue } = await import("firebase-admin/firestore")
+  await groupRef.update({
+    viewerUids: FieldValue.arrayUnion(targetUid),
+  })
+  await writeStaffShare(targetUid, manager.uid, parsedId.data)
+
+  revalidatePath("/dashboard")
+  return { success: true }
+}
+
+export async function removeGroupViewer(
+  groupId: string,
+  viewerUid: string
+): Promise<{ success?: boolean; error?: string }> {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const parsedId = firestoreId.safeParse(groupId)
+  if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
+
+  const parsedViewerUid = firestoreId.safeParse(viewerUid)
+  if (!parsedViewerUid.success) return { error: "Identifiant invalide." }
+
+  const groupRef = adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedId.data)
+  const groupSnap = await groupRef.get()
+  if (!groupSnap.exists) return { error: "Groupe introuvable." }
+
+  const { FieldValue } = await import("firebase-admin/firestore")
+  await groupRef.update({
+    viewerUids: FieldValue.arrayRemove(parsedViewerUid.data),
+  })
+  await deleteStaffShare(parsedViewerUid.data, parsedId.data)
+
+  revalidatePath("/dashboard")
+  return { success: true }
+}
+
 export async function deleteGroup(groupId: string) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
@@ -310,8 +487,13 @@ export async function getGroupAthletes(groupId: string) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
+  // Resolve the actual owner: viewers also need to read the athletes list,
+  // and the doc lives under the owner's manager tree even for shared groups.
+  const access = await resolveGroupAccess(manager.uid, groupId)
+  if (!access) return { error: "Non autorisé." }
+
   const snapshot = await adminDb
-    .collection("managers").doc(manager.uid)
+    .collection("managers").doc(access.ownerUid)
     .collection("groups").doc(groupId)
     .collection("athletes")
     .orderBy("createdAt", "desc")
@@ -362,8 +544,13 @@ export async function getCampaigns(groupId: string) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
+  // Owner OR viewer can list campaigns. We resolve the actual owner so the
+  // doc path is correct for shared groups.
+  const access = await resolveGroupAccess(manager.uid, groupId)
+  if (!access) return { error: "Non autorisé." }
+
   const basePath = adminDb
-    .collection("managers").doc(manager.uid)
+    .collection("managers").doc(access.ownerUid)
     .collection("groups").doc(groupId)
 
   // Fetch campaigns, athletes (for responder names), and every campaign's
@@ -1151,8 +1338,11 @@ export async function getResponseCount(groupId: string, campaignId: string) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
+  const access = await resolveGroupAccess(manager.uid, groupId)
+  if (!access) return { error: "Non autorisé." }
+
   const snapshot = await adminDb
-    .collection("managers").doc(manager.uid)
+    .collection("managers").doc(access.ownerUid)
     .collection("groups").doc(groupId)
     .collection("campaigns").doc(campaignId)
     .collection("responses")
@@ -1180,8 +1370,11 @@ export async function getCampaignResponders(groupId: string, campaignId: string)
     return { error: "Identifiant invalide." }
   }
 
+  const access = await resolveGroupAccess(manager.uid, parsedGroupId.data)
+  if (!access) return { error: "Non autorisé." }
+
   const basePath = adminDb
-    .collection("managers").doc(manager.uid)
+    .collection("managers").doc(access.ownerUid)
     .collection("groups").doc(parsedGroupId.data)
   const campaignRef = basePath.collection("campaigns").doc(parsedCampaignId.data)
 

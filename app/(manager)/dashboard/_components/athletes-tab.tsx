@@ -29,6 +29,10 @@ interface AthletesTabProps {
 }
 
 export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
+  // Viewers (read-only role) see the athlete list but no invite controls
+  // and no per-athlete remove button. The roster + photos are still useful
+  // context for the staff person looking on.
+  const isViewer = group.role === "viewer"
   const t = useTranslations("athletes")
   const tc = useTranslations("common")
   const [athletes, setAthletes] = useState<GroupAthlete[]>([])
@@ -80,40 +84,43 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">{t("inviteLink")}</Label>
-        <div className="flex gap-2">
-          <Input value={inviteLink} readOnly className="min-w-0 text-xs font-mono" />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={copyInviteLink}
-            aria-label={t("copyLink")}
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRegenerate}
-            disabled={regenerating}
-            aria-label={t("regenerateLink")}
-          >
-            {regenerating ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {t("linkExpiresOn", {
-            date: new Date(group.inviteTokenExpiresAt).toLocaleDateString(),
-          })}
-        </p>
-      </div>
-
-      <Separator />
+      {!isViewer && (
+        <>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">{t("inviteLink")}</Label>
+            <div className="flex gap-2">
+              <Input value={inviteLink} readOnly className="min-w-0 text-xs font-mono" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={copyInviteLink}
+                aria-label={t("copyLink")}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                aria-label={t("regenerateLink")}
+              >
+                {regenerating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t("linkExpiresOn", {
+                date: new Date(group.inviteTokenExpiresAt).toLocaleDateString(),
+              })}
+            </p>
+          </div>
+          <Separator />
+        </>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-6">
@@ -160,32 +167,34 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
                   title={t("profilePending")}
                 />
               )}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    aria-label={t("removeAthlete")}
-                  >
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t("removeAthleteTitle")}</AlertDialogTitle>
-                    <AlertDialogDescription>{t("removeAthleteDescription")}</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => handleRemoveAthlete(athlete.id)}
+              {!isViewer && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      aria-label={t("removeAthlete")}
                     >
-                      {t("removeAthlete")}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t("removeAthleteTitle")}</AlertDialogTitle>
+                      <AlertDialogDescription>{t("removeAthleteDescription")}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleRemoveAthlete(athlete.id)}
+                      >
+                        {t("removeAthlete")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           ))}
         </div>
