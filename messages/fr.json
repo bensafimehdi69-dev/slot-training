@@ -222,5 +222,48 @@
   "travel": {
     "byFoot": "À pied {minutes} min",
     "byCar": "En voiture {minutes} min"
+  },
+  "emails": {
+    "campaignCreated": {
+      "subject": "Nouvelle campagne d'entraînement - {start} au {end}",
+      "greeting": "Bonjour {name},",
+      "intro": "Une nouvelle campagne d'entraînement a été créée :",
+      "location": "Lieu",
+      "period": "Période",
+      "deadline": "Date limite de réponse",
+      "cta": "Répondre à la campagne",
+      "footer": "Merci de répondre avant la date limite."
+    },
+    "campaignUpdated": {
+      "subject": "Mise à jour de la campagne - {start} au {end}",
+      "intro": "La campagne d'entraînement à laquelle vous êtes invité a été modifiée. Voici les nouveaux paramètres :",
+      "cta": "Voir / mettre à jour ma réponse"
+    },
+    "campaignDeleted": {
+      "subject": "Campagne d'entraînement annulée - {start} au {end}",
+      "intro": "La campagne d'entraînement à laquelle vous étiez invité a été annulée. Vos éventuelles réponses ont été supprimées."
+    },
+    "campaignReminder": {
+      "subject": "Rappel : campagne d'entraînement à compléter (clôture dans {hours}h)",
+      "intro": "Petit rappel — vous n'avez pas encore répondu à la campagne d'entraînement. La clôture des réponses est dans environ {hours}h (le {deadline}).",
+      "cta": "Répondre maintenant",
+      "footer": "Si vous avez répondu juste à l'instant, vous pouvez ignorer ce message."
+    },
+    "planningValidated": {
+      "subject": "Votre planning est validé",
+      "introWithSessions": "Voici vos {count} séance(s) pour la semaine :",
+      "noSessions": "Malheureusement, aucun créneau compatible n'a pu être trouvé pour cette campagne.",
+      "noSessionsReason": "Raison : {reason}",
+      "noSessionsDefault": "Aucun créneau sans conflit avec votre emploi du temps.",
+      "sessionType": "(séance {type})",
+      "sessionTypeCollective": "collective",
+      "sessionTypeIndividual": "individuelle",
+      "departureTime": "Heure de départ",
+      "estimatedTravelPair": "Trajet estimé : à pied {walking} min, en voiture {driving} min",
+      "estimatedTravel": "Trajet estimé : {minutes} min",
+      "departureAddress": "Adresse de départ",
+      "trainingLocation": "Lieu d'entraînement",
+      "cta": "Voir mon planning"
+    }
   }
 }

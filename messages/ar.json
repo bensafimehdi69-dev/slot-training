@@ -222,5 +222,48 @@
   "travel": {
     "byFoot": "مشيًا {minutes} دقيقة",
     "byCar": "بالسيارة {minutes} دقيقة"
+  },
+  "emails": {
+    "campaignCreated": {
+      "subject": "حملة تدريب جديدة - من {start} إلى {end}",
+      "greeting": "مرحبًا {name},",
+      "intro": "تم إنشاء حملة تدريب جديدة:",
+      "location": "المكان",
+      "period": "الفترة",
+      "deadline": "آخر موعد للإجابة",
+      "cta": "الإجابة على الحملة",
+      "footer": "يرجى الإجابة قبل الموعد النهائي."
+    },
+    "campaignUpdated": {
+      "subject": "تحديث الحملة - من {start} إلى {end}",
+      "intro": "تم تعديل حملة التدريب التي دُعيت إليها. إليك المعلمات الجديدة:",
+      "cta": "عرض / تحديث إجابتي"
+    },
+    "campaignDeleted": {
+      "subject": "إلغاء حملة التدريب - من {start} إلى {end}",
+      "intro": "تم إلغاء حملة التدريب التي دُعيت إليها. تم حذف أي إجابة قمت بإرسالها."
+    },
+    "campaignReminder": {
+      "subject": "تذكير: حملة تدريب يجب إكمالها (تنتهي خلال {hours} ساعة)",
+      "intro": "تذكير سريع — لم تجب بعد على حملة التدريب. تنتهي الإجابات خلال حوالي {hours} ساعة (في {deadline}).",
+      "cta": "الإجابة الآن",
+      "footer": "إذا كنت قد أجبت للتو، يمكنك تجاهل هذه الرسالة."
+    },
+    "planningValidated": {
+      "subject": "تمت المصادقة على جدولك",
+      "introWithSessions": "إليك حصصك ({count}) للأسبوع:",
+      "noSessions": "للأسف، لم يتم العثور على وقت متوافق لهذه الحملة.",
+      "noSessionsReason": "السبب: {reason}",
+      "noSessionsDefault": "لا يوجد وقت دون تعارض مع جدولك.",
+      "sessionType": "(حصة {type})",
+      "sessionTypeCollective": "جماعية",
+      "sessionTypeIndividual": "فردية",
+      "departureTime": "وقت المغادرة",
+      "estimatedTravelPair": "وقت الانتقال المقدر: مشيًا {walking} دقيقة، بالسيارة {driving} دقيقة",
+      "estimatedTravel": "وقت الانتقال المقدر: {minutes} دقيقة",
+      "departureAddress": "عنوان الانطلاق",
+      "trainingLocation": "مكان التدريب",
+      "cta": "عرض جدولي"
+    }
   }
 }

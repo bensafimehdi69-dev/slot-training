@@ -222,5 +222,48 @@
   "travel": {
     "byFoot": "On foot {minutes} min",
     "byCar": "By car {minutes} min"
+  },
+  "emails": {
+    "campaignCreated": {
+      "subject": "New training campaign - {start} to {end}",
+      "greeting": "Hi {name},",
+      "intro": "A new training campaign has been created:",
+      "location": "Location",
+      "period": "Period",
+      "deadline": "Response deadline",
+      "cta": "Reply to the campaign",
+      "footer": "Please reply before the deadline."
+    },
+    "campaignUpdated": {
+      "subject": "Campaign update - {start} to {end}",
+      "intro": "The training campaign you were invited to has been updated. Here are the new parameters:",
+      "cta": "View / update my reply"
+    },
+    "campaignDeleted": {
+      "subject": "Training campaign cancelled - {start} to {end}",
+      "intro": "The training campaign you were invited to has been cancelled. Any reply you submitted has been removed."
+    },
+    "campaignReminder": {
+      "subject": "Reminder: training campaign to complete (closes in {hours}h)",
+      "intro": "Quick reminder — you haven't replied to the training campaign yet. Replies close in about {hours}h (on {deadline}).",
+      "cta": "Reply now",
+      "footer": "If you've just replied, you can ignore this message."
+    },
+    "planningValidated": {
+      "subject": "Your planning is validated",
+      "introWithSessions": "Here are your {count} session(s) for the week:",
+      "noSessions": "Unfortunately, no compatible slot could be found for this campaign.",
+      "noSessionsReason": "Reason: {reason}",
+      "noSessionsDefault": "No slot without conflicts with your schedule.",
+      "sessionType": "({type} session)",
+      "sessionTypeCollective": "collective",
+      "sessionTypeIndividual": "individual",
+      "departureTime": "Departure time",
+      "estimatedTravelPair": "Estimated travel: on foot {walking} min, by car {driving} min",
+      "estimatedTravel": "Estimated travel: {minutes} min",
+      "departureAddress": "Departure address",
+      "trainingLocation": "Training location",
+      "cta": "View my planning"
+    }
   }
 }

@@ -1,4 +1,6 @@
 import { Resend } from "resend"
+import { getTranslations } from "next-intl/server"
+import { defaultLocale, type Locale } from "@/lib/i18n/config"
 
 // Verified domain on Resend (slot-training.mbapps.cloud — DKIM + SPF + DMARC
 // records added on OVH). Override via RESEND_FROM_EMAIL if you ever need to
@@ -52,9 +54,25 @@ function esc(value: string | undefined | null): string {
     .replace(/'/g, "&#39;")
 }
 
+/**
+ * Wraps the locale-resolution boilerplate. Returns a `t(key)` function
+ * scoped to the email namespace + the dir attribute so RTL languages
+ * (Arabic) get the right HTML directionality.
+ */
+async function loadTemplate(locale: Locale | undefined, sub: string) {
+  const useLocale = locale ?? defaultLocale
+  const t = await getTranslations({ locale: useLocale, namespace: `emails.${sub}` })
+  const dir = useLocale === "ar" ? "rtl" : "ltr"
+  return { t, dir }
+}
+
+const ctaButton = (href: string, label: string) =>
+  `<a href="${esc(href)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">${esc(label)}</a>`
+
 export async function sendCampaignNotification(
   to: string,
   athleteFirstName: string,
+  locale: Locale | undefined,
   campaignData: {
     trainingLocation: string
     startDate: string
@@ -63,7 +81,11 @@ export async function sendCampaignNotification(
     responseLink: string
   }
 ) {
-  const subject = `Nouvelle campagne d'entraînement - ${campaignData.startDate} au ${campaignData.endDate}`
+  const { t, dir } = await loadTemplate(locale, "campaignCreated")
+  const subject = t("subject", {
+    start: campaignData.startDate,
+    end: campaignData.endDate,
+  })
   logEmailInDev(to, subject, { "Response link": campaignData.responseLink })
   try {
     await getResend().emails.send({
@@ -71,20 +93,20 @@ export async function sendCampaignNotification(
       to,
       subject,
       html: `
-        <h2>Bonjour ${esc(athleteFirstName)},</h2>
-        <p>Une nouvelle campagne d'entraînement a été créée :</p>
-        <ul>
-          <li><strong>Lieu :</strong> ${esc(campaignData.trainingLocation)}</li>
-          <li><strong>Période :</strong> ${esc(campaignData.startDate)} au ${esc(campaignData.endDate)}</li>
-          <li><strong>Date limite de réponse :</strong> ${esc(campaignData.deadline)}</li>
-        </ul>
-        <p><a href="${esc(campaignData.responseLink)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Répondre à la campagne</a></p>
-        <p>Merci de répondre avant la date limite.</p>
+        <div dir="${dir}">
+          <h2>${esc(t("greeting", { name: athleteFirstName }))}</h2>
+          <p>${esc(t("intro"))}</p>
+          <ul>
+            <li><strong>${esc(t("location"))} :</strong> ${esc(campaignData.trainingLocation)}</li>
+            <li><strong>${esc(t("period"))} :</strong> ${esc(campaignData.startDate)} → ${esc(campaignData.endDate)}</li>
+            <li><strong>${esc(t("deadline"))} :</strong> ${esc(campaignData.deadline)}</li>
+          </ul>
+          <p>${ctaButton(campaignData.responseLink, t("cta"))}</p>
+          <p>${esc(t("footer"))}</p>
+        </div>
       `,
     })
   } catch (error) {
-    // Log only the error message, never the full object — it may contain
-    // tokens, recipient PII, or Resend payloads we don't want in aggregated logs.
     console.error("[EMAIL] sendCampaignNotification failed:", error instanceof Error ? error.message : "unknown")
   }
 }
@@ -97,6 +119,7 @@ export async function sendCampaignNotification(
 export async function sendCampaignReminderNotification(
   to: string,
   athleteFirstName: string,
+  locale: Locale | undefined,
   reminderData: {
     trainingLocation: string
     startDate: string
@@ -106,7 +129,8 @@ export async function sendCampaignReminderNotification(
     responseLink: string
   }
 ) {
-  const subject = `Rappel : campagne d'entraînement à compléter (clôture dans ${reminderData.hoursRemaining}h)`
+  const { t, dir } = await loadTemplate(locale, "campaignReminder")
+  const subject = t("subject", { hours: reminderData.hoursRemaining })
   logEmailInDev(to, subject, { "Response link": reminderData.responseLink })
   try {
     await getResend().emails.send({
@@ -114,17 +138,16 @@ export async function sendCampaignReminderNotification(
       to,
       subject,
       html: `
-        <h2>Bonjour ${esc(athleteFirstName)},</h2>
-        <p>Petit rappel — vous n'avez pas encore répondu à la campagne d'entraînement.
-        La clôture des réponses est dans <strong>environ ${reminderData.hoursRemaining}h</strong>
-        (le ${esc(reminderData.deadline)}).</p>
-        <ul>
-          <li><strong>Lieu :</strong> ${esc(reminderData.trainingLocation)}</li>
-          <li><strong>Période :</strong> ${esc(reminderData.startDate)} au ${esc(reminderData.endDate)}</li>
-        </ul>
-        <p><a href="${esc(reminderData.responseLink)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Répondre maintenant</a></p>
-        <p style="color:#64748b;font-size:13px">Si vous avez répondu juste à l'instant,
-        vous pouvez ignorer ce message.</p>
+        <div dir="${dir}">
+          <h2>${esc(athleteFirstName)},</h2>
+          <p>${esc(t("intro", { hours: reminderData.hoursRemaining, deadline: reminderData.deadline }))}</p>
+          <ul>
+            <li><strong>${esc(reminderData.trainingLocation)}</strong></li>
+            <li>${esc(reminderData.startDate)} → ${esc(reminderData.endDate)}</li>
+          </ul>
+          <p>${ctaButton(reminderData.responseLink, t("cta"))}</p>
+          <p style="color:#64748b;font-size:13px">${esc(t("footer"))}</p>
+        </div>
       `,
     })
   } catch (error) {
@@ -147,6 +170,7 @@ export interface PlanningSession {
 export async function sendPlanningNotification(
   to: string,
   athleteFirstName: string,
+  locale: Locale | undefined,
   planningData: {
     // Empty array = the athlete has no plannable session this week. The email
     // body falls back to a "no slot found" message in that case.
@@ -154,49 +178,59 @@ export async function sendPlanningNotification(
     trainingLocation: string
     planningLink: string
     // Optional reason explaining why no session could be planned, surfaced
-    // when \`sessions\` is empty.
+    // when `sessions` is empty.
     reason?: string
   }
 ) {
+  const { t, dir } = await loadTemplate(locale, "planningValidated")
   try {
     let content: string
     if (planningData.sessions.length === 0) {
-      content = `<p>Malheureusement, aucun créneau compatible n'a pu être trouvé pour cette campagne.</p><p>Raison : ${esc(planningData.reason) || "Aucun créneau sans conflit avec votre emploi du temps."}</p>`
+      const reason = planningData.reason || t("noSessionsDefault")
+      content = `<p>${esc(t("noSessions"))}</p><p>${esc(t("noSessionsReason", { reason }))}</p>`
     } else {
       const sessionList = planningData.sessions
         .map((s) => {
+          // Translated session-type label (collectif/individuel → matching
+          // word in the recipient's language). The `type` field is stored as
+          // the French token but we map it on the way out.
+          const typeLabel =
+            s.type === "collectif"
+              ? t("sessionTypeCollective")
+              : t("sessionTypeIndividual")
+
           // Prefer the per-mode pair when available; fall back to the legacy
           // single-number for old campaigns whose optimisationResult predates
           // the walking/driving split.
           let travel = ""
           if (s.walkingMinutes !== undefined && s.drivingMinutes !== undefined) {
-            travel = `<li><strong>Trajet estimé :</strong> à pied ${s.walkingMinutes} min, en voiture ${s.drivingMinutes} min</li>`
+            travel = `<li>${esc(t("estimatedTravelPair", { walking: s.walkingMinutes, driving: s.drivingMinutes }))}</li>`
           } else if (s.travelMinutes !== undefined) {
-            travel = `<li><strong>Trajet estimé :</strong> ${s.travelMinutes} min</li>`
+            travel = `<li>${esc(t("estimatedTravel", { minutes: s.travelMinutes }))}</li>`
           }
           const departure = s.departureTime
-            ? `<li><strong>Heure de départ :</strong> ${esc(s.departureTime)}</li>`
+            ? `<li><strong>${esc(t("departureTime"))} :</strong> ${esc(s.departureTime)}</li>`
             : ""
           const departureAddress = s.departureAddress
-            ? `<li><strong>Adresse de départ :</strong> ${esc(s.departureAddress)}</li>`
+            ? `<li><strong>${esc(t("departureAddress"))} :</strong> ${esc(s.departureAddress)}</li>`
             : ""
           return `
             <li style="margin-bottom:12px">
               <strong>${esc(s.day)} ${esc(s.startTime)} – ${esc(s.endTime)}</strong>
-              (séance ${esc(s.type)})
+              ${esc(t("sessionType", { type: typeLabel }))}
               <ul>${departure}${travel}${departureAddress}</ul>
             </li>
           `
         })
         .join("")
       content = `
-        <p>Voici vos ${planningData.sessions.length} séance(s) pour la semaine :</p>
+        <p>${esc(t("introWithSessions", { count: planningData.sessions.length }))}</p>
         <ul>${sessionList}</ul>
-        <p><strong>Lieu d'entraînement :</strong> ${esc(planningData.trainingLocation)}</p>
+        <p><strong>${esc(t("trainingLocation"))} :</strong> ${esc(planningData.trainingLocation)}</p>
       `
     }
 
-    const subject = "Votre planning d'entraînement est disponible"
+    const subject = t("subject")
     logEmailInDev(to, subject, {
       "Sessions": String(planningData.sessions.length),
       "Link": planningData.planningLink,
@@ -206,10 +240,11 @@ export async function sendPlanningNotification(
       to,
       subject,
       html: `
-        <h2>Bonjour ${esc(athleteFirstName)},</h2>
-        <p>Le planning de votre période d'entraînement a été validé.</p>
-        ${content}
-        <p><a href="${esc(planningData.planningLink)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Voir mon planning</a></p>
+        <div dir="${dir}">
+          <h2>${esc(athleteFirstName)},</h2>
+          ${content}
+          <p>${ctaButton(planningData.planningLink, t("cta"))}</p>
+        </div>
       `,
     })
   } catch (error) {
@@ -220,6 +255,7 @@ export async function sendPlanningNotification(
 export async function sendCampaignUpdatedNotification(
   to: string,
   athleteFirstName: string,
+  locale: Locale | undefined,
   campaignData: {
     trainingLocation: string
     startDate: string
@@ -228,7 +264,17 @@ export async function sendCampaignUpdatedNotification(
     responseLink: string
   }
 ) {
-  const subject = `Mise à jour de la campagne - ${campaignData.startDate} au ${campaignData.endDate}`
+  const { t, dir } = await loadTemplate(locale, "campaignUpdated")
+  // The "created" namespace owns the field labels (location/period/deadline)
+  // — reuse them rather than duplicating in every template namespace.
+  const tCreated = await getTranslations({
+    locale: locale ?? defaultLocale,
+    namespace: "emails.campaignCreated",
+  })
+  const subject = t("subject", {
+    start: campaignData.startDate,
+    end: campaignData.endDate,
+  })
   logEmailInDev(to, subject, { "Response link": campaignData.responseLink })
   try {
     await getResend().emails.send({
@@ -236,14 +282,16 @@ export async function sendCampaignUpdatedNotification(
       to,
       subject,
       html: `
-        <h2>Bonjour ${esc(athleteFirstName)},</h2>
-        <p>Une campagne d'entraînement à laquelle vous participez a été modifiée. Merci de revérifier vos disponibilités :</p>
-        <ul>
-          <li><strong>Lieu :</strong> ${esc(campaignData.trainingLocation)}</li>
-          <li><strong>Période :</strong> ${esc(campaignData.startDate)} au ${esc(campaignData.endDate)}</li>
-          <li><strong>Date limite de réponse :</strong> ${esc(campaignData.deadline)}</li>
-        </ul>
-        <p><a href="${esc(campaignData.responseLink)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Mettre à jour ma réponse</a></p>
+        <div dir="${dir}">
+          <h2>${esc(athleteFirstName)},</h2>
+          <p>${esc(t("intro"))}</p>
+          <ul>
+            <li><strong>${esc(tCreated("location"))} :</strong> ${esc(campaignData.trainingLocation)}</li>
+            <li><strong>${esc(tCreated("period"))} :</strong> ${esc(campaignData.startDate)} → ${esc(campaignData.endDate)}</li>
+            <li><strong>${esc(tCreated("deadline"))} :</strong> ${esc(campaignData.deadline)}</li>
+          </ul>
+          <p>${ctaButton(campaignData.responseLink, t("cta"))}</p>
+        </div>
       `,
     })
   } catch (error) {
@@ -254,14 +302,19 @@ export async function sendCampaignUpdatedNotification(
 export async function sendCampaignDeletedNotification(
   to: string,
   athleteFirstName: string,
+  locale: Locale | undefined,
   campaignData: {
     startDate: string
     endDate: string
   }
 ) {
-  const subject = `Annulation de campagne - ${campaignData.startDate} au ${campaignData.endDate}`
+  const { t, dir } = await loadTemplate(locale, "campaignDeleted")
+  const subject = t("subject", {
+    start: campaignData.startDate,
+    end: campaignData.endDate,
+  })
   logEmailInDev(to, subject, {
-    "Period": `${campaignData.startDate} au ${campaignData.endDate}`,
+    "Period": `${campaignData.startDate} → ${campaignData.endDate}`,
   })
   try {
     await getResend().emails.send({
@@ -269,9 +322,10 @@ export async function sendCampaignDeletedNotification(
       to,
       subject,
       html: `
-        <h2>Bonjour ${esc(athleteFirstName)},</h2>
-        <p>La campagne d'entraînement prévue du <strong>${esc(campaignData.startDate)}</strong> au <strong>${esc(campaignData.endDate)}</strong> a été <strong>annulée</strong> par votre entraîneur.</p>
-        <p>Aucune action n'est requise de votre part. Vos données pour cette campagne ont été supprimées.</p>
+        <div dir="${dir}">
+          <h2>${esc(athleteFirstName)},</h2>
+          <p>${esc(t("intro"))}</p>
+        </div>
       `,
     })
   } catch (error) {
@@ -279,25 +333,30 @@ export async function sendCampaignDeletedNotification(
   }
 }
 
-export async function sendDeletionConfirmation(to: string, firstName: string) {
-  const subject = "Confirmation de suppression de vos données"
+export async function sendDeletionConfirmation(to: string, firstName: string, locale?: Locale) {
+  // Single-paragraph GDPR confirmation — translate inline rather than
+  // creating a 6th nested namespace for one fixed message.
+  const useLocale = locale ?? defaultLocale
+  const dir = useLocale === "ar" ? "rtl" : "ltr"
+  const subject =
+    useLocale === "en"
+      ? "Confirmation of your data deletion"
+      : useLocale === "ar"
+        ? "تأكيد حذف بياناتك"
+        : "Confirmation de suppression de vos données"
+  const body =
+    useLocale === "en"
+      ? "All your personal data has been deleted as requested. This action is irreversible."
+      : useLocale === "ar"
+        ? "تم حذف جميع بياناتك الشخصية بناءً على طلبك. هذا الإجراء لا يمكن التراجع عنه."
+        : "Conformément à votre demande, toutes vos données personnelles ont été supprimées. Cette action est irréversible."
   logEmailInDev(to, subject, { "First name": firstName })
   try {
     await getResend().emails.send({
       from: FROM_EMAIL,
       to,
       subject,
-      html: `
-        <h2>Bonjour ${esc(firstName)},</h2>
-        <p>Conformément à votre demande, toutes vos données personnelles ont été supprimées :</p>
-        <ul>
-          <li>Adresses (domicile, études, club)</li>
-          <li>Emploi du temps</li>
-          <li>Contraintes spécifiques</li>
-          <li>Compte utilisateur</li>
-        </ul>
-        <p>Cette action est irréversible. Merci d'avoir utilisé Slot Training.</p>
-      `,
+      html: `<div dir="${dir}"><h2>${esc(firstName)},</h2><p>${esc(body)}</p></div>`,
     })
   } catch (error) {
     console.error("[EMAIL] sendDeletionConfirmation failed:", error instanceof Error ? error.message : "unknown")
