@@ -69,6 +69,39 @@ async function loadTemplate(locale: Locale | undefined, sub: string) {
 const ctaButton = (href: string, label: string) =>
   `<a href="${esc(href)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">${esc(label)}</a>`
 
+export async function sendStaffInvitationNotification(
+  to: string,
+  inviterName: string,
+  locale: Locale | undefined,
+  data: { groupName: string; inviteLink: string; alreadyHasAccount: boolean }
+) {
+  const { t, dir } = await loadTemplate(locale, "staffInvitation")
+  const subject = t("subject", { group: data.groupName })
+  logEmailInDev(to, subject, { "Invite link": data.inviteLink })
+  try {
+    await getResend().emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject,
+      html: `
+        <div dir="${dir}">
+          <h2>${esc(t("title"))}</h2>
+          <p>${esc(t("intro", { inviter: inviterName, group: data.groupName }))}</p>
+          <p>${esc(data.alreadyHasAccount ? t("loginCta") : t("createCta"))}</p>
+          <p>${ctaButton(data.inviteLink, data.alreadyHasAccount ? t("loginButton") : t("createButton"))}</p>
+          <p style="color:#6b7280;font-size:12px">${esc(t("expiry"))}</p>
+          <p>${esc(t("footer"))}</p>
+        </div>
+      `,
+    })
+  } catch (error) {
+    console.error(
+      "[EMAIL] sendStaffInvitationNotification failed:",
+      error instanceof Error ? error.message : "unknown"
+    )
+  }
+}
+
 export async function sendCampaignNotification(
   to: string,
   athleteFirstName: string,

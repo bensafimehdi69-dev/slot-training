@@ -95,6 +95,9 @@
     "emailPlaceholder": "member@team.com",
     "add": "إضافة",
     "added": "تم منح الوصول.",
+    "invited": "تم إرسال الدعوة إلى {email}.",
+    "inviteCancelled": "تم إلغاء الدعوة.",
+    "pendingBadge": "في الانتظار",
     "removed": "تم إلغاء الوصول.",
     "currentViewers": "الوصول الحالي ({count})",
     "none": "لا أحد حتى الآن.",
@@ -348,6 +351,17 @@
     "feature4Desc": "من 3 ساعات تنسيق إلى أقل من 15 دقيقة."
   },
   "emails": {
+    "staffInvitation": {
+      "subject": "دعوة للانضمام إلى المجموعة « {group} »",
+      "title": "دعوة إلى مجموعة تدريب",
+      "intro": "يدعوك {inviter} للانضمام إلى المجموعة « {group} » بصفة مشاهد (للقراءة فقط).",
+      "loginCta": "لديك حساب مدير بالفعل. سجّل الدخول للوصول إلى المجموعة.",
+      "createCta": "أنشئ حساب مدير للوصول إلى المجموعة.",
+      "loginButton": "تسجيل الدخول",
+      "createButton": "إنشاء حسابي",
+      "expiry": "تنتهي صلاحية هذا الرابط خلال 30 يومًا.",
+      "footer": "إذا لم تكن تتوقع هذه الدعوة، يمكنك تجاهلها."
+    },
     "campaignCreated": {
       "subject": "حملة تدريب جديدة - من {start} إلى {end}",
       "greeting": "مرحبًا {name},",
