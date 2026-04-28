@@ -28,26 +28,26 @@ const firebaseConfig = {
 if (firebaseConfig.apiKey) {
   // eslint-disable-next-line no-undef
   firebase.initializeApp(firebaseConfig)
+  // The messaging instance must be created so the SDK installs its internal
+  // `push` event listener — without it, FCM cannot deliver pushes to this SW.
+  // We deliberately do NOT register `onBackgroundMessage`: Chrome auto-renders
+  // the notification from the payload's `notification` field, so adding our
+  // own handler would surface a duplicate.
   // eslint-disable-next-line no-undef
-  const messaging = firebase.messaging()
-
-  // Background message handler: shown when the PWA is not in focus. The
-  // server sends DATA-ONLY messages (see lib/server/push.ts) so the browser
-  // doesn't auto-display a notification — this handler is the only display
-  // path, which keeps us at exactly one notification per push instead of the
-  // duplicate Chrome shows when a top-level `notification` field is present.
-  messaging.onBackgroundMessage((payload) => {
-    const data = payload.data ?? {}
-    const title = data.title || "Slot Training"
-    const options = {
-      body: data.body || "",
-      icon: "/icon.svg",
-      badge: "/icon.svg",
-      data,
-    }
-    self.registration.showNotification(title, options)
-  })
+  firebase.messaging()
 }
+
+// Take over from the previous SW as soon as we install. Combined with
+// clients.claim() below, this means the new SW becomes the active one on the
+// next page load instead of waiting for the user to close every tab/PWA —
+// which would otherwise leave older SW versions running for a long time.
+self.addEventListener("install", () => {
+  self.skipWaiting()
+})
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim())
+})
 
 // Click handler: bring the app to focus, or open a relevant URL if the
 // payload provides one in `data.url`.

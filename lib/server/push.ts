@@ -76,20 +76,29 @@ export async function sendPushToUser(
   const tokens = snap.docs.map((d) => d.id)
   const messaging = getMessaging()
 
-  // Data-only payload: no top-level `notification` and no `webpush.notification`.
-  // When either is set, Chrome's FCM SW auto-displays the notif AND fires
-  // `onBackgroundMessage` — the user ends up with two identical popups. By
-  // shipping a data-only message, only our SW handler renders the notification,
-  // so we get exactly one.
-  const data: Record<string, string> = {
-    title: payload.title,
-    body: payload.body,
-  }
-  if (payload.url) data.url = payload.url
-
+  // Why we send `notification` AND no `onBackgroundMessage` handler in the SW:
+  // FCM duplicates notifications when both the payload has a `notification`
+  // field (Chrome auto-displays it) AND our SW registers an
+  // `onBackgroundMessage` handler that calls `showNotification`. We removed
+  // the SW handler — Chrome's auto-display now renders the notification
+  // exactly once. Older SW versions on user devices still expect the
+  // `notification` field to be present, which is why we keep sending it: it
+  // makes the legacy SW render the right title/body during the brief window
+  // before the new SW activates.
   const response = await messaging.sendEachForMulticast({
     tokens,
-    data,
+    notification: {
+      title: payload.title,
+      body: payload.body,
+    },
+    data: payload.url ? { url: payload.url } : undefined,
+    webpush: {
+      fcmOptions: payload.url ? { link: payload.url } : undefined,
+      notification: {
+        icon: "/icon.svg",
+        badge: "/icon.svg",
+      },
+    },
   })
 
   let pruned = 0
