@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import {
   Users,
   Pencil,
@@ -54,6 +55,8 @@ interface GroupCardProps {
 }
 
 export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardProps) {
+  const t = useTranslations("managerDashboard")
+  const tc = useTranslations("common")
   const [editOpen, setEditOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -73,7 +76,7 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success("Groupe modifié.")
+        toast.success(t("groupUpdated"))
         setEditOpen(false)
         onRefresh()
       }
@@ -92,7 +95,7 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success("Groupe supprimé.")
+        toast.success(t("groupDeleted"))
         onRefresh()
       }
     } finally {
@@ -119,7 +122,9 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
             <div className="min-w-0">
               <CardTitle className="text-lg">{group.name}</CardTitle>
               <CardDescription>
-                Créé le {new Date(group.createdAt).toLocaleDateString("fr-FR")}
+                {t("createdOn", {
+                  date: new Date(group.createdAt).toLocaleDateString(),
+                })}
               </CardDescription>
             </div>
           </button>
@@ -132,13 +137,13 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Modifier le groupe</DialogTitle>
-                  <DialogDescription>Modifiez le nom du groupe.</DialogDescription>
+                  <DialogTitle>{t("editGroupTitle")}</DialogTitle>
+                  <DialogDescription>{t("editGroupDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleEdit}>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor={`edit-name-${group.id}`}>Nom du groupe</Label>
+                      <Label htmlFor={`edit-name-${group.id}`}>{t("groupNameLabel")}</Label>
                       <Input
                         id={`edit-name-${group.id}`}
                         name="name"
@@ -150,7 +155,7 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
                   <DialogFooter>
                     <Button type="submit" disabled={editing}>
                       {editing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Enregistrer
+                      {tc("save")}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -173,15 +178,18 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Supprimer le groupe « {group.name} » ?</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    {t("deleteGroupTitle", { name: group.name })}
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
-                    Cette action est irréversible. Tous les athlètes, campagnes
-                    et réponses associés à ce groupe seront définitivement supprimés.
+                    {t("deleteGroupDescription")}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete}>Supprimer</AlertDialogAction>
+                  <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete}>
+                    {tc("delete")}
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -198,8 +206,8 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh }: GroupCardP
         <CardContent id={panelId}>
           <Tabs defaultValue="athletes" className="w-full">
             <TabsList>
-              <TabsTrigger value="athletes">Athlètes</TabsTrigger>
-              <TabsTrigger value="campaigns">Campagnes</TabsTrigger>
+              <TabsTrigger value="athletes">{t("tabAthletes")}</TabsTrigger>
+              <TabsTrigger value="campaigns">{t("tabCampaigns")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="athletes" className="mt-4">
