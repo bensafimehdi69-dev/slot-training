@@ -92,13 +92,10 @@ export function listenForForegroundMessages(
   if (typeof window === "undefined") return () => {}
   const messaging = getMessaging(app)
   return onMessage(messaging, (payload) => {
-    // Server now ships data-only payloads (see lib/server/push.ts) so title
-    // and body live under `data` rather than `notification`.
-    const data = payload.data ?? {}
     handler({
-      title: typeof data.title === "string" ? data.title : payload.notification?.title,
-      body: typeof data.body === "string" ? data.body : payload.notification?.body,
-      url: typeof data.url === "string" ? data.url : undefined,
+      title: payload.notification?.title,
+      body: payload.notification?.body,
+      url: typeof payload.data?.url === "string" ? payload.data.url : undefined,
     })
   })
 }
