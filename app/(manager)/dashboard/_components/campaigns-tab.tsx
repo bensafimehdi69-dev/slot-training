@@ -80,6 +80,25 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
     loadCampaigns()
   }, [loadCampaigns])
 
+  // Live updates: refetch when the manager comes back to the tab/window and
+  // poll every 30 s while the campaigns view is mounted, so athlete responses
+  // appear without a manual refresh. Polling is paused while the document is
+  // hidden so we don't burn round-trips when the app is in the background.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const refresh = () => {
+      if (document.visibilityState === "visible") loadCampaigns()
+    }
+    document.addEventListener("visibilitychange", refresh)
+    window.addEventListener("focus", refresh)
+    const interval = window.setInterval(refresh, 30_000)
+    return () => {
+      document.removeEventListener("visibilitychange", refresh)
+      window.removeEventListener("focus", refresh)
+      window.clearInterval(interval)
+    }
+  }, [loadCampaigns])
+
   // Load athletes when the create dialog opens — keeps the initial render
   // cheap when the manager isn't planning to create a campaign right now.
   useEffect(() => {

@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Users,
   User,
@@ -45,19 +44,21 @@ export function DailyPlanningView({ dailyPlannings }: DailyPlanningViewProps) {
   )
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-blue-600" />
-          {tp("perDayTitle", { count: totalSessions })}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    // Section, not Card — the planning view already lives inside the
+    // CampaignCard's CardContent, so wrapping it in another Card stacked
+    // a third 24px padding on each side and squeezed the day blocks. Plain
+    // section reclaims the horizontal space for the slots themselves.
+    <section className="space-y-2">
+      <h3 className="flex items-center gap-2 text-base font-semibold">
+        <CalendarDays className="h-4 w-4 text-blue-600" />
+        {tp("perDayTitle", { count: totalSessions })}
+      </h3>
+      <div className="space-y-2">
         {dailyPlannings.map((planning) => (
           <DayBlock key={planning.dayKey} planning={planning} />
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
@@ -67,8 +68,8 @@ function DayBlock({ planning }: { planning: DailyPlanning }) {
     planning.endOfDaySession !== null || planning.morningSessions.length > 0
 
   return (
-    <div className="rounded-lg border p-3">
-      <div className="mb-2 flex items-center justify-between">
+    <div className="rounded-lg border p-2 sm:p-3">
+      <div className="mb-1.5 flex items-center justify-between">
         <p className="font-medium">{planning.day}</p>
         {!hasAny && (
           <span className="text-xs italic text-muted-foreground">

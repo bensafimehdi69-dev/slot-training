@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "next-intl"
 import { Copy, RefreshCw, Trash2, Loader2 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -154,14 +153,6 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
                   aria-label={t("profilePending")}
                   title={t("profilePending")}
                 />
-              )}
-              {athlete.gdprConsent && (
-                <Badge
-                  variant="secondary"
-                  className="shrink-0 px-1.5 py-0 text-[10px] leading-4"
-                >
-                  {t("gdprBadge")}
-                </Badge>
               )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
