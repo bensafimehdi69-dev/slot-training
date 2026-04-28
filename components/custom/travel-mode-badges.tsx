@@ -1,13 +1,18 @@
 import { Badge } from "@/components/ui/badge"
-import { Car, Footprints, Clock } from "lucide-react"
+import { Car, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface TravelModeBadgesProps {
+  // Walking time is accepted in the props for backwards compatibility with
+  // existing callers but is no longer displayed — Google's walking
+  // estimates are unrealistic for far destinations (multi-hour walks for
+  // 20+ km), so we only surface the driving time which is what athletes
+  // actually use.
   walkingMinutes?: number
   drivingMinutes?: number
   // Legacy single-mode value used for older optimisations that predate the
-  // walking/driving split. If walkingMinutes/drivingMinutes are unset, this
-  // renders as a single Clock badge so the historical data stays readable.
+  // mode split. Rendered as a single Clock badge so historical data stays
+  // readable.
   fallbackMinutes?: number
   className?: string
 }
@@ -25,50 +30,32 @@ function format(minutes: number): string {
   return m > 0 ? `${h}h${m.toString().padStart(2, "0")}` : `${h}h`
 }
 
-/**
- * Side-by-side walking + driving travel pills. Falls back to a single
- * Clock badge when only legacy `fallbackMinutes` is available.
- */
 export function TravelModeBadges({
-  walkingMinutes,
   drivingMinutes,
   fallbackMinutes,
   className,
 }: TravelModeBadgesProps) {
-  const hasPair =
-    typeof walkingMinutes === "number" && typeof drivingMinutes === "number"
-
-  if (!hasPair) {
-    if (typeof fallbackMinutes !== "number") return null
+  if (typeof drivingMinutes === "number") {
     return (
       <Badge
         variant="outline"
-        className={cn(colourFor(fallbackMinutes), className)}
+        className={cn(colourFor(drivingMinutes), className)}
+        aria-label={`En voiture : ${format(drivingMinutes)}`}
       >
-        <Clock className="mr-1 h-3 w-3" />
-        {format(fallbackMinutes)}
+        <Car className="mr-1 h-3 w-3" />
+        {format(drivingMinutes)}
       </Badge>
     )
   }
 
+  if (typeof fallbackMinutes !== "number") return null
   return (
-    <span className={cn("inline-flex items-center gap-1", className)}>
-      <Badge
-        variant="outline"
-        className={colourFor(walkingMinutes!)}
-        aria-label={`À pied : ${format(walkingMinutes!)}`}
-      >
-        <Footprints className="mr-1 h-3 w-3" />
-        {format(walkingMinutes!)}
-      </Badge>
-      <Badge
-        variant="outline"
-        className={colourFor(drivingMinutes!)}
-        aria-label={`En voiture : ${format(drivingMinutes!)}`}
-      >
-        <Car className="mr-1 h-3 w-3" />
-        {format(drivingMinutes!)}
-      </Badge>
-    </span>
+    <Badge
+      variant="outline"
+      className={cn(colourFor(fallbackMinutes), className)}
+    >
+      <Clock className="mr-1 h-3 w-3" />
+      {format(fallbackMinutes)}
+    </Badge>
   )
 }

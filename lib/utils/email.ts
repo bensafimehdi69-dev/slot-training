@@ -199,12 +199,12 @@ export async function sendPlanningNotification(
               ? t("sessionTypeCollective")
               : t("sessionTypeIndividual")
 
-          // Prefer the per-mode pair when available; fall back to the legacy
-          // single-number for old campaigns whose optimisationResult predates
-          // the walking/driving split.
+          // Show driving time only — walking estimates are unrealistic for
+          // far destinations. Falls back to the legacy single-number for old
+          // campaigns that predate the walking/driving split.
           let travel = ""
-          if (s.walkingMinutes !== undefined && s.drivingMinutes !== undefined) {
-            travel = `<li>${esc(t("estimatedTravelPair", { walking: s.walkingMinutes, driving: s.drivingMinutes }))}</li>`
+          if (s.drivingMinutes !== undefined) {
+            travel = `<li>${esc(t("estimatedTravelDriving", { driving: s.drivingMinutes }))}</li>`
           } else if (s.travelMinutes !== undefined) {
             travel = `<li>${esc(t("estimatedTravel", { minutes: s.travelMinutes }))}</li>`
           }

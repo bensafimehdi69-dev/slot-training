@@ -265,7 +265,6 @@
     "open": "فتح"
   },
   "travel": {
-    "byFoot": "مشيًا {minutes} دقيقة",
     "byCar": "بالسيارة {minutes} دقيقة"
   },
   "joinForm": {
@@ -365,7 +364,7 @@
       "sessionTypeCollective": "جماعية",
       "sessionTypeIndividual": "فردية",
       "departureTime": "وقت المغادرة",
-      "estimatedTravelPair": "وقت الانتقال المقدر: مشيًا {walking} دقيقة، بالسيارة {driving} دقيقة",
+      "estimatedTravelDriving": "وقت الانتقال المقدر: بالسيارة {driving} دقيقة",
       "estimatedTravel": "وقت الانتقال المقدر: {minutes} دقيقة",
       "departureAddress": "عنوان الانطلاق",
       "trainingLocation": "مكان التدريب",
