@@ -6,7 +6,11 @@ export interface SlotResult {
   unavailableAthletes: AthleteSlotInfo[]
   availableCount: number
   totalCount: number
+  // averageTravelMinutes = average of the per-athlete worst-case (longest)
+  // travel; the per-mode averages are surfaced for the session pill display.
   averageTravelMinutes: number
+  averageWalkingMinutes?: number
+  averageDrivingMinutes?: number
 }
 
 export interface AthleteSlotInfo {
@@ -15,7 +19,13 @@ export interface AthleteSlotInfo {
   lastName: string
   available: boolean
   reason?: string
+  // travelMinutes = max(walkingMinutes, drivingMinutes), kept as the single
+  // sortable / averageable number. The two mode-specific fields are surfaced
+  // to the UI so the manager sees "à pied 25 min / en voiture 12 min" and
+  // can pick a session that works for both kinds of athletes.
   travelMinutes?: number
+  walkingMinutes?: number
+  drivingMinutes?: number
   departureAddress?: string
   departureTime?: string
 }
@@ -28,6 +38,8 @@ export interface IndividualSlot {
   startTime: string
   endTime: string
   travelMinutes: number
+  walkingMinutes?: number
+  drivingMinutes?: number
   departureAddress: string
   departureTime: string
   exclusionReason: string
@@ -48,6 +60,8 @@ export interface DailySession {
   durationMinutes: number
   athletes: AthleteSlotInfo[]
   averageTravelMinutes: number
+  averageWalkingMinutes?: number
+  averageDrivingMinutes?: number
 }
 
 export interface DailyPlanning {

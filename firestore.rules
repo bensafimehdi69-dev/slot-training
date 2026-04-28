@@ -12,6 +12,13 @@ service cloud.firestore {
     match /managers/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
 
+      // FCM push tokens: server-side writes via the registerFcmToken action
+      // (Admin SDK), but allow client read so a manager can see / clear
+      // their own registrations from a future "Devices" UI.
+      match /fcmTokens/{tokenId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
       match /groups/{groupId} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
 
@@ -41,6 +48,11 @@ service cloud.firestore {
     // Athletes: only the athlete can read/write their own encrypted profile.
     match /athletes/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // Same fcmTokens pattern as on the manager side.
+      match /fcmTokens/{tokenId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // Reverse indexes: server-only (Admin SDK). Deny every client read or

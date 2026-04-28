@@ -107,7 +107,8 @@ export function CampaignEditDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[90vh] max-w-md flex-col overflow-hidden"
+        // Mobile: full-height takeover; desktop: centered modal capped at 90vh.
+        className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:gap-4 sm:rounded-lg sm:p-6"
         onPointerDownOutside={(e) => {
           const target = e.target as Element | null
           if (target?.closest(".pac-container")) e.preventDefault()
@@ -117,7 +118,7 @@ export function CampaignEditDialog({
           if (target?.closest(".pac-container")) e.preventDefault()
         }}
       >
-        <DialogHeader>
+        <DialogHeader className="border-b p-4 sm:border-b-0 sm:p-0">
           <DialogTitle>Modifier la campagne</DialogTitle>
           <DialogDescription>
             Toute modification réinitialise l&apos;optimisation et envoie un email
@@ -125,7 +126,7 @@ export function CampaignEditDialog({
           </DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 space-y-4 overflow-y-auto py-4 pr-1">
+          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-0 sm:py-4 sm:pr-1">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-startDate">Date de début</Label>
@@ -204,8 +205,12 @@ export function CampaignEditDialog({
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button type="submit" disabled={saving}>
+          <DialogFooter className="border-t p-4 sm:border-t-0 sm:p-0">
+            <Button
+              type="submit"
+              disabled={saving}
+              className="w-full sm:w-auto"
+            >
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Enregistrer
             </Button>

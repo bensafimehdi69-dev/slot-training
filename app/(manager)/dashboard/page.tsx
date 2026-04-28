@@ -16,8 +16,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { getGroups, createGroup } from "./actions"
+import { getGroups, createGroup, runScheduledCampaignTasks } from "./actions"
 import { GroupCard } from "./_components/group-card"
+import { NotificationsToggle } from "@/components/custom/notifications-toggle"
 import type { Group } from "@/lib/types/group"
 
 export default function DashboardPage() {
@@ -43,6 +44,36 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadGroups()
+  }, [loadGroups])
+
+  // Lazy cron: every time the manager opens the dashboard, run housekeeping.
+  // Closes campaigns whose deadline has passed and emails non-responders 48h
+  // before the deadline. Idempotent server-side via lastReminderSentAt.
+  useEffect(() => {
+    let cancelled = false
+    runScheduledCampaignTasks().then((result) => {
+      if (cancelled || !result.data) return
+      const { closedCount, remindersSentCount } = result.data
+      if (closedCount > 0) {
+        toast.info(
+          closedCount === 1
+            ? "1 campagne finalisée automatiquement (deadline dépassée)."
+            : `${closedCount} campagnes finalisées automatiquement (deadline dépassée).`
+        )
+        // Refresh so the newly-closed campaigns show their updated status.
+        loadGroups()
+      }
+      if (remindersSentCount > 0) {
+        toast.info(
+          remindersSentCount === 1
+            ? "1 rappel envoyé aux athlètes n'ayant pas encore répondu."
+            : `${remindersSentCount} rappels envoyés aux athlètes n'ayant pas encore répondu.`
+        )
+      }
+    })
+    return () => {
+      cancelled = true
+    }
   }, [loadGroups])
 
   // Auto-expand the first group on initial load. Separated from loadGroups()
@@ -100,7 +131,9 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">Gérez vos groupes, campagnes et plannings.</p>
         </div>
-        <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
+        <div className="flex flex-wrap items-center gap-2">
+          <NotificationsToggle />
+          <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
@@ -129,7 +162,8 @@ export default function DashboardPage() {
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {groups.length === 0 ? (

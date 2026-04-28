@@ -24,6 +24,23 @@ export interface Campaign {
   optimizationResult: OptimizationResult | null
   planningStatus: "pending" | "validated" | "rejected"
   planningStatusUpdatedAt: Date | null
+  // Athlete UIDs targeted by this campaign. Undefined on legacy campaigns —
+  // those are treated as "all current athletes in the group".
+  targetAthleteIds?: string[]
+}
+
+export interface CampaignResponder {
+  athleteId: string
+  firstName: string
+  lastName: string
+  hasResponded: boolean
+}
+
+// Manager-only view of a campaign that bundles the responder list inline.
+// Used by the dashboard so it doesn't have to fan out one extra fetch per
+// campaign card. Athletes never see this shape.
+export interface ManagerCampaign extends Campaign {
+  responders: CampaignResponder[]
 }
 
 export interface CampaignResponse {

@@ -93,6 +93,40 @@ export function getDepartureInfo(
   }
 }
 
+/**
+ * Does any occupied cell overlap the training slot [slotStartTime, slotEndTime)?
+ *
+ * `getDepartureInfo` only checks whether the athlete is occupied at the slot's
+ * START. A 90-minute training slot can begin during a free hour and then
+ * extend into an occupied one (cours/maison qui commence plus tard) — that's
+ * still a conflict and must rule the athlete out for the slot. The optimizer
+ * calls this in addition to `getDepartureInfo` to catch mid-slot conflicts.
+ */
+export function getOverlapConflict(
+  daySchedule: DaySchedule,
+  slotStartTime: string,
+  slotEndTime: string
+): { conflict: true; reason: string } | { conflict: false } {
+  if (!daySchedule || daySchedule.length === 0) return { conflict: false }
+  const slotStartMinutes = timeToMinutes(slotStartTime)
+  const slotEndMinutes = timeToMinutes(slotEndTime)
+  for (const slot of daySchedule) {
+    const classStart = timeToMinutes(slot.hour)
+    const classEnd = classStart + 60
+    // Standard interval-overlap test: half-open [start, end) intersection.
+    if (classStart < slotEndMinutes && classEnd > slotStartMinutes) {
+      const isHome = slot.location === "home"
+      return {
+        conflict: true,
+        reason: isHome
+          ? `À la maison de ${minutesToTime(classStart)} à ${minutesToTime(classEnd)}`
+          : `Cours de ${minutesToTime(classStart)} à ${minutesToTime(classEnd)}`,
+      }
+    }
+  }
+  return { conflict: false }
+}
+
 interface ReturnResult {
   // Where the athlete needs to be after the training slot finishes — the
   // first occupied cell that comes after \`slotEndTime\` decides this. If

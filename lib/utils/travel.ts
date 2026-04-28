@@ -24,28 +24,37 @@ function currentWeekBucket(): string {
   return `${now.getUTCFullYear()}-W${week.toString().padStart(2, "0")}`
 }
 
-interface TravelResult {
-  durationMinutes: number
+export interface TravelResult {
+  // Walking and driving durations in minutes. Both are fetched in parallel so
+  // the planning UI can display both modes; the optimiser uses the longer of
+  // the two as the worst-case travel budget when deciding feasibility.
+  walkingMinutes: number
+  drivingMinutes: number
+  // Driving distance — kept for telemetry / "unusually long" alert logging.
   distanceKm: number
 }
 
 /**
- * Calls Google Distance Matrix directly. No more `/api/maps/distance`
- * round-trip, no more module-global `mapsAvailable` circuit breaker
- * (which was process-scoped on serverless and stuck `false` forever on
- * a transient failure). Callers decide how to react to a null return.
+ * Calls Google Distance Matrix for a single mode. Caller fans out walking
+ * and driving in parallel.
  */
 async function fetchTravelFromGoogle(
   origin: string,
-  destination: string
-): Promise<TravelResult | null> {
+  destination: string,
+  mode: "walking" | "driving"
+): Promise<{ durationMinutes: number; distanceKm: number } | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
   if (!apiKey) return null
 
   const url = new URL("https://maps.googleapis.com/maps/api/distancematrix/json")
   url.searchParams.set("origins", origin)
   url.searchParams.set("destinations", destination)
-  url.searchParams.set("mode", "transit")
+  url.searchParams.set("mode", mode)
+  // Driving with `departure_time=now` lets Google factor in real-time traffic
+  // (otherwise it returns a free-flow estimate). Walking ignores this.
+  if (mode === "driving") {
+    url.searchParams.set("departure_time", "now")
+  }
   url.searchParams.set("language", "fr")
   url.searchParams.set("key", apiKey)
 
@@ -59,8 +68,13 @@ async function fetchTravelFromGoogle(
     const element = data.rows?.[0]?.elements?.[0]
     if (!element || element.status !== "OK") return null
 
+    // Prefer `duration_in_traffic` when present (driving + departure_time),
+    // otherwise fall back to the static duration.
+    const durationSeconds: number =
+      element.duration_in_traffic?.value ?? element.duration.value
+
     return {
-      durationMinutes: Math.ceil(element.duration.value / 60),
+      durationMinutes: Math.ceil(durationSeconds / 60),
       distanceKm: Math.round((element.distance.value / 1000) * 10) / 10,
     }
   } catch {
@@ -90,23 +104,52 @@ export async function getTravelTime(
   if (cached.exists) {
     const data = cached.data()!
     const calculatedAt = data.calculatedAt?.toDate()
-    if (calculatedAt) {
+    // Only trust cache entries written under the new (walking + driving)
+    // schema. Pre-fix entries had a single `durationMinutes` field — those
+    // are silently ignored so the optimiser refetches with the new modes.
+    if (
+      calculatedAt &&
+      typeof data.walkingMinutes === "number" &&
+      typeof data.drivingMinutes === "number"
+    ) {
       const ageDays = (Date.now() - calculatedAt.getTime()) / (1000 * 60 * 60 * 24)
       if (ageDays < CACHE_TTL_DAYS) {
-        return { durationMinutes: data.durationMinutes, distanceKm: data.distanceKm }
+        return {
+          walkingMinutes: data.walkingMinutes,
+          drivingMinutes: data.drivingMinutes,
+          distanceKm: data.distanceKm ?? 0,
+        }
       }
     }
   }
 
-  const result = await fetchTravelFromGoogle(originStr, destStr)
-  if (!result) return null
+  const [walking, driving] = await Promise.all([
+    fetchTravelFromGoogle(originStr, destStr, "walking"),
+    fetchTravelFromGoogle(originStr, destStr, "driving"),
+  ])
 
-  if (result.durationMinutes > 120) {
-    console.warn(`[TRAVEL ALERT] Unusually long travel time: ${result.durationMinutes} min`)
+  // We need both modes to be informative. If either one fails, treat the call
+  // as failed so the optimiser falls back to its permissive branch instead of
+  // calibrating against a half-known trip.
+  if (!walking || !driving) return null
+
+  const result: TravelResult = {
+    walkingMinutes: walking.durationMinutes,
+    drivingMinutes: driving.durationMinutes,
+    // Driving distance is the canonical "how far" — walking distance can be
+    // dramatically larger because it routes via footpaths.
+    distanceKm: driving.distanceKm,
+  }
+
+  if (Math.max(walking.durationMinutes, driving.durationMinutes) > 120) {
+    console.warn(
+      `[TRAVEL ALERT] Unusually long travel time: walking=${walking.durationMinutes}min driving=${driving.durationMinutes}min`
+    )
   }
 
   await cacheRef.set({
-    durationMinutes: result.durationMinutes,
+    walkingMinutes: result.walkingMinutes,
+    drivingMinutes: result.drivingMinutes,
     distanceKm: result.distanceKm,
     calculatedAt: new Date(),
   })

@@ -3,13 +3,13 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Clock,
   Users,
   User,
   Sunrise,
   Moon,
   CalendarDays,
 } from "lucide-react"
+import { TravelModeBadges } from "@/components/custom/travel-mode-badges"
 import type { DailyPlanning, DailySession } from "@/lib/types/planning"
 
 interface DailyPlanningViewProps {
@@ -94,37 +94,49 @@ function SessionRow({
   const windowLabel = window === "morning" ? "Matin" : "Fin de journée"
 
   return (
-    <div className="flex flex-col gap-2 rounded-md bg-muted/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-center gap-2">
-        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="text-xs font-medium uppercase text-muted-foreground">
-          {windowLabel}
-        </span>
-        <span className="text-sm font-medium">
-          {session.startTime} – {session.endTime}
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
+    <div className="rounded-md bg-muted/50 px-3 py-2">
+      {/* Row 1: window label + time on the left, type badge on the right.
+          Stays on one line even on a 320px screen since these are short. */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="text-[10px] font-medium uppercase text-muted-foreground sm:text-xs">
+            {windowLabel}
+          </span>
+          <span className="text-sm font-medium">
+            {session.startTime} – {session.endTime}
+          </span>
+        </div>
         {session.type === "collective" ? (
-          <Badge className="bg-blue-600 text-white">
-            <Users className="h-3 w-3 mr-1" />
-            Collective {session.athletes.length}
+          <Badge className="shrink-0 bg-blue-600 text-white">
+            <Users className="mr-1 h-3 w-3" />
+            Coll. {session.athletes.length}
           </Badge>
         ) : (
-          <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-700">
-            <User className="h-3 w-3 mr-1" />
-            Individuel
+          <Badge
+            variant="outline"
+            className="shrink-0 border-blue-300 bg-blue-50 text-blue-700"
+          >
+            <User className="mr-1 h-3 w-3" />
+            Indiv.
           </Badge>
         )}
+      </div>
+      {/* Row 2: athletes + travel badges. Wraps onto multiple lines on
+          mobile so the walking + driving pills don't truncate. */}
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="text-xs text-muted-foreground">
           {session.athletes.map((a) => a.firstName).join(", ")}
         </span>
-        {session.averageTravelMinutes > 0 && (
-          <Badge variant="outline" className="text-xs">
-            <Clock className="h-3 w-3 mr-1" />
-            {session.averageTravelMinutes} min
-          </Badge>
-        )}
+        <TravelModeBadges
+          walkingMinutes={session.averageWalkingMinutes}
+          drivingMinutes={session.averageDrivingMinutes}
+          fallbackMinutes={
+            session.averageTravelMinutes > 0
+              ? session.averageTravelMinutes
+              : undefined
+          }
+        />
       </div>
     </div>
   )

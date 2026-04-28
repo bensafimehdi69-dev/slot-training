@@ -89,12 +89,15 @@ export function ScheduleGrid({
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[420px]">
+      {/* Wider min-w on mobile so cells stay finger-sized; sticky hour column
+          keeps the row label visible while the user scrolls horizontally
+          through the 7 day columns. */}
+      <div className="min-w-[560px]">
         <div
           className="grid gap-1"
           style={{ gridTemplateColumns: `60px repeat(${dayKeys.length}, 1fr)` }}
         >
-          <div className="text-xs font-medium text-muted-foreground" />
+          <div className="sticky left-0 z-10 bg-background text-xs font-medium text-muted-foreground" />
           {dayKeys.map((day) => (
             <div key={day} className="text-center text-xs font-medium">
               {dayLabels[day]}
@@ -103,7 +106,7 @@ export function ScheduleGrid({
 
           {hours.map((hour) => (
             <React.Fragment key={`row-${hour}`}>
-              <div className="flex items-center justify-end pr-1 text-xs text-muted-foreground">
+              <div className="sticky left-0 z-10 flex items-center justify-end bg-background pr-1 text-xs text-muted-foreground">
                 {hour}
               </div>
               {dayKeys.map((day) => {
@@ -114,7 +117,7 @@ export function ScheduleGrid({
                     type="button"
                     onClick={() => cycle(day, hour)}
                     className={cn(
-                      "flex h-8 items-center justify-center rounded-sm border text-[10px] font-medium transition-colors",
+                      "flex h-11 items-center justify-center rounded-sm border text-[10px] font-medium transition-colors sm:h-8",
                       cellClass(state)
                     )}
                     aria-label={`${dayLabels[day]} ${hour} – ${state === "training" ? "Disponible" : state === "school" ? "À l'école" : "À la maison"}`}

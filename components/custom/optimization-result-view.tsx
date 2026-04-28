@@ -15,27 +15,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { CheckCircle, XCircle, Clock, Users, User, Loader2 } from "lucide-react"
+import { CheckCircle, XCircle, Users, User, Loader2 } from "lucide-react"
 import { DailyPlanningView } from "@/components/custom/daily-planning-view"
+import { TravelModeBadges } from "@/components/custom/travel-mode-badges"
 import type { OptimizationResult, AthleteSlotInfo, IndividualSlot } from "@/lib/types/planning"
-
-function TravelBadge({ minutes }: { minutes?: number }) {
-  if (minutes === undefined || minutes === null) return null
-
-  let colorClass = "bg-green-100 text-green-800 border-green-200"
-  if (minutes >= 60) {
-    colorClass = "bg-red-100 text-red-800 border-red-200"
-  } else if (minutes >= 30) {
-    colorClass = "bg-yellow-100 text-yellow-800 border-yellow-200"
-  }
-
-  return (
-    <Badge variant="outline" className={colorClass}>
-      <Clock className="h-3 w-3 mr-1" />
-      {minutes} min
-    </Badge>
-  )
-}
 
 function AthleteRow({ athlete }: { athlete: AthleteSlotInfo }) {
   return (
@@ -60,12 +43,59 @@ function AthleteRow({ athlete }: { athlete: AthleteSlotInfo }) {
         {athlete.reason || "-"}
       </td>
       <td className="py-2 px-3">
-        <TravelBadge minutes={athlete.travelMinutes} />
+        <TravelModeBadges
+          walkingMinutes={athlete.walkingMinutes}
+          drivingMinutes={athlete.drivingMinutes}
+          fallbackMinutes={athlete.travelMinutes}
+        />
       </td>
       <td className="py-2 px-3 text-sm text-muted-foreground">
         {athlete.departureTime || "-"}
       </td>
     </tr>
+  )
+}
+
+/**
+ * Mobile-friendly card variant of `AthleteRow`. The 5-column table doesn't
+ * survive on a 360px screen — switching to a stacked layout below `sm` keeps
+ * names, status and travel times all visible without horizontal scroll.
+ */
+function AthleteCard({ athlete }: { athlete: AthleteSlotInfo }) {
+  return (
+    <div className="rounded-md border p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-medium">
+          {athlete.firstName} {athlete.lastName}
+        </p>
+        {athlete.available ? (
+          <Badge className="bg-green-600 text-white">
+            <CheckCircle className="mr-1 h-3 w-3" />
+            Disponible
+          </Badge>
+        ) : (
+          <Badge variant="destructive">
+            <XCircle className="mr-1 h-3 w-3" />
+            Indisponible
+          </Badge>
+        )}
+      </div>
+      {athlete.reason && (
+        <p className="mt-1 text-xs text-muted-foreground">{athlete.reason}</p>
+      )}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <TravelModeBadges
+          walkingMinutes={athlete.walkingMinutes}
+          drivingMinutes={athlete.drivingMinutes}
+          fallbackMinutes={athlete.travelMinutes}
+        />
+        {athlete.departureTime && (
+          <span className="text-xs text-muted-foreground">
+            Départ : {athlete.departureTime}
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -87,7 +117,11 @@ function IndividualSlotCard({ slot }: { slot: IndividualSlot }) {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <TravelBadge minutes={slot.travelMinutes} />
+        <TravelModeBadges
+          walkingMinutes={slot.walkingMinutes}
+          drivingMinutes={slot.drivingMinutes}
+          fallbackMinutes={slot.travelMinutes}
+        />
         {slot.departureTime && (
           <span className="text-xs text-muted-foreground">
             Départ : {slot.departureTime}
@@ -161,21 +195,33 @@ export function OptimizationResultView({
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Trajet moyen</p>
-              <p className="text-sm font-medium">
-                {bestSlot.averageTravelMinutes > 0 ? `${bestSlot.averageTravelMinutes} min` : "-"}
-              </p>
+              <div className="text-sm font-medium">
+                {bestSlot.averageWalkingMinutes !== undefined ||
+                bestSlot.averageDrivingMinutes !== undefined ? (
+                  <TravelModeBadges
+                    walkingMinutes={bestSlot.averageWalkingMinutes}
+                    drivingMinutes={bestSlot.averageDrivingMinutes}
+                    fallbackMinutes={bestSlot.averageTravelMinutes}
+                  />
+                ) : bestSlot.averageTravelMinutes > 0 ? (
+                  `${bestSlot.averageTravelMinutes} min`
+                ) : (
+                  "-"
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Athletes Table */}
+      {/* Athletes — table on ≥sm, stacked cards on mobile to keep all
+          5 columns readable without horizontal scroll on a 360px screen. */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Détail par athlète</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-muted/50">
@@ -198,6 +244,14 @@ export function OptimizationResultView({
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="space-y-2 p-3 sm:hidden">
+            {allAthletes.map((athlete, index) => (
+              <AthleteCard
+                key={`${athlete.athleteId}-${index}`}
+                athlete={athlete}
+              />
+            ))}
           </div>
         </CardContent>
       </Card>

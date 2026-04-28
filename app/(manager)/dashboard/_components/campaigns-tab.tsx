@@ -1,9 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -24,10 +25,10 @@ import {
 } from "@/components/ui/select"
 import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete-map"
 import { ConstraintsTapGrid } from "@/components/custom/constraints-tap-grid"
-import { getCampaigns, createCampaign } from "../actions"
+import { getCampaigns, createCampaign, getGroupAthletes } from "../actions"
 import { CampaignCard } from "./campaign-card"
-import type { Group } from "@/lib/types/group"
-import type { Campaign } from "@/lib/types/campaign"
+import type { Group, GroupAthlete } from "@/lib/types/group"
+import type { ManagerCampaign } from "@/lib/types/campaign"
 import type { AddressWithCoords } from "@/lib/types/address"
 
 // Coach + facility availability is a plain boolean grid — no school/home
@@ -45,7 +46,7 @@ interface CampaignsTabProps {
 }
 
 export function CampaignsTab({ group }: CampaignsTabProps) {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [campaigns, setCampaigns] = useState<ManagerCampaign[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -60,6 +61,12 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
   const [availableSlots, setAvailableSlots] = useState<AvailableSlots>(
     createDefaultAvailableSlots()
   )
+  const [athletes, setAthletes] = useState<GroupAthlete[]>([])
+  const [athletesLoading, setAthletesLoading] = useState(false)
+  // Athletes who will receive this campaign. Default = every athlete in the
+  // group. The Set keeps toggle / select-all logic O(1) and avoids order
+  // sensitivity when comparing against the loaded athletes list.
+  const [selectedAthleteIds, setSelectedAthleteIds] = useState<Set<string>>(new Set())
 
   const loadCampaigns = useCallback(async () => {
     const result = await getCampaigns(group.id)
@@ -71,10 +78,52 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
     loadCampaigns()
   }, [loadCampaigns])
 
+  // Load athletes when the create dialog opens — keeps the initial render
+  // cheap when the manager isn't planning to create a campaign right now.
+  useEffect(() => {
+    if (!createOpen) return
+    let cancelled = false
+    setAthletesLoading(true)
+    getGroupAthletes(group.id).then((result) => {
+      if (cancelled) return
+      const list = result.data ?? []
+      setAthletes(list)
+      setSelectedAthleteIds(new Set(list.map((a) => a.id)))
+      setAthletesLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [createOpen, group.id])
+
+  const allSelected = useMemo(
+    () => athletes.length > 0 && selectedAthleteIds.size === athletes.length,
+    [athletes.length, selectedAthleteIds.size]
+  )
+
+  const toggleAthlete = (athleteId: string) => {
+    setSelectedAthleteIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(athleteId)) next.delete(athleteId)
+      else next.add(athleteId)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    setSelectedAthleteIds((prev) =>
+      prev.size === athletes.length ? new Set() : new Set(athletes.map((a) => a.id))
+    )
+  }
+
   const handleCreateCampaign = async (formData: FormData) => {
     if (creatingRef.current) return
     if (!trainingLocation) {
       toast.error("Sélectionnez un lieu d'entraînement sur la carte.")
+      return
+    }
+    if (athletes.length > 0 && selectedAthleteIds.size === 0) {
+      toast.error("Sélectionnez au moins un athlète destinataire.")
       return
     }
     creatingRef.current = true
@@ -86,6 +135,10 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
       formData.set("trainingLocationLat", String(trainingLocation.lat))
       formData.set("trainingLocationLng", String(trainingLocation.lng))
       formData.set("availableSlots", JSON.stringify(availableSlots))
+      formData.set(
+        "targetAthleteIds",
+        JSON.stringify(Array.from(selectedAthleteIds))
+      )
       const result = await createCampaign(group.id, formData)
       if (result.error) {
         toast.error(result.error)
@@ -128,10 +181,11 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
             </Button>
           </DialogTrigger>
           <DialogContent
-            // Cap the modal height to the viewport and let the body scroll.
-            // Without this, adding the coach-availability grid pushes the
-            // submit button below the fold on small laptops.
-            className="flex max-h-[90vh] max-w-md flex-col overflow-hidden"
+            // Mobile: full-height takeover so the dense form (dates + grid +
+            // athlete multi-select) gets the entire viewport. Desktop: keep
+            // the centered modal capped at 90vh so the page behind stays
+            // visible.
+            className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:gap-4 sm:rounded-lg sm:p-6"
             // Google Places Autocomplete appends its dropdown (.pac-container) to
             // <body>, i.e. outside this modal's DOM subtree. Radix treats those
             // clicks as "pointer-down outside" and closes the dialog before the
@@ -148,14 +202,14 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
               if (target?.closest(".pac-container")) e.preventDefault()
             }}
           >
-            <DialogHeader>
+            <DialogHeader className="border-b p-4 sm:border-b-0 sm:p-0">
               <DialogTitle>Créer une campagne</DialogTitle>
               <DialogDescription>
                 Définissez la période et les paramètres de la campagne.
               </DialogDescription>
             </DialogHeader>
             <form action={handleCreateCampaign} className="flex min-h-0 flex-1 flex-col">
-              <div className="flex-1 space-y-4 overflow-y-auto py-4 pr-1">
+              <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-0 sm:py-4 sm:pr-1">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Date de début</Label>
@@ -214,9 +268,58 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
                     onChange={setAvailableSlots}
                   />
                 </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Athlètes destinataires</Label>
+                    {athletes.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={toggleAll}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Par défaut, tous les athlètes du groupe reçoivent la campagne. Décochez ceux à exclure.
+                  </p>
+                  {athletesLoading ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : athletes.length === 0 ? (
+                    <p className="text-xs italic text-muted-foreground">
+                      Aucun athlète dans ce groupe pour le moment.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-2">
+                      {athletes.map((athlete) => {
+                        const checked = selectedAthleteIds.has(athlete.id)
+                        const fullName = `${athlete.firstName ?? ""} ${athlete.lastName ?? ""}`.trim() || athlete.email
+                        return (
+                          <label
+                            key={athlete.id}
+                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-muted"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={() => toggleAthlete(athlete.id)}
+                            />
+                            <span className="flex-1 truncate text-sm">{fullName}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
-              <DialogFooter>
-                <Button type="submit" disabled={creating}>
+              <DialogFooter className="border-t p-4 sm:border-t-0 sm:p-0">
+                <Button
+                  type="submit"
+                  disabled={creating}
+                  className="w-full sm:w-auto"
+                >
                   {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Créer la campagne
                 </Button>
@@ -241,6 +344,7 @@ export function CampaignsTab({ group }: CampaignsTabProps) {
               key={campaign.id}
               groupId={group.id}
               campaign={campaign}
+              responders={campaign.responders}
               onRefresh={loadCampaigns}
             />
           ))}
