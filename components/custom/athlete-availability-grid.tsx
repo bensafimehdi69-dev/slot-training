@@ -81,9 +81,12 @@ export function AthleteAvailabilityGrid({
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[500px]">
-        <div className="grid grid-cols-8 gap-1">
-          <div className="text-xs font-medium text-muted-foreground" />
+      {/* Wider min-w + 44px cells in mobile so the 3-state cycle is taggable
+          with a thumb. Hour column is sticky so it stays visible while the
+          7 day columns scroll horizontally. */}
+      <div className="min-w-[560px]">
+        <div className="grid grid-cols-[3rem_repeat(7,minmax(0,1fr))] gap-1">
+          <div className="sticky left-0 z-10 bg-background text-xs font-medium text-muted-foreground" />
           {DAYS.map((day) => (
             <div key={day} className="text-center text-xs font-medium">
               {day}
@@ -92,7 +95,7 @@ export function AthleteAvailabilityGrid({
 
           {HOURS.map((hour, hourIdx) => (
             <React.Fragment key={`row-${hour}`}>
-              <div className="flex items-center justify-end pr-1 text-xs text-muted-foreground">
+              <div className="sticky left-0 z-10 flex items-center justify-end bg-background pr-1 text-xs text-muted-foreground">
                 {hour}
               </div>
               {DAYS.map((_, dayIdx) => {
@@ -104,7 +107,7 @@ export function AthleteAvailabilityGrid({
                     onClick={() => cycle(dayIdx, hourIdx)}
                     aria-label={`${DAYS[dayIdx]} ${hour} – ${cellLabel(state)}`}
                     className={cn(
-                      "flex h-8 items-center justify-center rounded-sm border text-[10px] font-medium transition-colors",
+                      "flex h-11 items-center justify-center rounded-sm border text-[10px] font-medium transition-colors sm:h-8",
                       cellClass(state)
                     )}
                   >

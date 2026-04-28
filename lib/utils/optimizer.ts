@@ -10,7 +10,7 @@ import type {
   DailySession,
 } from "@/lib/types/planning"
 import type { AddressWithCoords } from "@/lib/types/address"
-import { getDepartureInfo, getReturnInfo } from "./departure"
+import { getDepartureInfo, getReturnInfo, getOverlapConflict } from "./departure"
 import { getTravelTime } from "./travel"
 
 interface AthleteData {
@@ -259,6 +259,22 @@ export async function optimizeSlots(
           continue
         }
 
+        // Mid-slot conflict: the athlete is free at slotStart but a class /
+        // home obligation kicks in before slotEnd. getDepartureInfo only
+        // looks at the start instant, so a 90-min slot starting at 11:15 with
+        // a "school" cell at 12:00 would slip through without this check.
+        const overlap = getOverlapConflict(daySchedule, slotStart, slotEnd)
+        if (overlap.conflict) {
+          unavailableAthletes.push({
+            athleteId: athlete.athleteId,
+            firstName: athlete.firstName,
+            lastName: athlete.lastName,
+            available: false,
+            reason: overlap.reason,
+          })
+          continue
+        }
+
         // Cache hit expected (warmed above). If it's a miss here the fetch
         // will still run but this path is rare.
         const travel = await getTravelTime(
@@ -271,8 +287,14 @@ export async function optimizeSlots(
         )
 
         if (travel) {
+          // Worst-case feasibility: if even the slower mode (walking,
+          // typically) can't make it on time, we exclude the athlete. This
+          // matches the product call: the planning is calibrated against the
+          // longer of the two modes so the slot works regardless of how the
+          // athlete actually travels.
+          const worstTravel = Math.max(travel.walkingMinutes, travel.drivingMinutes)
           const availableFromMinutes = departure.availableFromTime ? timeToMinutes(departure.availableFromTime) : 0
-          const arrivalMinutes = availableFromMinutes + travel.durationMinutes
+          const arrivalMinutes = availableFromMinutes + worstTravel
           const slotStartMinutes = timeToMinutes(slotStart)
 
           if (arrivalMinutes > slotStartMinutes) {
@@ -281,8 +303,10 @@ export async function optimizeSlots(
               firstName: athlete.firstName,
               lastName: athlete.lastName,
               available: false,
-              reason: `Trajet ${travel.durationMinutes} min depuis ${departure.label} — arrivée estimée ${minutesToTime(arrivalMinutes)}`,
-              travelMinutes: travel.durationMinutes,
+              reason: `Trajet depuis ${departure.label} : à pied ${travel.walkingMinutes} min, en voiture ${travel.drivingMinutes} min — arrivée estimée ${minutesToTime(arrivalMinutes)}`,
+              travelMinutes: worstTravel,
+              walkingMinutes: travel.walkingMinutes,
+              drivingMinutes: travel.drivingMinutes,
             })
             continue
           }
@@ -306,15 +330,18 @@ export async function optimizeSlots(
               config.campaignId
             )
             if (returnTravel) {
-              const reachByMinutes = slotEndMinutes + returnTravel.durationMinutes
+              const worstReturn = Math.max(returnTravel.walkingMinutes, returnTravel.drivingMinutes)
+              const reachByMinutes = slotEndMinutes + worstReturn
               if (reachByMinutes > returnInfo.mustArriveByMinutes) {
                 unavailableAthletes.push({
                   athleteId: athlete.athleteId,
                   firstName: athlete.firstName,
                   lastName: athlete.lastName,
                   available: false,
-                  reason: `Trajet retour vers ${returnInfo.label} = ${returnTravel.durationMinutes} min — n'arrive pas avant ${minutesToTime(returnInfo.mustArriveByMinutes)}`,
-                  travelMinutes: travel.durationMinutes,
+                  reason: `Trajet retour vers ${returnInfo.label} : à pied ${returnTravel.walkingMinutes} min, en voiture ${returnTravel.drivingMinutes} min — n'arrive pas avant ${minutesToTime(returnInfo.mustArriveByMinutes)}`,
+                  travelMinutes: worstTravel,
+                  walkingMinutes: travel.walkingMinutes,
+                  drivingMinutes: travel.drivingMinutes,
                 })
                 continue
               }
@@ -326,9 +353,14 @@ export async function optimizeSlots(
             firstName: athlete.firstName,
             lastName: athlete.lastName,
             available: true,
-            travelMinutes: travel.durationMinutes,
+            travelMinutes: worstTravel,
+            walkingMinutes: travel.walkingMinutes,
+            drivingMinutes: travel.drivingMinutes,
             departureAddress: departure.label,
-            departureTime: minutesToTime(slotStartMinutes - travel.durationMinutes),
+            // Departure time uses the worst-case travel so the athlete won't
+            // be late no matter the mode. The displayed pair lets them see
+            // the faster option if they want a smaller buffer.
+            departureTime: minutesToTime(slotStartMinutes - worstTravel),
           })
         } else {
           availableAthletes.push({
@@ -341,10 +373,14 @@ export async function optimizeSlots(
         }
       }
 
-      const avgTravel =
+      const avgOf = (pick: (a: AthleteSlotInfo) => number | undefined) =>
         availableAthletes.length > 0
-          ? availableAthletes.reduce((sum, a) => sum + (a.travelMinutes || 0), 0) / availableAthletes.length
+          ? availableAthletes.reduce((sum, a) => sum + (pick(a) ?? 0), 0) /
+            availableAthletes.length
           : 0
+      const avgTravel = avgOf((a) => a.travelMinutes)
+      const avgWalking = avgOf((a) => a.walkingMinutes)
+      const avgDriving = avgOf((a) => a.drivingMinutes)
 
       results.push({
         day: dayLabels[day],
@@ -355,6 +391,8 @@ export async function optimizeSlots(
         availableCount: availableAthletes.length,
         totalCount: athletes.length,
         averageTravelMinutes: Math.round(avgTravel),
+        averageWalkingMinutes: avgWalking > 0 ? Math.round(avgWalking) : undefined,
+        averageDrivingMinutes: avgDriving > 0 ? Math.round(avgDriving) : undefined,
       })
     }
   }
@@ -421,6 +459,8 @@ function buildDailyPlannings(results: SlotResult[]): DailyPlanning[] {
         durationMinutes: SLOT_DURATION_MINUTES,
         athletes: best.availableAthletes,
         averageTravelMinutes: best.averageTravelMinutes,
+        averageWalkingMinutes: best.averageWalkingMinutes,
+        averageDrivingMinutes: best.averageDrivingMinutes,
       }
     }
 
@@ -445,6 +485,8 @@ function buildDailyPlannings(results: SlotResult[]): DailyPlanning[] {
           durationMinutes: SLOT_DURATION_MINUTES,
           athletes: peak.availableAthletes,
           averageTravelMinutes: peak.averageTravelMinutes,
+          averageWalkingMinutes: peak.averageWalkingMinutes,
+          averageDrivingMinutes: peak.averageDrivingMinutes,
         })
       } else {
         morningSessions.push(
@@ -513,6 +555,8 @@ function scheduleMorningIndividuals(morningCandidates: SlotResult[]): DailySessi
         durationMinutes: SLOT_DURATION_MINUTES,
         athletes: [athleteInSlot],
         averageTravelMinutes: athleteInSlot.travelMinutes ?? 0,
+        averageWalkingMinutes: athleteInSlot.walkingMinutes,
+        averageDrivingMinutes: athleteInSlot.drivingMinutes,
       })
       break
     }
@@ -595,6 +639,8 @@ function collectIndividualSlots(plannings: DailyPlanning[]): IndividualSlot[] {
         startTime: session.startTime,
         endTime: session.endTime,
         travelMinutes: a.travelMinutes ?? 0,
+        walkingMinutes: a.walkingMinutes,
+        drivingMinutes: a.drivingMinutes,
         departureAddress: a.departureAddress ?? "",
         departureTime: a.departureTime ?? "",
         exclusionReason: "Séance individuelle du matin",
@@ -612,6 +658,8 @@ function collectIndividualSlots(plannings: DailyPlanning[]): IndividualSlot[] {
           startTime: session.startTime,
           endTime: session.endTime,
           travelMinutes: a.travelMinutes ?? 0,
+          walkingMinutes: a.walkingMinutes,
+          drivingMinutes: a.drivingMinutes,
           departureAddress: a.departureAddress ?? "",
           departureTime: a.departureTime ?? "",
           exclusionReason: "Séance individuelle de fin de journée",

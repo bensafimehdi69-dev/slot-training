@@ -89,6 +89,49 @@ export async function sendCampaignNotification(
   }
 }
 
+/**
+ * Sent automatically to athletes who haven't responded yet, when the deadline
+ * is approaching (typically 24-48h before). Idempotent on the campaign side
+ * via lastReminderSentAt — see runScheduledCampaignTasks.
+ */
+export async function sendCampaignReminderNotification(
+  to: string,
+  athleteFirstName: string,
+  reminderData: {
+    trainingLocation: string
+    startDate: string
+    endDate: string
+    deadline: string
+    hoursRemaining: number
+    responseLink: string
+  }
+) {
+  const subject = `Rappel : campagne d'entraînement à compléter (clôture dans ${reminderData.hoursRemaining}h)`
+  logEmailInDev(to, subject, { "Response link": reminderData.responseLink })
+  try {
+    await getResend().emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject,
+      html: `
+        <h2>Bonjour ${esc(athleteFirstName)},</h2>
+        <p>Petit rappel — vous n'avez pas encore répondu à la campagne d'entraînement.
+        La clôture des réponses est dans <strong>environ ${reminderData.hoursRemaining}h</strong>
+        (le ${esc(reminderData.deadline)}).</p>
+        <ul>
+          <li><strong>Lieu :</strong> ${esc(reminderData.trainingLocation)}</li>
+          <li><strong>Période :</strong> ${esc(reminderData.startDate)} au ${esc(reminderData.endDate)}</li>
+        </ul>
+        <p><a href="${esc(reminderData.responseLink)}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Répondre maintenant</a></p>
+        <p style="color:#64748b;font-size:13px">Si vous avez répondu juste à l'instant,
+        vous pouvez ignorer ce message.</p>
+      `,
+    })
+  } catch (error) {
+    console.error("[EMAIL] sendCampaignReminderNotification failed:", error instanceof Error ? error.message : "unknown")
+  }
+}
+
 export interface PlanningSession {
   type: "collectif" | "individuel"
   day: string
@@ -96,6 +139,8 @@ export interface PlanningSession {
   endTime: string
   departureTime?: string
   travelMinutes?: number
+  walkingMinutes?: number
+  drivingMinutes?: number
   departureAddress?: string
 }
 
@@ -120,10 +165,15 @@ export async function sendPlanningNotification(
     } else {
       const sessionList = planningData.sessions
         .map((s) => {
-          const travel =
-            s.travelMinutes !== undefined
-              ? `<li><strong>Trajet estimé :</strong> ${s.travelMinutes} min</li>`
-              : ""
+          // Prefer the per-mode pair when available; fall back to the legacy
+          // single-number for old campaigns whose optimisationResult predates
+          // the walking/driving split.
+          let travel = ""
+          if (s.walkingMinutes !== undefined && s.drivingMinutes !== undefined) {
+            travel = `<li><strong>Trajet estimé :</strong> à pied ${s.walkingMinutes} min, en voiture ${s.drivingMinutes} min</li>`
+          } else if (s.travelMinutes !== undefined) {
+            travel = `<li><strong>Trajet estimé :</strong> ${s.travelMinutes} min</li>`
+          }
           const departure = s.departureTime
             ? `<li><strong>Heure de départ :</strong> ${esc(s.departureTime)}</li>`
             : ""

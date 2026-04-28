@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete-map"
 import { AthleteAvailabilityGrid } from "@/components/custom/athlete-availability-grid"
 import { LogoutButton } from "@/components/custom/logout-button"
+import { NotificationsToggle } from "@/components/custom/notifications-toggle"
 import { saveAthleteProfile } from "@/lib/actions/profile"
 import type { AddressWithCoords } from "@/lib/types/address"
 import type { ConstraintsGrid } from "@/lib/types/profile"
@@ -142,12 +143,15 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
           </TabsContent>
 
           <TabsContent value="profile" className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold">Mon profil</h1>
-              <p className="text-muted-foreground">
-                Gérez vos disponibilités et adresses. Ces informations seront
-                pré-remplies à chaque nouvelle campagne.
-              </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold">Mon profil</h1>
+                <p className="text-muted-foreground">
+                  Gérez vos disponibilités et adresses. Ces informations seront
+                  pré-remplies à chaque nouvelle campagne.
+                </p>
+              </div>
+              <NotificationsToggle />
             </div>
 
             <Card>
@@ -265,7 +269,7 @@ function CampaignStatusBadge({ campaign }: { campaign: AthleteCampaignSummary })
     return <Badge className="bg-green-600 text-white">Planning validé</Badge>
   }
   if (campaign.status === "closed") {
-    return <Badge variant="secondary">Fermée</Badge>
+    return <Badge variant="secondary">Finalisée</Badge>
   }
   if (campaign.hasResponded) {
     return <Badge className="bg-blue-600 text-white">Réponse envoyée</Badge>

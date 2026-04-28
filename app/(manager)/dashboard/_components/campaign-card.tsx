@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import {
   CalendarDays,
@@ -10,6 +10,11 @@ import {
   Loader2,
   Pencil,
   Trash2,
+  ChevronDown,
+  ChevronRight,
+  Check,
+  Clock,
+  MoreVertical,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,6 +31,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { OptimizationResultView } from "@/components/custom/optimization-result-view"
 import { CampaignEditDialog } from "./campaign-edit-dialog"
 import {
@@ -33,19 +45,22 @@ import {
   runOptimization,
   validatePlanning,
   rejectPlanning,
-  getResponseCount,
   deleteCampaign,
 } from "../actions"
-import type { Campaign } from "@/lib/types/campaign"
+import type { Campaign, CampaignResponder } from "@/lib/types/campaign"
 
 interface CampaignCardProps {
   groupId: string
   campaign: Campaign
+  // Pre-fetched by getCampaigns so we don't re-issue a per-card request from
+  // useEffect. Always provided in the dashboard flow; the parameter is kept
+  // optional only as a defensive default for future callers.
+  responders?: CampaignResponder[]
   onRefresh: () => void
 }
 
-export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps) {
-  const [responseCount, setResponseCount] = useState<number | null>(null)
+export function CampaignCard({ groupId, campaign, responders = [], onRefresh }: CampaignCardProps) {
+  const [respondersOpen, setRespondersOpen] = useState(false)
   const [closing, setClosing] = useState(false)
   const [optimizing, setOptimizing] = useState(false)
   const [validating, setValidating] = useState(false)
@@ -53,14 +68,13 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
   const [showResult, setShowResult] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Controlled state so we can trigger the delete confirm from a dropdown
+  // item (the AlertDialog can't have its own trigger when launched from a
+  // menu item — Radix dismisses the menu before the dialog opens otherwise).
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
-  useEffect(() => {
-    async function loadCount() {
-      const result = await getResponseCount(groupId, campaign.id)
-      if (result.data !== undefined) setResponseCount(result.data)
-    }
-    loadCount()
-  }, [groupId, campaign.id])
+  const respondedCount = responders.filter((r) => r.hasResponded).length
+  const targetCount = responders.length
 
   const handleClose = async () => {
     setClosing(true)
@@ -69,7 +83,7 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success("Campagne fermée.")
+      toast.success("Campagne finalisée.")
       onRefresh()
     }
   }
@@ -131,7 +145,7 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
       return <Badge variant="destructive">Rejeté</Badge>
     }
     if (campaign.status === "closed") {
-      return <Badge variant="secondary">Fermée</Badge>
+      return <Badge variant="secondary">Finalisée</Badge>
     }
     return <Badge>Active</Badge>
   }
@@ -149,9 +163,9 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
                 </span>
                 {statusBadge()}
               </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="break-words text-sm text-muted-foreground">
                   {campaign.trainingLocation.formatted}
                 </span>
               </div>
@@ -162,20 +176,57 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
                 <span>
                   Limite : {new Date(campaign.deadline).toLocaleDateString("fr-FR")}
                 </span>
-                {responseCount !== null && (
-                  <span className="font-medium text-blue-600">
-                    {responseCount} réponse(s)
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setRespondersOpen((v) => !v)}
+                  disabled={targetCount === 0}
+                  className="inline-flex items-center gap-1 font-medium text-blue-600 hover:underline disabled:cursor-default disabled:no-underline disabled:opacity-70"
+                >
+                  {respondersOpen ? (
+                    <ChevronDown className="h-3 w-3" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3" />
+                  )}
+                  {respondedCount} / {targetCount} rempli{targetCount > 1 ? "s" : ""}
+                </button>
               </div>
-              {campaign.status === "active" && responseCount !== null && responseCount > 0 && (
+              {campaign.status === "active" && respondedCount > 0 && (
                 <p className="text-xs italic text-muted-foreground">
-                  Fermez la campagne pour lancer l&apos;optimisation.
+                  Finalisez la campagne pour lancer l&apos;optimisation.
                 </p>
+              )}
+              {respondersOpen && responders.length > 0 && (
+                <ul className="mt-1 space-y-1 rounded-md border bg-muted/30 p-2">
+                  {responders.map((r) => {
+                    const fullName =
+                      `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.athleteId
+                    return (
+                      <li
+                        key={r.athleteId}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        {r.hasResponded ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+                        <span className={r.hasResponded ? "" : "text-muted-foreground"}>
+                          {fullName}
+                        </span>
+                        {!r.hasResponded && (
+                          <span className="text-muted-foreground">— en attente</span>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </div>
 
-            <div className="flex gap-2">
+            {/* Primary action stays visible at all sizes; secondary actions
+                (Modifier / Supprimer) collapse into a kebab so the row fits a
+                360px screen without truncation. */}
+            <div className="flex shrink-0 items-center gap-2">
               {campaign.status === "active" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -183,19 +234,19 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
                       variant="outline"
                       size="sm"
                       disabled={closing}
-                      aria-label="Fermer la campagne"
+                      aria-label="Finaliser la campagne"
                     >
                       {closing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Lock className="h-4 w-4" />
                       )}
-                      <span className="ml-1 hidden sm:inline">Fermer</span>
+                      <span className="ml-1 hidden sm:inline">Finaliser</span>
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Fermer cette campagne ?</AlertDialogTitle>
+                      <AlertDialogTitle>Finaliser cette campagne ?</AlertDialogTitle>
                       <AlertDialogDescription>
                         Les athlètes ne pourront plus répondre. Vous pourrez
                         ensuite lancer l&apos;optimisation.
@@ -203,7 +254,7 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Annuler</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleClose}>Fermer</AlertDialogAction>
+                      <AlertDialogAction onClick={handleClose}>Finaliser</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -232,31 +283,40 @@ export function CampaignCard({ groupId, campaign, onRefresh }: CampaignCardProps
                   {showResult ? "Masquer" : "Voir le résultat"}
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditOpen(true)}
-                aria-label="Modifier la campagne"
-              >
-                <Pencil className="h-4 w-4" />
-                <span className="ml-1 hidden sm:inline">Modifier</span>
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
-                    variant="destructive"
+                    variant="ghost"
                     size="sm"
+                    aria-label="Plus d'actions"
                     disabled={deleting}
-                    aria-label="Supprimer la campagne"
                   >
                     {deleting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Trash2 className="h-4 w-4" />
+                      <MoreVertical className="h-4 w-4" />
                     )}
-                    <span className="ml-1 hidden sm:inline">Supprimer</span>
                   </Button>
-                </AlertDialogTrigger>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Modifier
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => setDeleteConfirmOpen(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Supprimer
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <AlertDialog
+                open={deleteConfirmOpen}
+                onOpenChange={setDeleteConfirmOpen}
+              >
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Supprimer cette campagne ?</AlertDialogTitle>

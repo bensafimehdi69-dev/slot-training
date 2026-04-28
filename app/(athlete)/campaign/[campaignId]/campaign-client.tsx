@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import Link from "next/link"
 import { submitCampaignResponse, deleteAthleteData } from "./actions"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,7 +28,7 @@ import {
 import { StepProgress } from "@/components/custom/step-progress"
 import { ScheduleGrid } from "@/components/custom/schedule-grid"
 import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete-map"
-import { TravelTimeBadge } from "@/components/custom/travel-time-badge"
+import { TravelModeBadges } from "@/components/custom/travel-mode-badges"
 import {
   Timer,
   CheckCircle,
@@ -129,6 +130,8 @@ interface AthleteSession {
   endTime: string
   departureTime?: string
   travelMinutes?: number
+  walkingMinutes?: number
+  drivingMinutes?: number
   departureAddress?: string
 }
 
@@ -319,10 +322,16 @@ function SessionCard({ session }: { session: AthleteSession }) {
             </div>
           </div>
         )}
-        {session.travelMinutes !== undefined && (
+        {(session.walkingMinutes !== undefined ||
+          session.drivingMinutes !== undefined ||
+          session.travelMinutes !== undefined) && (
           <div>
             <p className="text-xs text-muted-foreground">Trajet estimé</p>
-            <TravelTimeBadge minutes={session.travelMinutes} />
+            <TravelModeBadges
+              walkingMinutes={session.walkingMinutes}
+              drivingMinutes={session.drivingMinutes}
+              fallbackMinutes={session.travelMinutes}
+            />
           </div>
         )}
       </div>
@@ -381,6 +390,50 @@ function CampaignForm({
     existingResponse?.constraints || ""
   )
 
+  // Restore an in-progress draft from localStorage on mount. We only honour
+  // it when no server-side response exists yet — otherwise the submitted
+  // version wins. Mounting an effect for the read keeps this SSR-safe.
+  const draftKey = `campaign-draft:${campaignId}`
+  useEffect(() => {
+    if (existingResponse) return
+    if (typeof window === "undefined") return
+    try {
+      const raw = window.localStorage.getItem(draftKey)
+      if (!raw) return
+      const draft = JSON.parse(raw) as Partial<{
+        schedule: WeeklySchedule
+        homeAddress: AddressWithCoords | null
+        schoolAddress: AddressWithCoords | null
+        constraints: string
+      }>
+      if (draft.schedule) setSchedule(draft.schedule)
+      if (draft.homeAddress) setHomeAddress(draft.homeAddress)
+      if (draft.schoolAddress !== undefined) setSchoolAddress(draft.schoolAddress)
+      if (typeof draft.constraints === "string") setConstraints(draft.constraints)
+    } catch {
+      // Corrupt JSON or schema mismatch — ignore and let the user start fresh.
+    }
+    // Run once on mount; intentionally not reactive to the form state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Save the draft on every change so a tab close, an app switch on mobile,
+  // or an accidental browser back-button never costs the athlete their
+  // 3-step input. Cleared after a successful submit (see handleSubmit) and
+  // when the athlete deletes their data (see DeleteDataSection).
+  useEffect(() => {
+    if (existingResponse) return
+    if (typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(
+        draftKey,
+        JSON.stringify({ schedule, homeAddress, schoolAddress, constraints })
+      )
+    } catch {
+      // Quota or private-mode error — silent.
+    }
+  }, [draftKey, existingResponse, schedule, homeAddress, schoolAddress, constraints])
+
   async function handleSubmit() {
     if (!homeAddress) {
       toast.error("L'adresse de domicile est requise.")
@@ -402,6 +455,13 @@ function CampaignForm({
     }
 
     toast.success("Réponse envoyée avec succès !")
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(draftKey)
+      } catch {
+        // ignore
+      }
+    }
     setShowForm(false)
     setLoading(false)
   }
@@ -454,6 +514,10 @@ function CampaignForm({
               </Button>
             )}
 
+            <Button asChild className="w-full">
+              <Link href="/home">Retour à mon espace</Link>
+            </Button>
+
             <Separator />
 
             <DeleteDataSection campaignId={campaignId} />
@@ -478,7 +542,10 @@ function CampaignForm({
               planning sera validé.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <Button asChild className="w-full">
+              <Link href="/home">Retour à mon espace</Link>
+            </Button>
             <DeleteDataSection campaignId={campaignId} />
           </CardContent>
         </Card>
@@ -649,6 +716,15 @@ function DeleteDataSection({ campaignId }: { campaignId: string }) {
       return
     }
 
+    // Wipe any local draft for this campaign too — keeping it would let a
+    // re-render quietly resurrect data the athlete just asked us to delete.
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(`campaign-draft:${campaignId}`)
+      } catch {
+        // ignore
+      }
+    }
     setDeleted(true)
     setDeleting(false)
     toast.success("Vos donnees ont ete supprimees.")

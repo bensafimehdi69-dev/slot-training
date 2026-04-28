@@ -1,0 +1,19 @@
+{
+  "name": "Slot Training",
+  "short_name": "Slot Training",
+  "description": "Optimisation des créneaux d'entraînement pour managers et athlètes.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

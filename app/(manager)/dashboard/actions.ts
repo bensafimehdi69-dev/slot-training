@@ -10,6 +10,7 @@ import {
   sendCampaignNotification,
   sendCampaignUpdatedNotification,
   sendCampaignDeletedNotification,
+  sendCampaignReminderNotification,
   sendPlanningNotification,
   type PlanningSession,
 } from "@/lib/utils/email"
@@ -20,9 +21,10 @@ import {
   deleteCampaignIndex,
   deleteIndexesForGroup,
 } from "@/lib/server/indexes"
+import { sendPushToUsers } from "@/lib/server/push"
 import { revalidatePath } from "next/cache"
 import type { Group, GroupAthlete } from "@/lib/types/group"
-import type { Campaign } from "@/lib/types/campaign"
+import type { Campaign, CampaignResponder, ManagerCampaign } from "@/lib/types/campaign"
 
 // Firestore doc IDs are strings of ≤1500 bytes with a limited charset. We
 // intentionally keep this permissive but bounded — just enough to reject
@@ -54,6 +56,11 @@ const availableSlotsSchema = z
   .array(z.array(z.boolean()).length(AVAILABILITY_HOURS))
   .length(AVAILABILITY_DAYS)
 
+// Targeted athlete IDs for a campaign. Capped to a sane maximum so a malformed
+// payload can't blow up the email fan-out. Each entry must look like a Firestore
+// doc id (no slashes, ≤128 chars).
+const targetAthleteIdsSchema = z.array(firestoreId).max(1000)
+
 const campaignSchema = z
   .object({
     startDate: isoDate,
@@ -65,6 +72,7 @@ const campaignSchema = z
     trainingLocationLng: z.coerce.number().finite().min(-180).max(180),
     deadline: z.string().min(1, "La date limite est requise."),
     availableSlots: availableSlotsSchema,
+    targetAthleteIds: targetAthleteIdsSchema.optional(),
   })
   .refine(({ startDate, endDate }) => endDate >= startDate, {
     message: "La date de fin doit être postérieure à la date de début.",
@@ -251,19 +259,58 @@ export async function getCampaigns(groupId: string) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
 
-  const snapshot = await adminDb
+  const basePath = adminDb
     .collection("managers").doc(manager.uid)
     .collection("groups").doc(groupId)
-    .collection("campaigns")
-    .orderBy("createdAt", "desc")
-    .get()
+
+  // Fetch campaigns, athletes (for responder names), and every campaign's
+  // responses in parallel. Previously CampaignCard fired its own
+  // `getCampaignResponders` from useEffect, cascading N+1 round-trips after
+  // the campaign list arrived. Inlining cuts the cold-render time roughly
+  // in half on a group with several campaigns.
+  const [snapshot, athletesSnapshot] = await Promise.all([
+    basePath.collection("campaigns").orderBy("createdAt", "desc").get(),
+    basePath.collection("athletes").get(),
+  ])
+
+  const athleteById = new Map(
+    athletesSnapshot.docs.map((d) => [d.id, d.data()])
+  )
+
+  const responsesByCampaign = await Promise.all(
+    snapshot.docs.map((doc) =>
+      doc.ref.collection("responses").get().then(
+        (s) => new Set(s.docs.map((d) => d.id))
+      )
+    )
+  )
 
   // Explicit field picking — never spread doc.data(). Firestore Timestamps
   // are class instances and Next.js 16 rejects them when a server component
   // forwards an unconverted one to a client component. The \`optimizationStartedAt\`
   // timestamp used to leak through the spread and crash the dashboard.
-  const campaigns: Campaign[] = snapshot.docs.map((doc) => {
+  const campaigns: ManagerCampaign[] = snapshot.docs.map((doc, idx) => {
     const data = doc.data()
+    const respondedIds = responsesByCampaign[idx]
+    const targetIds = data.targetAthleteIds as string[] | undefined
+    const targetSet = Array.isArray(targetIds) ? new Set(targetIds) : null
+
+    const responders: CampaignResponder[] = athletesSnapshot.docs
+      .filter((d) => (targetSet ? targetSet.has(d.id) : true))
+      .map((d) => {
+        const a = athleteById.get(d.id)!
+        return {
+          athleteId: d.id,
+          firstName: (a.firstName as string) || "",
+          lastName: (a.lastName as string) || "",
+          hasResponded: respondedIds.has(d.id),
+        }
+      })
+      .sort((a, b) => {
+        const an = `${a.lastName} ${a.firstName}`.trim().toLowerCase()
+        const bn = `${b.lastName} ${b.firstName}`.trim().toLowerCase()
+        return an.localeCompare(bn)
+      })
     const rawResult = data.optimizationResult as Record<string, unknown> | null | undefined
 
     // availableSlots is stored as a JSON string; legacy campaigns predating
@@ -304,7 +351,11 @@ export async function getCampaigns(groupId: string) {
         : null,
       planningStatus: data.planningStatus ?? "pending",
       planningStatusUpdatedAt: data.planningStatusUpdatedAt?.toDate() ?? null,
-    } as Campaign
+      targetAthleteIds: Array.isArray(data.targetAthleteIds)
+        ? (data.targetAthleteIds as string[])
+        : undefined,
+      responders,
+    } as ManagerCampaign
   })
 
   return { data: campaigns }
@@ -329,6 +380,19 @@ export async function createCampaign(groupId: string, formData: FormData) {
     }
   }
 
+  // targetAthleteIds is sent as a JSON array of athlete UIDs. If the field is
+  // missing, the campaign targets every athlete currently in the group (legacy
+  // behaviour).
+  let targetAthleteIdsRaw: unknown = undefined
+  const targetAthleteIdsField = formData.get("targetAthleteIds")
+  if (typeof targetAthleteIdsField === "string" && targetAthleteIdsField.length > 0) {
+    try {
+      targetAthleteIdsRaw = JSON.parse(targetAthleteIdsField)
+    } catch {
+      return { error: "Liste d'athlètes invalide." }
+    }
+  }
+
   const parsed = campaignSchema.safeParse({
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
@@ -339,11 +403,30 @@ export async function createCampaign(groupId: string, formData: FormData) {
     trainingLocationLng: formData.get("trainingLocationLng"),
     deadline: formData.get("deadline"),
     availableSlots: availableSlotsRaw,
+    targetAthleteIds: targetAthleteIdsRaw,
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Champs invalides." }
   }
   const input = parsed.data
+
+  // Intersect the requested target list with athletes currently in the group.
+  // Anything else (stale UID, manual tampering) is dropped silently — we never
+  // send a campaign to someone who isn't a member of the group.
+  const athletesSnapshot = await adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedId.data)
+    .collection("athletes")
+    .get()
+
+  const allAthleteIds = new Set(athletesSnapshot.docs.map((doc) => doc.id))
+  let targetAthleteIds: string[] | undefined
+  if (input.targetAthleteIds) {
+    targetAthleteIds = input.targetAthleteIds.filter((id) => allAthleteIds.has(id))
+    if (targetAthleteIds.length === 0) {
+      return { error: "Aucun athlète sélectionné." }
+    }
+  }
 
   const campaignRef = await adminDb
     .collection("managers").doc(manager.uid)
@@ -366,6 +449,7 @@ export async function createCampaign(groupId: string, formData: FormData) {
       planningStatus: "pending",
       planningStatusUpdatedAt: null,
       availableSlots: JSON.stringify(input.availableSlots),
+      ...(targetAthleteIds ? { targetAthleteIds } : {}),
     })
 
   // Reverse index so athlete-facing lookups can resolve campaignId → path
@@ -375,17 +459,16 @@ export async function createCampaign(groupId: string, formData: FormData) {
     groupId: parsedId.data,
   })
 
-  // Send emails to all athletes in the group. Awaited in parallel so the
+  // Send emails only to targeted athletes. Awaited in parallel so the
   // serverless function doesn't terminate before the Resend calls resolve —
   // fire-and-forget would drop messages silently.
-  const athletesSnapshot = await adminDb
-    .collection("managers").doc(manager.uid)
-    .collection("groups").doc(parsedId.data)
-    .collection("athletes")
-    .get()
+  const targetSet = targetAthleteIds ? new Set(targetAthleteIds) : null
+  const targetedDocs = athletesSnapshot.docs.filter((doc) =>
+    targetSet ? targetSet.has(doc.id) : true
+  )
 
   await Promise.allSettled(
-    athletesSnapshot.docs.map(async (athleteDoc) => {
+    targetedDocs.map(async (athleteDoc) => {
       const athlete = athleteDoc.data()
       if (!athlete.email) return
       const responseLink = buildAthleteLink(`/campaign/${campaignRef.id}`)
@@ -397,6 +480,19 @@ export async function createCampaign(groupId: string, formData: FormData) {
         responseLink,
       })
     })
+  )
+
+  // Push notification fan-out, in parallel with the email path. Athletes
+  // who haven't opted in have no tokens, so sendPushToUser is a silent no-op
+  // for them — no extra cost.
+  await sendPushToUsers(
+    targetedDocs.map((d) => d.id),
+    "athlete",
+    {
+      title: "Nouvelle campagne d'entraînement",
+      body: `${input.startDate} → ${input.endDate} · ${input.trainingLocationFormatted}`,
+      url: `/campaign/${campaignRef.id}`,
+    }
   )
 
   revalidatePath("/dashboard")
@@ -500,27 +596,33 @@ export async function updateCampaign(
     console.error("[CAMPAIGN] travelTimes wipe failed:", error instanceof Error ? error.message : "unknown")
   }
 
-  // Notify everyone in the group — even athletes who haven't responded yet —
-  // so they can adjust before the new deadline.
+  // Notify only the targeted athletes — even those who haven't responded yet —
+  // so they can adjust before the new deadline. Legacy campaigns (no
+  // targetAthleteIds) fall back to the whole group.
   const athletesSnapshot = await adminDb
     .collection("managers").doc(manager.uid)
     .collection("groups").doc(parsedGroupId.data)
     .collection("athletes")
     .get()
 
+  const existingTargets = snap.data()?.targetAthleteIds as string[] | undefined
+  const targetSet = Array.isArray(existingTargets) ? new Set(existingTargets) : null
+
   await Promise.allSettled(
-    athletesSnapshot.docs.map(async (athleteDoc) => {
-      const athlete = athleteDoc.data()
-      if (!athlete.email) return
-      const responseLink = buildAthleteLink(`/campaign/${parsedCampaignId.data}`)
-      return sendCampaignUpdatedNotification(athlete.email, athlete.firstName || "Athlete", {
-        trainingLocation: input.trainingLocationFormatted,
-        startDate: input.startDate,
-        endDate: input.endDate,
-        deadline: input.deadline,
-        responseLink,
+    athletesSnapshot.docs
+      .filter((doc) => (targetSet ? targetSet.has(doc.id) : true))
+      .map(async (athleteDoc) => {
+        const athlete = athleteDoc.data()
+        if (!athlete.email) return
+        const responseLink = buildAthleteLink(`/campaign/${parsedCampaignId.data}`)
+        return sendCampaignUpdatedNotification(athlete.email, athlete.firstName || "Athlete", {
+          trainingLocation: input.trainingLocationFormatted,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          deadline: input.deadline,
+          responseLink,
+        })
       })
-    })
   )
 
   revalidatePath("/dashboard")
@@ -547,22 +649,29 @@ export async function deleteCampaign(groupId: string, campaignId: string) {
   const data = snap.data()!
 
   // Notify athletes BEFORE the data is gone so we can still read their
-  // emails from the group's athletes subcollection.
+  // emails from the group's athletes subcollection. Only targeted athletes get
+  // notified; legacy campaigns (no targetAthleteIds) fall back to the whole
+  // group.
   const athletesSnapshot = await adminDb
     .collection("managers").doc(manager.uid)
     .collection("groups").doc(parsedGroupId.data)
     .collection("athletes")
     .get()
 
+  const existingTargets = data.targetAthleteIds as string[] | undefined
+  const targetSet = Array.isArray(existingTargets) ? new Set(existingTargets) : null
+
   await Promise.allSettled(
-    athletesSnapshot.docs.map((athleteDoc) => {
-      const athlete = athleteDoc.data()
-      if (!athlete.email) return Promise.resolve()
-      return sendCampaignDeletedNotification(athlete.email, athlete.firstName || "Athlete", {
-        startDate: data.startDate,
-        endDate: data.endDate,
+    athletesSnapshot.docs
+      .filter((doc) => (targetSet ? targetSet.has(doc.id) : true))
+      .map((athleteDoc) => {
+        const athlete = athleteDoc.data()
+        if (!athlete.email) return Promise.resolve()
+        return sendCampaignDeletedNotification(athlete.email, athlete.firstName || "Athlete", {
+          startDate: data.startDate,
+          endDate: data.endDate,
+        })
       })
-    })
   )
 
   // Wipe the campaign tree (responses, travelTimes, the campaign doc itself)
@@ -742,6 +851,8 @@ export async function validatePlanning(groupId: string, campaignId: string) {
         athleteId: string
         departureTime?: string
         travelMinutes?: number
+        walkingMinutes?: number
+        drivingMinutes?: number
         departureAddress?: string
       }>
     }
@@ -768,6 +879,8 @@ export async function validatePlanning(groupId: string, campaignId: string) {
               endTime: session.endTime,
               departureTime: a.departureTime,
               travelMinutes: a.travelMinutes,
+              walkingMinutes: a.walkingMinutes,
+              drivingMinutes: a.drivingMinutes,
               departureAddress: a.departureAddress,
             })
             sessionsByAthlete.set(a.athleteId, list)
@@ -781,6 +894,8 @@ export async function validatePlanning(groupId: string, campaignId: string) {
         athleteId: string
         departureTime?: string
         travelMinutes?: number
+        walkingMinutes?: number
+        drivingMinutes?: number
         departureAddress?: string
       }
       type RawBestSlot = {
@@ -799,6 +914,8 @@ export async function validatePlanning(groupId: string, campaignId: string) {
           endTime: bestSlot.endTime,
           departureTime: a.departureTime,
           travelMinutes: a.travelMinutes,
+          walkingMinutes: a.walkingMinutes,
+          drivingMinutes: a.drivingMinutes,
           departureAddress: a.departureAddress,
         })
         sessionsByAthlete.set(a.athleteId, list)
@@ -810,6 +927,8 @@ export async function validatePlanning(groupId: string, campaignId: string) {
         endTime: string
         departureTime?: string
         travelMinutes?: number
+        walkingMinutes?: number
+        drivingMinutes?: number
         departureAddress?: string
       }
       for (const indiv of (optimResult.individualSlots ?? []) as RawIndividual[]) {
@@ -821,6 +940,8 @@ export async function validatePlanning(groupId: string, campaignId: string) {
           endTime: indiv.endTime,
           departureTime: indiv.departureTime,
           travelMinutes: indiv.travelMinutes,
+          walkingMinutes: indiv.walkingMinutes,
+          drivingMinutes: indiv.drivingMinutes,
           departureAddress: indiv.departureAddress,
         })
         sessionsByAthlete.set(indiv.athleteId, list)
@@ -828,6 +949,7 @@ export async function validatePlanning(groupId: string, campaignId: string) {
     }
 
     const tasks: Array<Promise<unknown>> = []
+    const pushUids: string[] = []
     for (const athleteDoc of athletesSnapshot.docs) {
       const info = athleteDoc.data()
       if (!info.email) continue
@@ -842,8 +964,17 @@ export async function validatePlanning(groupId: string, campaignId: string) {
           })
         })()
       )
+      // Only push to athletes who actually have at least one session — a
+      // notification "Planning validé" with no sessions assigned would be
+      // confusing.
+      if (sessions.length > 0) pushUids.push(athleteDoc.id)
     }
     await Promise.allSettled(tasks)
+    await sendPushToUsers(pushUids, "athlete", {
+      title: "Votre planning est validé",
+      body: "Vos séances pour la semaine sont disponibles dans l'app.",
+      url: `/campaign/${campaignId}`,
+    })
   }
 
   revalidatePath("/dashboard")
@@ -880,4 +1011,199 @@ export async function getResponseCount(groupId: string, campaignId: string) {
     .get()
 
   return { data: snapshot.size }
+}
+
+/**
+ * List the targeted athletes for a campaign with their response status.
+ *
+ * If the campaign has explicit targetAthleteIds, the list is built from that
+ * set (intersected with athletes still in the group). Otherwise — legacy
+ * campaigns predating targeted sends — every current group athlete is
+ * returned. Each entry carries hasResponded so the dashboard can show who has
+ * filled in the campaign and who hasn't.
+ */
+export async function getCampaignResponders(groupId: string, campaignId: string) {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const parsedGroupId = firestoreId.safeParse(groupId)
+  const parsedCampaignId = firestoreId.safeParse(campaignId)
+  if (!parsedGroupId.success || !parsedCampaignId.success) {
+    return { error: "Identifiant invalide." }
+  }
+
+  const basePath = adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedGroupId.data)
+  const campaignRef = basePath.collection("campaigns").doc(parsedCampaignId.data)
+
+  const [campaignSnap, athletesSnapshot, responsesSnapshot] = await Promise.all([
+    campaignRef.get(),
+    basePath.collection("athletes").get(),
+    campaignRef.collection("responses").get(),
+  ])
+
+  if (!campaignSnap.exists) return { error: "Campagne introuvable." }
+
+  const targetIds = campaignSnap.data()?.targetAthleteIds as string[] | undefined
+  const targetSet = Array.isArray(targetIds) ? new Set(targetIds) : null
+  const respondedIds = new Set(responsesSnapshot.docs.map((doc) => doc.id))
+
+  const responders: CampaignResponder[] = athletesSnapshot.docs
+    .filter((doc) => (targetSet ? targetSet.has(doc.id) : true))
+    .map((doc) => {
+      const data = doc.data()
+      return {
+        athleteId: doc.id,
+        firstName: (data.firstName as string) || "",
+        lastName: (data.lastName as string) || "",
+        hasResponded: respondedIds.has(doc.id),
+      }
+    })
+    .sort((a, b) => {
+      const an = `${a.lastName} ${a.firstName}`.trim().toLowerCase()
+      const bn = `${b.lastName} ${b.firstName}`.trim().toLowerCase()
+      return an.localeCompare(bn)
+    })
+
+  return { data: responders }
+}
+
+// Window during which the deadline reminder is sent (and lower bound — past
+// this point we wait for auto-finalize instead). 48h before the deadline,
+// every non-responder gets a single nudge by email.
+const REMINDER_WINDOW_HOURS = 48
+// Idempotence guard: don't re-send a reminder for the same campaign within
+// this many hours. A manager hitting refresh shouldn't spam athletes.
+const REMINDER_COOLDOWN_HOURS = 20
+
+/**
+ * Background tasks the manager would otherwise have to remember to run:
+ * (1) Auto-finalize campaigns whose deadline has passed (status active →
+ *     closed), so the dashboard can move on to the optimisation step.
+ * (2) Send a reminder email to non-responders when the deadline is within
+ *     the next 48h, idempotent via lastReminderSentAt on the campaign.
+ *
+ * Called from the dashboard mount — "lazy cron" — so we don't depend on a
+ * separate scheduled function service. Cheap when there's nothing to do
+ * (one read per campaign, no writes).
+ */
+export async function runScheduledCampaignTasks() {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const groupsSnap = await adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups")
+    .get()
+
+  let closedCount = 0
+  let remindersSentCount = 0
+  const now = Date.now()
+  const reminderWindowMs = REMINDER_WINDOW_HOURS * 60 * 60 * 1000
+  const reminderCooldownMs = REMINDER_COOLDOWN_HOURS * 60 * 60 * 1000
+
+  // Process each group in parallel. Inside a group, campaigns are also
+  // processed in parallel — the work for each is independent.
+  await Promise.allSettled(
+    groupsSnap.docs.map(async (groupDoc) => {
+      const groupId = groupDoc.id
+      const basePath = adminDb
+        .collection("managers").doc(manager.uid)
+        .collection("groups").doc(groupId)
+
+      const [campaignsSnap, athletesSnap] = await Promise.all([
+        basePath.collection("campaigns").where("status", "==", "active").get(),
+        basePath.collection("athletes").get(),
+      ])
+
+      const athleteById = new Map(
+        athletesSnap.docs.map((d) => [d.id, d.data()])
+      )
+
+      await Promise.allSettled(
+        campaignsSnap.docs.map(async (campDoc) => {
+          const data = campDoc.data()
+          const deadlineMs =
+            (data.deadline as FirebaseFirestore.Timestamp | undefined)?.toMillis() ?? 0
+          if (!deadlineMs) return
+
+          // (1) Past deadline → close.
+          if (deadlineMs <= now) {
+            await campDoc.ref.update({ status: "closed" })
+            closedCount += 1
+            return
+          }
+
+          // (2) Within the reminder window → nudge non-responders.
+          const msUntilDeadline = deadlineMs - now
+          if (msUntilDeadline > reminderWindowMs) return
+
+          const lastReminderMs =
+            (data.lastReminderSentAt as FirebaseFirestore.Timestamp | undefined)?.toMillis() ?? 0
+          if (now - lastReminderMs < reminderCooldownMs) return
+
+          const targetIds = data.targetAthleteIds as string[] | undefined
+          const targetSet = Array.isArray(targetIds) ? new Set(targetIds) : null
+          const responsesSnap = await campDoc.ref.collection("responses").get()
+          const respondedIds = new Set(responsesSnap.docs.map((d) => d.id))
+
+          const recipients = athletesSnap.docs.filter((d) => {
+            if (targetSet && !targetSet.has(d.id)) return false
+            if (respondedIds.has(d.id)) return false
+            const a = athleteById.get(d.id)
+            return Boolean(a?.email)
+          })
+          if (recipients.length === 0) return
+
+          const hoursRemaining = Math.max(1, Math.round(msUntilDeadline / (60 * 60 * 1000)))
+          const trainingLocation = (data.trainingLocation?.formatted as string) || ""
+          const startDate = (data.startDate as string) || ""
+          const endDate = (data.endDate as string) || ""
+          // \`deadline\` is a Firestore Timestamp; format as readable French
+          // datetime for the email body.
+          const deadlineLabel = new Date(deadlineMs).toLocaleString("fr-FR", {
+            dateStyle: "long",
+            timeStyle: "short",
+          })
+
+          await Promise.allSettled(
+            recipients.map((d) => {
+              const a = athleteById.get(d.id)!
+              return sendCampaignReminderNotification(
+                a.email as string,
+                (a.firstName as string) || "Athlete",
+                {
+                  trainingLocation,
+                  startDate,
+                  endDate,
+                  deadline: deadlineLabel,
+                  hoursRemaining,
+                  responseLink: buildAthleteLink(`/campaign/${campDoc.id}`),
+                }
+              )
+            })
+          )
+
+          await sendPushToUsers(
+            recipients.map((d) => d.id),
+            "athlete",
+            {
+              title: `Rappel : campagne à compléter (${hoursRemaining}h)`,
+              body: `Période ${startDate} → ${endDate}. Répondez avant la deadline.`,
+              url: `/campaign/${campDoc.id}`,
+            }
+          )
+
+          await campDoc.ref.update({ lastReminderSentAt: new Date() })
+          remindersSentCount += recipients.length
+        })
+      )
+    })
+  )
+
+  if (closedCount > 0 || remindersSentCount > 0) {
+    revalidatePath("/dashboard")
+  }
+  return { data: { closedCount, remindersSentCount } }
 }

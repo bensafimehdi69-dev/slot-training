@@ -48,6 +48,8 @@ export interface AthleteSession {
   endTime: string
   departureTime?: string
   travelMinutes?: number
+  walkingMinutes?: number
+  drivingMinutes?: number
   departureAddress?: string
 }
 
@@ -254,6 +256,51 @@ export async function submitCampaignResponse(
       submittedAt: new Date(),
     })
 
+    // Did this submission complete the campaign? Push the manager once when
+    // every targeted athlete has responded — better than spamming on every
+    // single response. Counted off the responses subcollection size after
+    // the write so we don't double-count if the athlete edits.
+    try {
+      const targetIds = campDoc.data()?.targetAthleteIds as string[] | undefined
+      const targetSet = Array.isArray(targetIds) ? new Set(targetIds) : null
+      const [responsesSnap, athletesSnap] = await Promise.all([
+        campaignRef.collection("responses").get(),
+        adminDb
+          .collection("managers").doc(managerUid)
+          .collection("groups").doc(groupId)
+          .collection("athletes").get(),
+      ])
+      const groupAthleteIds = new Set(athletesSnap.docs.map((d) => d.id))
+      const expected = targetSet
+        ? Array.from(targetSet).filter((id) => groupAthleteIds.has(id))
+        : Array.from(groupAthleteIds)
+      const respondedTargeted = responsesSnap.docs.filter((d) =>
+        expected.includes(d.id)
+      ).length
+
+      if (expected.length > 0 && respondedTargeted >= expected.length) {
+        // Mark the campaign so we don't re-push if an athlete re-submits.
+        const already = campDoc.data()?.allRespondedNotifiedAt as
+          | FirebaseFirestore.Timestamp
+          | undefined
+        if (!already) {
+          await campaignRef.update({ allRespondedNotifiedAt: new Date() })
+          const { sendPushToUser } = await import("@/lib/server/push")
+          await sendPushToUser(managerUid, "manager", {
+            title: "Tous les athlètes ont répondu",
+            body: "La campagne peut être finalisée et l'optimisation lancée.",
+            url: "/dashboard",
+          })
+        }
+      }
+    } catch (error) {
+      // Don't fail the response submit if the side-channel push errors out.
+      console.error(
+        "[CAMPAIGN] manager-completion push failed:",
+        error instanceof Error ? error.message : "unknown"
+      )
+    }
+
     return { success: true }
   } catch (error) {
     console.error("[CAMPAIGN] submitCampaignResponse failed:", error instanceof Error ? error.message : "unknown")
@@ -349,6 +396,8 @@ function findAthleteSessions(
           endTime: session.endTime,
           departureTime: member.departureTime,
           travelMinutes: member.travelMinutes,
+          walkingMinutes: member.walkingMinutes,
+          drivingMinutes: member.drivingMinutes,
           departureAddress: member.departureAddress,
         })
       }
@@ -370,6 +419,8 @@ function findAthleteSessions(
         endTime: bestSlot.endTime,
         departureTime: inCollective.departureTime,
         travelMinutes: inCollective.travelMinutes,
+        walkingMinutes: inCollective.walkingMinutes,
+        drivingMinutes: inCollective.drivingMinutes,
         departureAddress: inCollective.departureAddress,
       })
     }
@@ -383,6 +434,8 @@ function findAthleteSessions(
       endTime: slot.endTime,
       departureTime: slot.departureTime,
       travelMinutes: slot.travelMinutes,
+      walkingMinutes: slot.walkingMinutes,
+      drivingMinutes: slot.drivingMinutes,
       departureAddress: slot.departureAddress,
     })
   }

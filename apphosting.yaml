@@ -55,3 +55,11 @@ env:
   - variable: NEXT_PUBLIC_APP_URL
     secret: NEXT_PUBLIC_APP_URL
     availability: [BUILD, RUNTIME]
+
+  # --- FCM (web push) ---
+  # Public VAPID key generated at
+  # console.firebase.google.com/project/<id>/settings/cloudmessaging.
+  # Must include BUILD: Next.js inlines NEXT_PUBLIC_* vars at build time.
+  - variable: NEXT_PUBLIC_FIREBASE_VAPID_KEY
+    secret: NEXT_PUBLIC_FIREBASE_VAPID_KEY
+    availability: [BUILD, RUNTIME]
