@@ -180,7 +180,10 @@
     "unavailable": "Unavailable",
     "individualSlotsTitle": "Individual sessions ({count})",
     "individualReasonMorning": "Morning individual session",
-    "individualReasonEndOfDay": "End-of-day individual session"
+    "individualReasonEndOfDay": "End-of-day individual session",
+    "trainingVolumeTitle": "Training volume per athlete",
+    "trainingVolumeCollective": "Coll. {attended}/{total}",
+    "trainingVolumeIndividual": "Indiv. {count}"
   },
   "athleteHome": {
     "myCampaigns": "My campaigns",

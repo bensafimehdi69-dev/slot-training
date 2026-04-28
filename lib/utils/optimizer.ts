@@ -240,6 +240,21 @@ export async function optimizeSlots(
   const timeSlots = generateTimeSlots(config.timeRangeStart, config.timeRangeEnd)
   const days = dayKeys
 
+  // Decision trace — every meaningful step pushes one line. Surfaced both
+  // in Cloud Run logs (via console.info) and in the UI's debug panel so we
+  // can post-mortem the algo's choices.
+  const debug: string[] = []
+  const debugLog = (line: string) => {
+    console.info(`[OPTIMIZER] ${config.campaignId} ${line}`)
+    debug.push(line)
+  }
+
+  debugLog(
+    `start: athletes=${athletes.length} ` +
+      `range=${config.timeRangeStart}-${config.timeRangeEnd} ` +
+      `slotStep=${SLOT_STEP_MINUTES}min`
+  )
+
   // Allocate the in-memory travel cache and surface it through the config so
   // every checkAthleteForSlot call inside this invocation hits the same map.
   // We never wrote to a caller-provided cache before, so always create a
@@ -268,18 +283,26 @@ export async function optimizeSlots(
     })),
   ]
   if (allPairs.length > 0) {
+    const warmupStart = Date.now()
     const warmupResults = await Promise.all(
       allPairs.map(({ origin, destination, day }) =>
         fetchTravel(origin, destination, day, cfg)
       )
     )
     const failures = warmupResults.filter((r) => r === null).length
+    debugLog(
+      `warmup: ${allPairs.length} pairs, ${failures} failures, ` +
+        `${((Date.now() - warmupStart) / 1000).toFixed(1)}s`
+    )
     if (failures / warmupResults.length > MAPS_FAILURE_ABORT_RATIO) {
       throw new MapsUnavailableError()
     }
+  } else {
+    debugLog("warmup: skipped (no athletes)")
   }
 
   const results: SlotResult[] = []
+  const mainStart = Date.now()
 
   for (const day of days) {
     for (const slotStart of timeSlots) {
@@ -319,12 +342,15 @@ export async function optimizeSlots(
     }
   }
 
+  debugLog(
+    `main pass: ${days.length}days × up to ${timeSlots.length}slots = ` +
+      `${results.length} feasible 90-min slots in ${((Date.now() - mainStart) / 1000).toFixed(1)}s`
+  )
+
   // Per-day plannings, with ad-hoc duration adjustments: collective sessions
-  // try to extend to 2h, individuals run at 60min (or 45 fallback). The
-  // debug sink collects per-day diagnostic lines that the UI surfaces in a
-  // collapsible panel — handy for tuning the heuristics on real campaigns.
-  const debugMorning: string[] = []
-  const dailyPlannings = await buildDailyPlannings(results, athletes, cfg, debugMorning)
+  // try to extend to 2h, individuals run at 60min (or 45 fallback). Each
+  // day pushes its own decision lines into the trace.
+  const dailyPlannings = await buildDailyPlannings(results, athletes, cfg, debugLog)
 
   // Legacy aggregated view, derived from dailyPlannings, kept so the existing
   // dashboard / planning emails keep rendering during the UI migration.
@@ -341,9 +367,11 @@ export async function optimizeSlots(
     individualSlots,
     allSlots: results.slice(0, 5),
     calculatedAt: new Date(),
-    debugMorning,
+    debug,
   }
 }
+
+type DebugSink = (line: string) => void
 
 function getStartHour(startTime: string): number {
   return Number(startTime.split(":")[0])
@@ -491,15 +519,22 @@ async function buildDailyPlannings(
   results: SlotResult[],
   athletes: AthleteData[],
   config: CampaignConfig,
-  debugSink?: string[]
+  debug?: DebugSink
 ): Promise<DailyPlanning[]> {
   // Each day is independent — Promise.all runs them concurrently. The travel
   // cache is shared across days, so concurrent fetches for the same pair may
   // race once but converge to the same value (the second fetch hits the
   // cache the first one wrote).
-  return Promise.all(
-    dayKeys.map(async (day) => {
+  // Each day collects its own debug lines locally, then we drain them in
+  // dayKeys order at the end. With Promise.all running days concurrently a
+  // shared sink would interleave lines from different days, hurting
+  // readability of the trace.
+  const perDayDebug: string[][] = dayKeys.map(() => [])
+  const plannings = await Promise.all(
+    dayKeys.map(async (day, dayIdx) => {
       const dayLabel = dayLabels[day]
+      const localDebug: DebugSink = (line) => perDayDebug[dayIdx].push(line)
+
       const daySlots = results.filter(
         (r) => r.day === dayLabel && r.availableCount > 0
       )
@@ -519,15 +554,40 @@ async function buildDailyPlannings(
           return a.averageTravelMinutes - b.averageTravelMinutes
         })
         const best = endOfDayCandidates[0]
+        localDebug(
+          `${day} end-of-day: ${endOfDayCandidates.length} candidates, ` +
+            `picked ${best.startTime}-${best.endTime} ` +
+            `(${best.availableCount}/${athletes.length} athletes, ` +
+            `avgTravel=${best.averageTravelMinutes}min)`
+        )
 
         if (best.availableCount >= 2) {
-          endOfDaySession = await buildCollectiveSession(best, day, athletes, config)
+          endOfDaySession = await buildCollectiveSession(
+            best,
+            day,
+            athletes,
+            config,
+            localDebug
+          )
         } else {
-          endOfDaySession = await buildIndividualSession(best, day, athletes, config)
+          endOfDaySession = await buildIndividualSession(
+            best,
+            day,
+            athletes,
+            config,
+            localDebug
+          )
         }
+      } else {
+        localDebug(`${day} end-of-day: no feasible slot in 16h-21h window`)
       }
 
-      const morningSessions = await scheduleMorningSessions(day, athletes, config, debugSink)
+      const morningSessions = await scheduleMorningSessions(
+        day,
+        athletes,
+        config,
+        localDebug
+      )
 
       return {
         day: dayLabel,
@@ -537,6 +597,16 @@ async function buildDailyPlannings(
       } as DailyPlanning
     })
   )
+
+  // Drain per-day buffers in dayKeys order so the trace reads sequentially
+  // (Sun, Mon, …, Sat) regardless of the concurrent execution above.
+  if (debug) {
+    for (const lines of perDayDebug) {
+      for (const line of lines) debug(line)
+    }
+  }
+
+  return plannings
 }
 
 /**
@@ -550,7 +620,8 @@ async function buildCollectiveSession(
   slot: SlotResult,
   day: DayKey,
   athletes: AthleteData[],
-  config: CampaignConfig
+  config: CampaignConfig,
+  debug?: DebugSink
 ): Promise<DailySession> {
   const baseEnd = timeToMinutes(slot.startTime) + COLLECTIVE_BASE_DURATION_MINUTES
   const extendedEnd = timeToMinutes(slot.startTime) + COLLECTIVE_EXTENDED_DURATION_MINUTES
@@ -572,7 +643,16 @@ async function buildCollectiveSession(
     if (checks.every((c) => c.available)) {
       canExtend = true
       extendedAvailable = checks
+    } else {
+      // Surface which athlete blocked the extension and why — useful when
+      // you wonder why some days are 1h30 and others 2h.
+      const blocked = checks.find((c) => !c.available)
+      debug?.(
+        `${day} extend 90→120 blocked: ${blocked?.firstName ?? "?"} — ${blocked?.reason ?? "unknown"}`
+      )
     }
+  } else {
+    debug?.(`${day} extend 90→120 skipped: would exceed campaign time range`)
   }
 
   const endTime = canExtend ? extendedEndStr : minutesToTime(baseEnd)
@@ -580,6 +660,11 @@ async function buildCollectiveSession(
     ? COLLECTIVE_EXTENDED_DURATION_MINUTES
     : COLLECTIVE_BASE_DURATION_MINUTES
   const finalAthletes = canExtend ? extendedAvailable : slot.availableAthletes
+  if (canExtend) {
+    debug?.(
+      `${day} extend 90→120 ok (${finalAthletes.length} athletes stay until ${extendedEndStr})`
+    )
+  }
 
   const avgOf = (pick: (a: AthleteSlotInfo) => number | undefined) =>
     finalAthletes.length > 0
@@ -614,7 +699,8 @@ async function buildIndividualSession(
   slot: SlotResult,
   day: DayKey,
   athletes: AthleteData[],
-  config: CampaignConfig
+  config: CampaignConfig,
+  debug?: DebugSink
 ): Promise<DailySession | null> {
   const athleteInfo = slot.availableAthletes[0]
   if (!athleteInfo) return null
@@ -626,6 +712,9 @@ async function buildIndividualSession(
     if (timeToMinutes(endStr) > timeToMinutes(config.timeRangeEnd)) continue
     const info = await checkAthleteForSlot(athlete, day, slot.startTime, endStr, config)
     if (!info.available) continue
+    debug?.(
+      `${day} end-of-day individual: ${athlete.firstName} ${slot.startTime}-${endStr} (${duration}min)`
+    )
     return {
       type: "individual",
       startTime: slot.startTime,
@@ -639,6 +728,9 @@ async function buildIndividualSession(
   }
   // Should be unreachable since the 90-min slot was feasible, but keep a
   // graceful fallback to the original slot rather than dropping the session.
+  debug?.(
+    `${day} end-of-day individual fallback: ${athlete.firstName} kept at original 90-min slot`
+  )
   return {
     type: "individual",
     startTime: slot.startTime,
@@ -677,7 +769,7 @@ async function scheduleMorningSessions(
   day: DayKey,
   athletes: AthleteData[],
   config: CampaignConfig,
-  debugSink?: string[]
+  debug?: DebugSink
 ): Promise<DailySession[]> {
   // Slot starts in the morning window, bounded by the campaign's own
   // timeRangeStart. Step matches the main pass (15 min) so the per-day
@@ -751,12 +843,11 @@ async function scheduleMorningSessions(
   // to work or the data was simply too tight.
   const peak = (pool: keyof Pick<SlotInfo, "pool90" | "pool60" | "pool45">) =>
     slots.reduce((m, s) => Math.max(m, s[pool].length), 0)
-  const summary =
+  debug?.(
     `${day} morning: viableSlots=${slots.length} ` +
-    `peak90=${peak("pool90")} peak60=${peak("pool60")} peak45=${peak("pool45")} ` +
-    `athletes=${athletes.length}`
-  console.info(`[OPTIMIZER] ${config.campaignId} ${summary}`)
-  debugSink?.push(summary)
+      `peak90=${peak("pool90")} peak60=${peak("pool60")} peak45=${peak("pool45")} ` +
+      `athletes=${athletes.length}`
+  )
 
   const occupied: Array<{ start: number; end: number }> = []
   const placedIds = new Set<string>()
@@ -873,11 +964,10 @@ async function scheduleMorningSessions(
           : undefined,
     })
 
-    const placedLine =
-      `${day} placed ${best.slot.startTime}-${minutesToTime(endMinutes)} ` +
-      `${best.type} (${duration}min) [${finalAthletes.map((a) => a.firstName).join(", ")}]`
-    console.info(`[OPTIMIZER] ${config.campaignId} ${placedLine}`)
-    debugSink?.push(placedLine)
+    debug?.(
+      `${day} morning placed ${best.slot.startTime}-${minutesToTime(endMinutes)} ` +
+        `${best.type} (${duration}min) [${finalAthletes.map((a) => a.firstName).join(", ")}]`
+    )
 
     finalAthletes.forEach((a) => placedIds.add(a.athleteId))
     occupied.push({ start: timeToMinutes(best.slot.startTime), end: endMinutes })
@@ -889,9 +979,7 @@ async function scheduleMorningSessions(
     .filter((a) => !placedIds.has(a.athleteId))
     .map((a) => a.firstName)
   if (unplacedNames.length > 0) {
-    const line = `${day} unplaced: ${unplacedNames.join(", ")}`
-    console.info(`[OPTIMIZER] ${config.campaignId} ${line}`)
-    debugSink?.push(line)
+    debug?.(`${day} morning unplaced: ${unplacedNames.join(", ")}`)
   }
 
   return sessions.sort(
