@@ -4,13 +4,13 @@ import { useRef, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "next-intl"
 import {
-  Users,
   Pencil,
   Trash2,
   Loader2,
   ChevronDown,
   ChevronUp,
 } from "lucide-react"
+import { AvatarUpload } from "@/components/custom/avatar-upload"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -42,7 +42,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { updateGroup, deleteGroup } from "../actions"
+import { updateGroup, deleteGroup, setGroupAvatar } from "../actions"
 import { AthletesTab } from "./athletes-tab"
 import { CampaignsTab } from "./campaigns-tab"
 import type { Group } from "@/lib/types/group"
@@ -119,6 +119,18 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
+          {/* Avatar sits outside the toggle button so the camera overlay
+              stays clickable without competing with the expand/collapse
+              gesture on the card header. */}
+          <AvatarUpload
+            src={group.avatarUrl}
+            name={group.name}
+            size={44}
+            ariaLabel="Changer la photo du groupe"
+            onUpload={(formData) => setGroupAvatar(group.id, formData)}
+            onUploaded={onRefresh}
+            className="mr-3"
+          />
           {/* Keyboard-accessible expand/collapse toggle. */}
           <button
             type="button"
@@ -127,7 +139,6 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
             aria-controls={panelId}
             className="flex flex-1 items-center gap-3 text-left"
           >
-            <Users className="h-5 w-5 shrink-0 text-blue-600" />
             <div className="min-w-0">
               <CardTitle className="text-lg">{group.name}</CardTitle>
               <CardDescription>

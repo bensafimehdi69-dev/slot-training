@@ -2,6 +2,8 @@
 
 import { z } from "zod"
 import { getSession } from "@/lib/firebase/auth"
+import { adminDb } from "@/lib/firebase/admin"
+import { saveAvatar } from "@/lib/server/avatar-storage"
 import {
   writeAthleteProfile,
   readAthleteProfile,
@@ -56,4 +58,32 @@ export async function getAthleteProfile(): Promise<AthleteProfile | null> {
   const session = await getSession()
   if (!session) return null
   return readAthleteProfile(session.uid)
+}
+
+/**
+ * Upload + persist the athlete's avatar. URL stored on the global athlete
+ * doc (`athletes/{uid}.avatarUrl`); the per-group athlete entries pick it
+ * up via the getGroupAthletes server action which joins the global docs.
+ */
+export async function setAthleteAvatar(
+  formData: FormData
+): Promise<{ avatarUrl?: string; error?: string }> {
+  const session = await getSession()
+  if (!session) return { error: "Non authentifié." }
+
+  const file = formData.get("file")
+  if (!(file instanceof File)) return { error: "Fichier manquant." }
+
+  try {
+    const avatarUrl = await saveAvatar("athletes", session.uid, file)
+    await adminDb
+      .collection("athletes")
+      .doc(session.uid)
+      .set({ avatarUrl }, { merge: true })
+    return { avatarUrl }
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Upload échoué.",
+    }
+  }
 }

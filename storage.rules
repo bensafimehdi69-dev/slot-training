@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// All avatar writes go through server actions using the Admin SDK, which
+// bypasses these rules. They exist as defense-in-depth against direct client
+// access via the Firebase Auth session.
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Avatars are public-readable so they can be loaded in <img src> without
+    // a signed URL or session token. Direct client writes are denied — the
+    // app uses server actions that validate ownership before uploading.
+    match /avatars/{type}/{file=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Default deny: nothing else lives in Storage today.
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

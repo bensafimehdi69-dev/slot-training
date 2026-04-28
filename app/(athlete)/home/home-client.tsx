@@ -29,13 +29,16 @@ import { AthleteAvailabilityGrid } from "@/components/custom/athlete-availabilit
 import { LogoutButton } from "@/components/custom/logout-button"
 import { NotificationsToggle } from "@/components/custom/notifications-toggle"
 import { LanguagePicker } from "@/components/custom/language-picker"
-import { saveAthleteProfile } from "@/lib/actions/profile"
+import { saveAthleteProfile, setAthleteAvatar } from "@/lib/actions/profile"
+import { AvatarUpload } from "@/components/custom/avatar-upload"
 import type { AddressWithCoords } from "@/lib/types/address"
 import type { ConstraintsGrid } from "@/lib/types/profile"
 import type { AthleteCampaignSummary } from "./actions"
 
 interface HomeClientProps {
   email: string
+  firstName?: string
+  avatarUrl?: string | null
   profile: {
     homeAddress: AddressWithCoords | null
     schoolAddress: AddressWithCoords | null
@@ -45,7 +48,10 @@ interface HomeClientProps {
   campaigns: AthleteCampaignSummary[]
 }
 
-export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
+export function HomeClient({ email, firstName, avatarUrl, profile, campaigns }: HomeClientProps) {
+  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(
+    avatarUrl ?? null,
+  )
   const t = useTranslations("athleteHome")
   const [homeAddress, setHomeAddress] = useState(profile.homeAddress)
   const [schoolAddress, setSchoolAddress] = useState(profile.schoolAddress)
@@ -140,9 +146,19 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
 
           <TabsContent value="profile" className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-bold">{t("profileTitle")}</h1>
-                <p className="text-muted-foreground">{t("profileSubtitle")}</p>
+              <div className="flex items-start gap-3">
+                <AvatarUpload
+                  src={currentAvatarUrl}
+                  name={firstName ?? email}
+                  size={64}
+                  ariaLabel="Changer ma photo"
+                  onUpload={(formData) => setAthleteAvatar(formData)}
+                  onUploaded={(url) => setCurrentAvatarUrl(url)}
+                />
+                <div>
+                  <h1 className="text-2xl font-bold">{t("profileTitle")}</h1>
+                  <p className="text-muted-foreground">{t("profileSubtitle")}</p>
+                </div>
               </div>
               <NotificationsToggle />
             </div>
