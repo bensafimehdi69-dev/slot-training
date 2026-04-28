@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Timer } from "lucide-react"
 import { LogoutButton } from "@/components/custom/logout-button"
 import { LanguagePicker } from "@/components/custom/language-picker"
+import { ManagerAvatarMenu } from "@/components/custom/manager-avatar-menu"
 
 export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
   // Distinguish "no session" (send to /login) from "session but not a manager"
@@ -22,6 +23,8 @@ export default async function ManagerLayout({ children }: { children: React.Reac
 
   const managerData = managerDoc.data()
   const managerName = typeof managerData?.name === "string" ? managerData.name : "Manager"
+  const managerAvatarUrl =
+    typeof managerData?.avatarUrl === "string" ? managerData.avatarUrl : null
 
   return (
     <div className="min-h-screen">
@@ -32,9 +35,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
             Slot Training
           </Link>
           <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-            <span className="hidden max-w-[140px] truncate text-sm text-muted-foreground sm:inline sm:max-w-none">
-              {managerName}
-            </span>
+            <ManagerAvatarMenu name={managerName} avatarUrl={managerAvatarUrl} />
             <LanguagePicker />
             <LogoutButton />
           </div>

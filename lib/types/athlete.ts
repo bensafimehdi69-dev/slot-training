@@ -6,4 +6,5 @@ export interface Athlete {
   hasProfile: boolean
   gdprConsent: boolean
   createdAt: Date
+  avatarUrl?: string
 }

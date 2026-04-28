@@ -4,6 +4,9 @@ export interface Group {
   createdAt: Date
   inviteToken: string
   inviteTokenExpiresAt: Date
+  // Public avatar URL persisted in Firebase Storage. Optional — falls back
+  // to initials in the UI when undefined.
+  avatarUrl?: string
 }
 
 export interface GroupAthlete {
@@ -14,4 +17,5 @@ export interface GroupAthlete {
   hasProfile: boolean
   gdprConsent: boolean
   createdAt: Date
+  avatarUrl?: string
 }

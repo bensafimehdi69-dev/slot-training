@@ -22,6 +22,7 @@ import {
   deleteIndexesForGroup,
 } from "@/lib/server/indexes"
 import { sendPushToUsers } from "@/lib/server/push"
+import { saveAvatar } from "@/lib/server/avatar-storage"
 import { defaultLocale, locales, type Locale } from "@/lib/i18n/config"
 
 /**
@@ -185,6 +186,67 @@ export async function updateGroup(groupId: string, formData: FormData) {
   return { success: true }
 }
 
+/**
+ * Upload + persist a group avatar. The file is uploaded via the Admin SDK
+ * (server-side), URL stored on the group doc. Throws on missing/invalid
+ * file so the client can surface a useful toast.
+ */
+export async function setGroupAvatar(
+  groupId: string,
+  formData: FormData
+): Promise<{ avatarUrl?: string; error?: string }> {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const parsedId = firestoreId.safeParse(groupId)
+  if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
+
+  const file = formData.get("file")
+  if (!(file instanceof File)) return { error: "Fichier manquant." }
+
+  const groupRef = adminDb
+    .collection("managers").doc(manager.uid)
+    .collection("groups").doc(parsedId.data)
+  const groupSnap = await groupRef.get()
+  if (!groupSnap.exists) return { error: "Groupe introuvable." }
+
+  try {
+    const avatarUrl = await saveAvatar("groups", parsedId.data, file)
+    await groupRef.update({ avatarUrl })
+    revalidatePath("/dashboard")
+    return { avatarUrl }
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Upload échoué.",
+    }
+  }
+}
+
+/**
+ * Upload + persist the manager's own avatar. Stored on the manager doc
+ * (managers/{uid}.avatarUrl).
+ */
+export async function setManagerAvatar(
+  formData: FormData
+): Promise<{ avatarUrl?: string; error?: string }> {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const file = formData.get("file")
+  if (!(file instanceof File)) return { error: "Fichier manquant." }
+
+  try {
+    const avatarUrl = await saveAvatar("managers", manager.uid, file)
+    await adminDb.collection("managers").doc(manager.uid).update({ avatarUrl })
+    revalidatePath("/dashboard")
+    return { avatarUrl }
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Upload échoué.",
+    }
+  }
+}
+
 export async function deleteGroup(groupId: string) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }
@@ -255,9 +317,25 @@ export async function getGroupAthletes(groupId: string) {
     .orderBy("createdAt", "desc")
     .get()
 
+  // Avatars live on the global athlete doc (athletes/{uid}.avatarUrl) so a
+  // single athlete's photo stays in sync across every group they joined.
+  // One getAll per call is cheap; skipping it would force per-doc reads.
+  const ids = snapshot.docs.map((d) => d.id)
+  const avatars = new Map<string, string>()
+  if (ids.length > 0) {
+    const globalDocs = await adminDb.getAll(
+      ...ids.map((id) => adminDb.collection("athletes").doc(id))
+    )
+    for (const doc of globalDocs) {
+      const url = doc.data()?.avatarUrl
+      if (typeof url === "string" && url.length > 0) avatars.set(doc.id, url)
+    }
+  }
+
   const athletes: GroupAthlete[] = snapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
+    avatarUrl: avatars.get(doc.id),
     createdAt: doc.data().createdAt?.toDate(),
   })) as GroupAthlete[]
 

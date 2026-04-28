@@ -3,4 +3,5 @@ export interface Manager {
   name: string
   email: string
   createdAt: Date
+  avatarUrl?: string
 }

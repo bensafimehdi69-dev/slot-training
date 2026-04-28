@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "next-intl"
 import { Copy, RefreshCw, Trash2, Loader2 } from "lucide-react"
+import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -133,6 +134,11 @@ export function AthletesTab({ group, onRefresh }: AthletesTabProps) {
               // pill — that's the deliberate trade-off for fitting one row.
               className="flex items-center gap-2 rounded-md border px-2 py-1.5"
             >
+              <Avatar
+                src={athlete.avatarUrl}
+                name={`${athlete.firstName} ${athlete.lastName}`}
+                size={28}
+              />
               <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
                 <p className="truncate text-sm font-medium">
                   {athlete.firstName} {athlete.lastName}
