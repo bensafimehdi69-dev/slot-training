@@ -21,6 +21,7 @@ import { AthleteAvailabilityGrid } from "@/components/custom/athlete-availabilit
 import type { ConstraintCell, ConstraintsGrid } from "@/lib/types/profile"
 import { Timer, Shield } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import type { AddressWithCoords } from "@/lib/types/address"
 
 interface JoinFormProps {
@@ -34,6 +35,8 @@ export function JoinForm({
   groupName,
   token,
 }: JoinFormProps) {
+  const t = useTranslations("joinForm")
+  const tc = useTranslations("common")
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
 
@@ -67,15 +70,15 @@ export function JoinForm({
 
   async function handleCreateAccount(): Promise<void> {
     if (!email || !password || !passwordConfirm) {
-      toast.error("Veuillez remplir tous les champs.")
+      toast.error(t("errFillAll"))
       return
     }
     if (password.length < 6) {
-      toast.error("Le mot de passe doit contenir au moins 6 caractères.")
+      toast.error(t("errPasswordTooShort"))
       return
     }
     if (password !== passwordConfirm) {
-      toast.error("Les mots de passe ne correspondent pas.")
+      toast.error(t("errPasswordNoMatch"))
       return
     }
 
@@ -86,19 +89,19 @@ export function JoinForm({
         email,
         password
       )
-      const token = await credential.user.getIdToken()
-      setIdToken(token)
+      const newToken = await credential.user.getIdToken()
+      setIdToken(newToken)
       setStep(3)
     } catch (error: unknown) {
       const code = (error as { code?: string }).code
       if (code === "auth/email-already-in-use") {
-        toast.error("Cette adresse email est déjà utilisée.")
+        toast.error(t("errEmailInUse"))
       } else if (code === "auth/invalid-email") {
-        toast.error("Adresse email invalide.")
+        toast.error(t("errInvalidEmail"))
       } else if (code === "auth/weak-password") {
-        toast.error("Le mot de passe est trop faible.")
+        toast.error(t("errWeakPassword"))
       } else {
-        toast.error("Impossible de créer le compte. Veuillez réessayer.")
+        toast.error(t("errAccountFailed"))
       }
     }
     setLoading(false)
@@ -106,11 +109,11 @@ export function JoinForm({
 
   async function handleComplete(): Promise<void> {
     if (!firstName.trim() || !lastName.trim()) {
-      toast.error("Le nom et le prénom sont requis.")
+      toast.error(t("errNameRequired"))
       return
     }
     if (!homeAddress) {
-      toast.error("L'adresse de domicile est requise.")
+      toast.error(t("errHomeAddressRequired"))
       return
     }
 
@@ -154,7 +157,7 @@ export function JoinForm({
       return
     }
 
-    toast.success("Inscription terminée ! Redirection…")
+    toast.success(t("successDone"))
     // Full-page navigation so the freshly-set session cookie is picked up by
     // the proxy (router.push wouldn't re-issue a request).
     window.location.href = "/home"
@@ -167,10 +170,8 @@ export function JoinForm({
           <div className="mb-4 flex justify-center">
             <Timer className="h-10 w-10 text-blue-600" />
           </div>
-          <CardTitle>Rejoindre {groupName}</CardTitle>
-          <CardDescription>
-            Complétez votre inscription en quelques minutes
-          </CardDescription>
+          <CardTitle>{t("title", { group: groupName })}</CardTitle>
+          <CardDescription>{t("subtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
           <StepProgress currentStep={step} totalSteps={6} />
@@ -180,24 +181,17 @@ export function JoinForm({
               <div className="space-y-3 rounded-lg border p-4">
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5 text-blue-600" />
-                  <h3 className="font-semibold">Protection de vos données</h3>
+                  <h3 className="font-semibold">{t("gdprTitle")}</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Pour optimiser vos créneaux d&apos;entraînement, nous
-                  collectons :
-                </p>
+                <p className="text-sm text-muted-foreground">{t("gdprIntro")}</p>
                 <ul className="ml-4 list-disc space-y-1 text-sm text-muted-foreground">
-                  <li>Votre nom et prénom</li>
-                  <li>Votre adresse email</li>
-                  <li>Vos adresses (domicile, études, club)</li>
-                  <li>Votre emploi du temps hebdomadaire</li>
-                  <li>Vos contraintes de disponibilité</li>
+                  <li>{t("gdprItem1")}</li>
+                  <li>{t("gdprItem2")}</li>
+                  <li>{t("gdprItem3")}</li>
+                  <li>{t("gdprItem4")}</li>
+                  <li>{t("gdprItem5")}</li>
                 </ul>
-                <p className="text-sm text-muted-foreground">
-                  Vos adresses sont chiffrées et ne sont jamais partagées avec
-                  votre entraîneur. Vous pouvez supprimer vos données à tout
-                  moment.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("gdprFooter")}</p>
               </div>
               <div className="flex items-start gap-3">
                 <Checkbox
@@ -211,8 +205,7 @@ export function JoinForm({
                   htmlFor="gdpr"
                   className="cursor-pointer text-sm leading-relaxed"
                 >
-                  J&apos;accepte la collecte et le traitement de mes données
-                  personnelles telles que décrites ci-dessus.
+                  {t("gdprConsent")}
                 </Label>
               </div>
               <Button
@@ -220,7 +213,7 @@ export function JoinForm({
                 disabled={!gdprConsent}
                 onClick={() => setStep(2)}
               >
-                Continuer
+                {tc("continue")}
               </Button>
             </div>
           )}
@@ -228,7 +221,7 @@ export function JoinForm({
           {step === 2 && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Adresse email</Label>
+                <Label htmlFor="email">{t("step2Email")}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -239,29 +232,29 @@ export function JoinForm({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Mot de passe</Label>
+                <Label htmlFor="password">{t("step2Password")}</Label>
                 <Input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="6 caractères minimum"
+                  placeholder={t("step2PasswordPlaceholder")}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="passwordConfirm">Confirmer le mot de passe</Label>
+                <Label htmlFor="passwordConfirm">{t("step2Confirm")}</Label>
                 <Input
                   id="passwordConfirm"
                   type="password"
                   value={passwordConfirm}
                   onChange={(e) => setPasswordConfirm(e.target.value)}
-                  placeholder="Retapez votre mot de passe"
+                  placeholder={t("step2ConfirmPlaceholder")}
                   required
                 />
                 {passwordConfirm.length > 0 && password !== passwordConfirm && (
                   <p className="text-xs text-red-600">
-                    Les mots de passe ne correspondent pas.
+                    {t("step2PasswordsNoMatch")}
                   </p>
                 )}
               </div>
@@ -270,7 +263,7 @@ export function JoinForm({
                 onClick={handleCreateAccount}
                 disabled={loading || !email || !password || !passwordConfirm || password !== passwordConfirm}
               >
-                {loading ? "Création du compte..." : "Créer mon compte"}
+                {loading ? t("step2Submitting") : t("step2Submit")}
               </Button>
             </div>
           )}
@@ -278,7 +271,7 @@ export function JoinForm({
           {step === 3 && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">Prénom</Label>
+                <Label htmlFor="firstName">{t("step3FirstName")}</Label>
                 <Input
                   id="firstName"
                   value={firstName}
@@ -287,7 +280,7 @@ export function JoinForm({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Nom</Label>
+                <Label htmlFor="lastName">{t("step3LastName")}</Label>
                 <Input
                   id="lastName"
                   value={lastName}
@@ -299,13 +292,13 @@ export function JoinForm({
                 className="w-full"
                 onClick={() => {
                   if (!firstName.trim() || !lastName.trim()) {
-                    toast.error("Le nom et le prénom sont requis.")
+                    toast.error(t("errNameRequired"))
                     return
                   }
                   setStep(4)
                 }}
               >
-                Continuer
+                {tc("continue")}
               </Button>
             </div>
           )}
@@ -313,7 +306,7 @@ export function JoinForm({
           {step === 4 && (
             <div className="space-y-4">
               <AddressAutocompleteMap
-                label="Adresse de domicile"
+                label={t("step4HomeAddress")}
                 value={homeAddress}
                 onChange={setHomeAddress}
                 required
@@ -322,13 +315,13 @@ export function JoinForm({
                 className="w-full"
                 onClick={() => {
                   if (!homeAddress) {
-                    toast.error("L'adresse de domicile est requise.")
+                    toast.error(t("errHomeAddressRequired"))
                     return
                   }
                   setStep(5)
                 }}
               >
-                Continuer
+                {tc("continue")}
               </Button>
             </div>
           )}
@@ -336,12 +329,12 @@ export function JoinForm({
           {step === 5 && (
             <div className="space-y-4">
               <AddressAutocompleteMap
-                label="Adresse du lieu d'études (optionnel)"
+                label={t("step5SchoolAddress")}
                 value={schoolAddress}
                 onChange={setSchoolAddress}
               />
               <Button className="w-full" onClick={() => setStep(6)}>
-                {schoolAddress ? "Continuer" : "Passer cette étape"}
+                {schoolAddress ? tc("continue") : t("step5Skip")}
               </Button>
             </div>
           )}
@@ -349,12 +342,9 @@ export function JoinForm({
           {step === 6 && (
             <div className="space-y-4">
               <div>
-                <Label className="mb-3 block">
-                  Vos disponibilités hebdomadaires
-                </Label>
+                <Label className="mb-3 block">{t("step6Title")}</Label>
                 <p className="mb-4 text-sm text-muted-foreground">
-                  Touchez les créneaux pour indiquer vos indisponibilités (en
-                  gris).
+                  {t("step6Hint")}
                 </p>
                 <AthleteAvailabilityGrid
                   value={constraintsGrid}
@@ -366,9 +356,7 @@ export function JoinForm({
                 onClick={handleComplete}
                 disabled={loading}
               >
-                {loading
-                  ? "Enregistrement..."
-                  : "Terminer l'inscription"}
+                {loading ? t("step6Submitting") : t("step6Submit")}
               </Button>
             </div>
           )}

@@ -12,8 +12,10 @@ import { Label } from "@/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 
 export default function RegisterPage() {
+  const t = useTranslations("auth")
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -45,7 +47,7 @@ export default function RegisterPage() {
       router.push("/dashboard")
       router.refresh()
     } catch {
-      toast.error("Compte créé. Veuillez vous connecter.")
+      toast.error(t("accountCreatedReconnect"))
       setLoading(false)
     }
   }
@@ -53,13 +55,13 @@ export default function RegisterPage() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>Créer un compte Manager</CardTitle>
-        <CardDescription>Commencez à organiser vos entraînements</CardDescription>
+        <CardTitle>{t("registerTitle")}</CardTitle>
+        <CardDescription>{t("registerSubtitle")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nom complet</Label>
+            <Label htmlFor="name">{t("fullName")}</Label>
             <Input
               id="name"
               name="name"
@@ -68,7 +70,7 @@ export default function RegisterPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("email")}</Label>
             <Input
               id="email"
               name="email"
@@ -78,7 +80,7 @@ export default function RegisterPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Mot de passe</Label>
+            <Label htmlFor="password">{t("password")}</Label>
             <div className="relative">
               <Input
                 id="password"
@@ -92,7 +94,7 @@ export default function RegisterPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                aria-label={showPassword ? t("hidePassword") : t("showPassword")}
                 aria-pressed={showPassword}
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
               >
@@ -101,12 +103,12 @@ export default function RegisterPage() {
             </div>
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Création..." : "Créer mon compte"}
+            {loading ? t("creatingAccount") : t("createMyAccount")}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
-            Déjà un compte ?{" "}
+            {t("alreadyHaveAccount")}{" "}
             <Link href="/login" className="text-blue-600 hover:underline">
-              Se connecter
+              {t("signIn")}
             </Link>
           </p>
         </form>

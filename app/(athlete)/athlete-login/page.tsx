@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Timer } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 
 // Same-origin relative path only: starts with `/`, is not `//...` or `/\...`
 // (would be interpreted as protocol-relative and could redirect off-site).
@@ -27,6 +28,7 @@ function isSafeRedirect(value: string | null): value is string {
 }
 
 export default function AthleteLoginPage() {
+  const t = useTranslations("auth")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -42,7 +44,7 @@ export default function AthleteLoginPage() {
 
   async function handleLogin() {
     if (!email || !password) {
-      toast.error("Veuillez saisir votre email et votre mot de passe.")
+      toast.error(t("missingFields"))
       return
     }
 
@@ -64,13 +66,13 @@ export default function AthleteLoginPage() {
         code === "auth/wrong-password" ||
         code === "auth/user-not-found"
       ) {
-        toast.error("Email ou mot de passe incorrect.")
+        toast.error(t("wrongCredentials"))
       } else if (code === "auth/invalid-email") {
-        toast.error("Adresse email invalide.")
+        toast.error(t("invalidEmail"))
       } else if (code === "auth/too-many-requests") {
-        toast.error("Trop de tentatives. Réessayez plus tard.")
+        toast.error(t("tryAgainLater"))
       } else {
-        toast.error("Connexion impossible. Veuillez réessayer.")
+        toast.error(t("loginFailed"))
       }
       setLoading(false)
     }
@@ -83,34 +85,32 @@ export default function AthleteLoginPage() {
           <div className="mb-4 flex justify-center">
             <Timer className="h-10 w-10 text-blue-600" />
           </div>
-          <CardTitle>Espace athlète</CardTitle>
-          <CardDescription>
-            Connectez-vous pour accéder à vos campagnes.
-          </CardDescription>
+          <CardTitle>{t("athleteLoginTitle")}</CardTitle>
+          <CardDescription>{t("athleteLoginSubtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("email")}</Label>
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="votre@email.com"
+                placeholder={t("emailPlaceholder")}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
+              <Label htmlFor="password">{t("password")}</Label>
               <Input
                 id="password"
                 type="password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder={t("passwordPlaceholder")}
                 required
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleLogin()
@@ -122,11 +122,10 @@ export default function AthleteLoginPage() {
               onClick={handleLogin}
               disabled={loading || !email || !password}
             >
-              {loading ? "Connexion en cours..." : "Se connecter"}
+              {loading ? t("loadingShort") : t("signIn")}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
-              Pas encore de compte ? Demandez un lien d&apos;invitation à votre
-              entraîneur.
+              {t("noAccountYet")}
             </p>
           </div>
         </CardContent>

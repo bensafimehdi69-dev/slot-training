@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,6 +22,7 @@ import { TravelModeBadges } from "@/components/custom/travel-mode-badges"
 import type { OptimizationResult, AthleteSlotInfo, IndividualSlot } from "@/lib/types/planning"
 
 function AthleteRow({ athlete }: { athlete: AthleteSlotInfo }) {
+  const tp = useTranslations("planning")
   return (
     <tr className="border-b last:border-b-0">
       <td className="py-2 px-3 text-sm font-medium">
@@ -30,12 +32,12 @@ function AthleteRow({ athlete }: { athlete: AthleteSlotInfo }) {
         {athlete.available ? (
           <Badge className="bg-green-600 text-white">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Disponible
+            {tp("available")}
           </Badge>
         ) : (
           <Badge variant="destructive">
             <XCircle className="h-3 w-3 mr-1" />
-            Indisponible
+            {tp("unavailable")}
           </Badge>
         )}
       </td>
@@ -62,6 +64,7 @@ function AthleteRow({ athlete }: { athlete: AthleteSlotInfo }) {
  * names, status and travel times all visible without horizontal scroll.
  */
 function AthleteCard({ athlete }: { athlete: AthleteSlotInfo }) {
+  const tp = useTranslations("planning")
   return (
     <div className="rounded-md border p-3">
       <div className="flex items-start justify-between gap-2">
@@ -71,12 +74,12 @@ function AthleteCard({ athlete }: { athlete: AthleteSlotInfo }) {
         {athlete.available ? (
           <Badge className="bg-green-600 text-white">
             <CheckCircle className="mr-1 h-3 w-3" />
-            Disponible
+            {tp("available")}
           </Badge>
         ) : (
           <Badge variant="destructive">
             <XCircle className="mr-1 h-3 w-3" />
-            Indisponible
+            {tp("unavailable")}
           </Badge>
         )}
       </div>
@@ -91,7 +94,7 @@ function AthleteCard({ athlete }: { athlete: AthleteSlotInfo }) {
         />
         {athlete.departureTime && (
           <span className="text-xs text-muted-foreground">
-            Départ : {athlete.departureTime}
+            {tp("departure")}: {athlete.departureTime}
           </span>
         )}
       </div>
@@ -100,6 +103,7 @@ function AthleteCard({ athlete }: { athlete: AthleteSlotInfo }) {
 }
 
 function IndividualSlotCard({ slot }: { slot: IndividualSlot }) {
+  const tp = useTranslations("planning")
   return (
     <div className="flex flex-col gap-2 rounded-lg border p-3 bg-blue-50/50 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
@@ -112,7 +116,7 @@ function IndividualSlotCard({ slot }: { slot: IndividualSlot }) {
             {slot.day} {slot.startTime} - {slot.endTime}
           </p>
           <p className="text-xs text-muted-foreground">
-            Raison : {slot.exclusionReason}
+            {tp("reason")}: {slot.exclusionReason}
           </p>
         </div>
       </div>
@@ -124,7 +128,7 @@ function IndividualSlotCard({ slot }: { slot: IndividualSlot }) {
         />
         {slot.departureTime && (
           <span className="text-xs text-muted-foreground">
-            Départ : {slot.departureTime}
+            {tp("departure")}: {slot.departureTime}
           </span>
         )}
       </div>
@@ -149,6 +153,9 @@ export function OptimizationResultView({
   isValidating,
   isRejecting,
 }: OptimizationResultViewProps) {
+  const tp = useTranslations("planning")
+  const tcamp = useTranslations("campaigns")
+  const tc = useTranslations("common")
   const bestSlot = result.bestSlot
   if (!bestSlot) return null
 
@@ -174,27 +181,27 @@ export function OptimizationResultView({
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="h-4 w-4 text-blue-600" />
-            Meilleur créneau collectif
+            {tp("bestSlot")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <p className="text-xs text-muted-foreground">Jour</p>
+              <p className="text-xs text-muted-foreground">{tp("day")}</p>
               <p className="text-sm font-medium">{bestSlot.day}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Horaire</p>
+              <p className="text-xs text-muted-foreground">{tp("schedule")}</p>
               <p className="text-sm font-medium">{bestSlot.startTime} - {bestSlot.endTime}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Participation</p>
+              <p className="text-xs text-muted-foreground">{tp("participation")}</p>
               <p className="text-sm font-medium">
                 {bestSlot.availableCount}/{bestSlot.totalCount} = {participationRate}%
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Trajet moyen</p>
+              <p className="text-xs text-muted-foreground">{tp("averageTravel")}</p>
               <div className="text-sm font-medium">
                 {bestSlot.averageWalkingMinutes !== undefined ||
                 bestSlot.averageDrivingMinutes !== undefined ? (
@@ -218,18 +225,18 @@ export function OptimizationResultView({
           5 columns readable without horizontal scroll on a 360px screen. */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Détail par athlète</CardTitle>
+          <CardTitle className="text-base">{tp("athleteDetail")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="hidden overflow-x-auto sm:block">
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Nom</th>
-                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Statut</th>
-                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Raison</th>
-                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Trajet</th>
-                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Départ</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">{tp("name")}</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">{tp("status")}</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">{tp("reason")}</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">{tp("travel")}</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">{tp("departure")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -262,7 +269,7 @@ export function OptimizationResultView({
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <User className="h-4 w-4 text-blue-600" />
-              Créneaux individuels ({result.individualSlots.length})
+              {tp("individualSlotsTitle", { count: result.individualSlots.length })}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -294,7 +301,7 @@ export function OptimizationResultView({
             ) : (
               <CheckCircle className="h-4 w-4 mr-2" />
             )}
-            Valider le planning
+            {tp("validate")}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -304,20 +311,17 @@ export function OptimizationResultView({
                 ) : (
                   <XCircle className="h-4 w-4 mr-2" />
                 )}
-                Rejeter
+                {tp("reject")}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Rejeter ce planning ?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  L&apos;optimisation sera supprimée et vous pourrez la
-                  relancer. Aucun email ne sera envoyé aux athlètes.
-                </AlertDialogDescription>
+                <AlertDialogTitle>{tp("rejectTitle")}</AlertDialogTitle>
+                <AlertDialogDescription>{tp("rejectDescription")}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                <AlertDialogAction onClick={onReject}>Rejeter</AlertDialogAction>
+                <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+                <AlertDialogAction onClick={onReject}>{tp("reject")}</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -327,14 +331,14 @@ export function OptimizationResultView({
       {planningStatus === "validated" && (
         <Badge className="bg-green-600 text-white">
           <CheckCircle className="h-3 w-3 mr-1" />
-          Planning validé
+          {tcamp("statusValidated")}
         </Badge>
       )}
 
       {planningStatus === "rejected" && (
         <Badge variant="destructive">
           <XCircle className="h-3 w-3 mr-1" />
-          Planning rejeté
+          {tcamp("statusRejected")}
         </Badge>
       )}
     </div>

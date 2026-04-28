@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 
 export default function ForgotPasswordPage() {
+  const t = useTranslations("auth")
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
 
@@ -24,9 +26,9 @@ export default function ForgotPasswordPage() {
     try {
       await sendPasswordResetEmail(auth, email)
       setSent(true)
-      toast.success("Email de réinitialisation envoyé !")
+      toast.success(t("resetEmailSent"))
     } catch {
-      toast.error("Impossible d'envoyer l'email. Vérifiez l'adresse.")
+      toast.error(t("resetEmailFailed"))
     } finally {
       setLoading(false)
     }
@@ -36,12 +38,12 @@ export default function ForgotPasswordPage() {
     return (
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Email envoyé</CardTitle>
-          <CardDescription>Vérifiez votre boîte de réception pour réinitialiser votre mot de passe.</CardDescription>
+          <CardTitle>{t("emailSentTitle")}</CardTitle>
+          <CardDescription>{t("emailSentSubtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Link href="/login">
-            <Button variant="outline" className="w-full">Retour à la connexion</Button>
+            <Button variant="outline" className="w-full">{t("backToLogin")}</Button>
           </Link>
         </CardContent>
       </Card>
@@ -51,20 +53,20 @@ export default function ForgotPasswordPage() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>Mot de passe oublié</CardTitle>
-        <CardDescription>Entrez votre email pour recevoir un lien de réinitialisation</CardDescription>
+        <CardTitle>{t("forgotTitle")}</CardTitle>
+        <CardDescription>{t("forgotSubtitle")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("email")}</Label>
             <Input id="email" name="email" type="email" autoComplete="email" required />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Envoi..." : "Envoyer le lien"}
+            {loading ? t("sendingLink") : t("sendLink")}
           </Button>
           <Link href="/login" className="block text-center text-sm text-blue-600 hover:underline">
-            Retour à la connexion
+            {t("backToLogin")}
           </Link>
         </form>
       </CardContent>

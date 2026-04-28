@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useTranslations } from "next-intl"
 import { submitCampaignResponse, deleteAthleteData } from "./actions"
 import { Button } from "@/components/ui/button"
 import {
@@ -182,29 +183,7 @@ export function CampaignClientPage({
 
   // If campaign is closed (and we didn't already show the planning view above)
   if (campaign.status === "closed") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <div className="mb-4 flex justify-center">
-              <CalendarClock className="h-16 w-16 text-gray-400" />
-            </div>
-            <CardTitle>Campagne cloturee</CardTitle>
-            <CardDescription>
-              Cette campagne n&apos;accepte plus de réponses.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Periode : {campaign.startDate} au {campaign.endDate}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Lieu : {campaign.trainingLocation.formatted}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return <ClosedCampaignCard campaign={campaign} />
   }
 
   // Show the form or submitted confirmation
@@ -216,6 +195,31 @@ export function CampaignClientPage({
       profile={profile}
       athleteFirstName={athleteFirstName}
     />
+  )
+}
+
+function ClosedCampaignCard({ campaign }: { campaign: SerializedCampaign }) {
+  const t = useTranslations("athleteCampaign")
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-md text-center">
+        <CardHeader>
+          <div className="mb-4 flex justify-center">
+            <CalendarClock className="h-16 w-16 text-gray-400" />
+          </div>
+          <CardTitle>{t("campaignClosed")}</CardTitle>
+          <CardDescription>{t("campaignClosedDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {t("period", { start: campaign.startDate, end: campaign.endDate })}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {t("location", { location: campaign.trainingLocation.formatted })}
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -232,6 +236,7 @@ function PlanningView({
   athleteSessions: AthleteSession[]
   trainingLocation: { formatted: string; lat: number; lng: number }
 }) {
+  const t = useTranslations("athleteCampaign")
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-lg">
@@ -239,10 +244,14 @@ function PlanningView({
           <div className="mb-4 flex justify-center">
             <Timer className="h-10 w-10 text-blue-600" />
           </div>
-          <CardTitle>Votre planning</CardTitle>
+          <CardTitle>{t("yourPlanning")}</CardTitle>
           <CardDescription>
-            Bonjour {athleteFirstName}, voici vos {athleteSessions.length}{" "}
-            séance(s) pour la période du {campaign.startDate} au {campaign.endDate}.
+            {t("yourPlanningSubtitle", {
+              name: athleteFirstName,
+              count: athleteSessions.length,
+              start: campaign.startDate,
+              end: campaign.endDate,
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -251,12 +260,11 @@ function PlanningView({
               <div className="mb-2 flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-gray-500" />
                 <h3 className="font-semibold text-gray-700">
-                  Aucune séance attribuée
+                  {t("noSessionAssignedTitle")}
                 </h3>
               </div>
               <p className="text-sm text-muted-foreground">
-                Aucun créneau compatible n&apos;a pu être trouvé pour cette période.
-                Contactez votre entraîneur pour plus d&apos;informations.
+                {t("noSessionAssignedDescription")}
               </p>
             </div>
           ) : (
@@ -271,9 +279,7 @@ function PlanningView({
           <div className="flex items-start gap-2 text-sm">
             <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground">
-                Lieu d&apos;entraînement
-              </p>
+              <p className="text-xs text-muted-foreground">{t("trainingLocation")}</p>
               <p>{trainingLocation.formatted}</p>
             </div>
           </div>
@@ -288,13 +294,14 @@ function PlanningView({
 }
 
 function SessionCard({ session }: { session: AthleteSession }) {
+  const t = useTranslations("athleteCampaign")
   const isCollective = session.type === "collectif"
   const cardClass = isCollective
     ? "border-blue-200 bg-blue-50"
     : "border-orange-200 bg-orange-50"
   const titleClass = isCollective ? "text-blue-800" : "text-orange-800"
   const iconClass = isCollective ? "text-blue-600" : "text-orange-600"
-  const title = isCollective ? "Créneau collectif" : "Créneau individuel"
+  const title = isCollective ? t("collectiveSlot") : t("individualSlot")
 
   return (
     <div className={`space-y-3 rounded-lg border p-4 ${cardClass}`}>
@@ -304,18 +311,18 @@ function SessionCard({ session }: { session: AthleteSession }) {
       </div>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
-          <p className="text-xs text-muted-foreground">Jour</p>
+          <p className="text-xs text-muted-foreground">{t("day")}</p>
           <p className="font-medium">{session.day}</p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Horaire</p>
+          <p className="text-xs text-muted-foreground">{t("schedule")}</p>
           <p className="font-medium">
             {session.startTime} - {session.endTime}
           </p>
         </div>
         {session.departureTime && (
           <div>
-            <p className="text-xs text-muted-foreground">Heure de départ</p>
+            <p className="text-xs text-muted-foreground">{t("departureTime")}</p>
             <div className="flex items-center gap-1">
               <Clock className="h-3 w-3 text-muted-foreground" />
               <p className="font-medium">{session.departureTime}</p>
@@ -326,7 +333,7 @@ function SessionCard({ session }: { session: AthleteSession }) {
           session.drivingMinutes !== undefined ||
           session.travelMinutes !== undefined) && (
           <div>
-            <p className="text-xs text-muted-foreground">Trajet estimé</p>
+            <p className="text-xs text-muted-foreground">{t("estimatedTravel")}</p>
             <TravelModeBadges
               walkingMinutes={session.walkingMinutes}
               drivingMinutes={session.drivingMinutes}
@@ -339,7 +346,7 @@ function SessionCard({ session }: { session: AthleteSession }) {
         <div className="flex items-start gap-2 text-sm">
           <Navigation className="mt-0.5 h-4 w-4 text-muted-foreground" />
           <div>
-            <p className="text-xs text-muted-foreground">Adresse de départ</p>
+            <p className="text-xs text-muted-foreground">{t("departureAddress")}</p>
             <p>{session.departureAddress}</p>
           </div>
         </div>
@@ -362,6 +369,9 @@ function CampaignForm({
   profile: SerializedProfile | null
   athleteFirstName: string
 }) {
+  const t = useTranslations("athleteCampaign")
+  const tHome = useTranslations("athleteHome")
+  const tc = useTranslations("common")
   const [showForm, setShowForm] = useState(!existingResponse)
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -436,7 +446,7 @@ function CampaignForm({
 
   async function handleSubmit() {
     if (!homeAddress) {
-      toast.error("L'adresse de domicile est requise.")
+      toast.error(tHome("homeAddressRequired"))
       return
     }
 
@@ -454,7 +464,7 @@ function CampaignForm({
       return
     }
 
-    toast.success("Réponse envoyée avec succès !")
+    toast.success(t("responseSentSuccess"))
     if (typeof window !== "undefined") {
       try {
         window.localStorage.removeItem(draftKey)
@@ -475,32 +485,29 @@ function CampaignForm({
             <div className="mb-4 flex justify-center">
               <CheckCircle className="h-16 w-16 text-green-600" />
             </div>
-            <CardTitle>Réponse envoyée</CardTitle>
+            <CardTitle>{t("responseSent")}</CardTitle>
             <CardDescription>
-              Bonjour {athleteFirstName}, votre réponse à la campagne a bien été
-              enregistrée.
+              {t("responseSentMessage", { name: athleteFirstName })}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border p-4 text-sm">
               <p className="text-muted-foreground">
-                Période : {campaign.startDate} au {campaign.endDate}
+                {t("period", { start: campaign.startDate, end: campaign.endDate })}
               </p>
               <p className="text-muted-foreground">
-                Lieu : {campaign.trainingLocation.formatted}
+                {t("location", { location: campaign.trainingLocation.formatted })}
               </p>
               <p className="text-muted-foreground">
-                Envoyé le :{" "}
-                {new Date(existingResponse.submittedAt).toLocaleDateString(
-                  "fr-FR",
-                  {
+                {t("submittedOn", {
+                  date: new Date(existingResponse.submittedAt).toLocaleString(undefined, {
                     day: "numeric",
                     month: "long",
                     year: "numeric",
                     hour: "2-digit",
                     minute: "2-digit",
-                  }
-                )}
+                  }),
+                })}
               </p>
             </div>
 
@@ -510,12 +517,12 @@ function CampaignForm({
                 className="w-full"
                 onClick={() => setShowForm(true)}
               >
-                Modifier ma réponse
+                {t("modifyResponse")}
               </Button>
             )}
 
             <Button asChild className="w-full">
-              <Link href="/home">Retour à mon espace</Link>
+              <Link href="/home">{t("backToHome")}</Link>
             </Button>
 
             <Separator />
@@ -536,15 +543,12 @@ function CampaignForm({
             <div className="mb-4 flex justify-center">
               <CheckCircle className="h-16 w-16 text-green-600" />
             </div>
-            <CardTitle>Réponse envoyée !</CardTitle>
-            <CardDescription>
-              Votre réponse a été enregistrée. Vous recevrez un email lorsque le
-              planning sera validé.
-            </CardDescription>
+            <CardTitle>{t("responseSent")}</CardTitle>
+            <CardDescription>{t("responseSavedShort")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button asChild className="w-full">
-              <Link href="/home">Retour à mon espace</Link>
+              <Link href="/home">{t("backToHome")}</Link>
             </Button>
             <DeleteDataSection campaignId={campaignId} />
           </CardContent>
@@ -561,9 +565,9 @@ function CampaignForm({
           <div className="mb-4 flex justify-center">
             <Timer className="h-10 w-10 text-blue-600" />
           </div>
-          <CardTitle>Campagne d&apos;entraînement</CardTitle>
+          <CardTitle>{t("title")}</CardTitle>
           <CardDescription>
-            {campaign.startDate} au {campaign.endDate} &mdash;{" "}
+            {campaign.startDate} → {campaign.endDate} &mdash;{" "}
             {campaign.trainingLocation.formatted}
           </CardDescription>
         </CardHeader>
@@ -573,10 +577,10 @@ function CampaignForm({
             totalSteps={3}
             label={
               step === 1
-                ? "Emploi du temps"
+                ? t("step1")
                 : step === 2
-                  ? "Adresses"
-                  : "Contraintes"
+                  ? t("step2")
+                  : t("step3")
             }
           />
 
@@ -585,11 +589,10 @@ function CampaignForm({
             <div className="space-y-4">
               <div>
                 <Label className="mb-3 block text-base font-semibold">
-                  Votre emploi du temps
+                  {t("scheduleLabel")}
                 </Label>
                 <p className="mb-4 text-sm text-muted-foreground">
-                  Indiquez vos heures de cours en cliquant sur les cases
-                  correspondantes.
+                  {t("scheduleHint")}
                 </p>
                 <ScheduleGrid
                   value={schedule}
@@ -602,7 +605,7 @@ function CampaignForm({
                 className="w-full"
                 onClick={() => setStep(2)}
               >
-                Continuer
+                {tc("continue")}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -612,13 +615,13 @@ function CampaignForm({
           {step === 2 && (
             <div className="space-y-4">
               <AddressAutocompleteMap
-                label="Adresse de domicile"
+                label={tHome("homeAddress")}
                 value={homeAddress}
                 onChange={setHomeAddress}
                 required
               />
               <AddressAutocompleteMap
-                label="Adresse du lieu d'etudes (optionnel)"
+                label={tHome("schoolAddress")}
                 value={schoolAddress}
                 onChange={setSchoolAddress}
               />
@@ -628,19 +631,19 @@ function CampaignForm({
                   onClick={() => setStep(1)}
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Retour
+                  {tc("back")}
                 </Button>
                 <Button
                   className="flex-1"
                   onClick={() => {
                     if (!homeAddress) {
-                      toast.error("L'adresse de domicile est requise.")
+                      toast.error(tHome("homeAddressRequired"))
                       return
                     }
                     setStep(3)
                   }}
                 >
-                  Continuer
+                  {tc("continue")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -652,11 +655,10 @@ function CampaignForm({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="constraints" className="text-base font-semibold">
-                  Contraintes particulieres
+                  {t("constraintsLabel")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Signalez toute contrainte qui pourrait affecter votre
-                  disponibilité (blessure, examen, transport, etc.)
+                  {t("constraintsHint")}
                 </p>
                 <Textarea
                   id="constraints"
@@ -664,7 +666,7 @@ function CampaignForm({
                   onChange={(e) =>
                     setConstraints(e.target.value.slice(0, 2000))
                   }
-                  placeholder="Ex: je n'ai pas de voiture le mercredi..."
+                  placeholder={t("constraintsPlaceholder")}
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground text-right">
@@ -677,14 +679,14 @@ function CampaignForm({
                   onClick={() => setStep(2)}
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Retour
+                  {tc("back")}
                 </Button>
                 <Button
                   className="flex-1"
                   onClick={handleSubmit}
                   disabled={loading}
                 >
-                  {loading ? "Envoi en cours..." : "Envoyer ma réponse"}
+                  {loading ? t("submitting") : t("submitResponse")}
                 </Button>
               </div>
             </div>
@@ -701,6 +703,8 @@ function CampaignForm({
 
 // GDPR Delete Section
 function DeleteDataSection({ campaignId }: { campaignId: string }) {
+  const t = useTranslations("athleteCampaign")
+  const tc = useTranslations("common")
   const [showConfirm, setShowConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleted, setDeleted] = useState(false)
@@ -727,13 +731,13 @@ function DeleteDataSection({ campaignId }: { campaignId: string }) {
     }
     setDeleted(true)
     setDeleting(false)
-    toast.success("Vos donnees ont ete supprimees.")
+    toast.success(t("dataDeleted"))
   }
 
   if (deleted) {
     return (
       <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-center text-sm text-green-800">
-        Vos donnees ont ete supprimees. Vous pouvez fermer cette page.
+        {t("dataDeletedClose")}
       </div>
     )
   }
@@ -748,33 +752,22 @@ function DeleteDataSection({ campaignId }: { campaignId: string }) {
             className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            Supprimer mes donnees
+            {t("deleteSection")}
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Supprimer toutes vos donnees ?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Cette action est irreversible. Toutes vos donnees seront
-              definitivement supprimees :
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t("deleteConfirmTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("deleteConfirmDescription")}</AlertDialogDescription>
           </AlertDialogHeader>
-          <ul className="ml-4 list-disc space-y-1 text-sm text-muted-foreground">
-            <li>Adresses (domicile, études)</li>
-            <li>Emploi du temps</li>
-            <li>Contraintes specifiques</li>
-            <li>Votre compte utilisateur</li>
-          </ul>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={handleDelete}
               disabled={deleting}
             >
-              {deleting ? "Suppression..." : "Confirmer la suppression"}
+              {deleting ? t("submitting") : tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
