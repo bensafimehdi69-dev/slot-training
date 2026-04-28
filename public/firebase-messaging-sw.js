@@ -31,15 +31,19 @@ if (firebaseConfig.apiKey) {
   // eslint-disable-next-line no-undef
   const messaging = firebase.messaging()
 
-  // Background message handler: shown when the PWA is not in focus.
-  // Payload shape is whatever we put in `notification` on the server send.
+  // Background message handler: shown when the PWA is not in focus. The
+  // server sends DATA-ONLY messages (see lib/server/push.ts) so the browser
+  // doesn't auto-display a notification — this handler is the only display
+  // path, which keeps us at exactly one notification per push instead of the
+  // duplicate Chrome shows when a top-level `notification` field is present.
   messaging.onBackgroundMessage((payload) => {
-    const title = payload.notification?.title ?? "Slot Training"
+    const data = payload.data ?? {}
+    const title = data.title || "Slot Training"
     const options = {
-      body: payload.notification?.body ?? "",
+      body: data.body || "",
       icon: "/icon.svg",
       badge: "/icon.svg",
-      data: payload.data ?? {},
+      data,
     }
     self.registration.showNotification(title, options)
   })

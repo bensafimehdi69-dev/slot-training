@@ -67,6 +67,11 @@ function isSlotAllowed(grid: boolean[][], day: DayKey, slotStart: string): boole
 const SLOT_DURATION_MINUTES = 90
 const SLOT_STEP_MINUTES = 15
 const MAPS_FAILURE_ABORT_RATIO = 0.5
+// Margin we leave between the athlete's worst-case arrival at the venue and
+// the official slot start so they have time to change before training. Same
+// margin is also held back on the return leg (change after training, then
+// travel to next obligation).
+const CHANGING_BUFFER_MINUTES = 10
 
 // Per-day session windows agreed with product:
 // - Morning (07h–12h): preferred window for the optional second session.
@@ -296,8 +301,17 @@ export async function optimizeSlots(
           const availableFromMinutes = departure.availableFromTime ? timeToMinutes(departure.availableFromTime) : 0
           const arrivalMinutes = availableFromMinutes + worstTravel
           const slotStartMinutes = timeToMinutes(slotStart)
+          // Athlete must arrive at least CHANGING_BUFFER_MINUTES before the
+          // slot starts so they can change. We only enforce this when there's
+          // an upstream constraint (availableFromMinutes > 0) — without one
+          // the athlete simply leaves earlier from home, no need to rule the
+          // slot out.
+          const requiredArrivalMinutes =
+            availableFromMinutes > 0
+              ? slotStartMinutes - CHANGING_BUFFER_MINUTES
+              : slotStartMinutes
 
-          if (arrivalMinutes > slotStartMinutes) {
+          if (arrivalMinutes > requiredArrivalMinutes) {
             unavailableAthletes.push({
               athleteId: athlete.athleteId,
               firstName: athlete.firstName,
@@ -331,7 +345,10 @@ export async function optimizeSlots(
             )
             if (returnTravel) {
               const worstReturn = Math.max(returnTravel.walkingMinutes, returnTravel.drivingMinutes)
-              const reachByMinutes = slotEndMinutes + worstReturn
+              // Mirror the changing buffer on the way out: we hold back the
+              // same amount of minutes after the slot ends so the athlete can
+              // change before heading off.
+              const reachByMinutes = slotEndMinutes + CHANGING_BUFFER_MINUTES + worstReturn
               if (reachByMinutes > returnInfo.mustArriveByMinutes) {
                 unavailableAthletes.push({
                   athleteId: athlete.athleteId,
@@ -357,10 +374,13 @@ export async function optimizeSlots(
             walkingMinutes: travel.walkingMinutes,
             drivingMinutes: travel.drivingMinutes,
             departureAddress: departure.label,
-            // Departure time uses the worst-case travel so the athlete won't
-            // be late no matter the mode. The displayed pair lets them see
-            // the faster option if they want a smaller buffer.
-            departureTime: minutesToTime(slotStartMinutes - worstTravel),
+            // Departure time uses the worst-case travel + the changing buffer
+            // so the athlete arrives early enough to change without rushing.
+            // The displayed pair lets them see the faster option if they want
+            // a smaller buffer.
+            departureTime: minutesToTime(
+              slotStartMinutes - worstTravel - CHANGING_BUFFER_MINUTES
+            ),
           })
         } else {
           availableAthletes.push({
@@ -442,13 +462,14 @@ function buildDailyPlannings(results: SlotResult[]): DailyPlanning[] {
 
     let endOfDaySession: DailySession | null = null
     if (endOfDayCandidates.length > 0) {
-      // Most athletes first; tiebreak: latest start (closer to fin de journée),
-      // then lowest average travel (kinder to the group's commute).
+      // Most athletes first; tiebreak: EARLIEST start (so the session lands as
+      // soon as everyone is available rather than getting pushed to 20h–21h30
+      // when classes finished much earlier), then lowest average travel.
       endOfDayCandidates.sort((a, b) => {
         if (b.availableCount !== a.availableCount) return b.availableCount - a.availableCount
-        const ha = getStartHour(a.startTime)
-        const hb = getStartHour(b.startTime)
-        if (hb !== ha) return hb - ha
+        const sa = timeToMinutes(a.startTime)
+        const sb = timeToMinutes(b.startTime)
+        if (sa !== sb) return sa - sb
         return a.averageTravelMinutes - b.averageTravelMinutes
       })
       const best = endOfDayCandidates[0]
@@ -604,12 +625,13 @@ function pickBestSlotFromPlannings(
     .filter((s): s is DailySession => s !== null)
 
   if (endOfDayAny.length > 0) {
-    // Prefer the latest start (closest to fin de journée), tiebreak by
-    // attendance, then by travel time.
+    // Earliest start wins (consistent with buildDailyPlannings: schedule the
+    // session as soon as the group is available), tiebreak by attendance,
+    // then by travel time.
     const best = endOfDayAny.reduce((acc, cur) => {
-      const accHour = getStartHour(acc.startTime)
-      const curHour = getStartHour(cur.startTime)
-      if (curHour !== accHour) return curHour > accHour ? cur : acc
+      const accStart = timeToMinutes(acc.startTime)
+      const curStart = timeToMinutes(cur.startTime)
+      if (curStart !== accStart) return curStart < accStart ? cur : acc
       if (cur.athletes.length !== acc.athletes.length) {
         return cur.athletes.length > acc.athletes.length ? cur : acc
       }

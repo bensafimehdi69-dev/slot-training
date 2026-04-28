@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,9 +10,15 @@ import {
   Sunrise,
   Moon,
   CalendarDays,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react"
 import { TravelModeBadges } from "@/components/custom/travel-mode-badges"
-import type { DailyPlanning, DailySession } from "@/lib/types/planning"
+import type {
+  AthleteSlotInfo,
+  DailyPlanning,
+  DailySession,
+} from "@/lib/types/planning"
 
 interface DailyPlanningViewProps {
   dailyPlannings: DailyPlanning[]
@@ -96,11 +103,13 @@ function SessionRow({
   const tp = useTranslations("planning")
   const Icon = window === "morning" ? Sunrise : Moon
   const windowLabel = window === "morning" ? tp("morning") : tp("endOfDay")
+  // One athlete's detail can be expanded at a time. Per-athlete travel data
+  // replaces the previous group-average pills, since an average isn't useful
+  // when athletes' commute times can differ a lot.
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   return (
     <div className="rounded-md bg-muted/50 px-3 py-2">
-      {/* Row 1: window label + time on the left, type badge on the right.
-          Stays on one line even on a 320px screen since these are short. */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -126,21 +135,74 @@ function SessionRow({
           </Badge>
         )}
       </div>
-      {/* Row 2: athletes + travel badges. Wraps onto multiple lines on
-          mobile so the walking + driving pills don't truncate. */}
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-xs text-muted-foreground">
-          {session.athletes.map((a) => a.firstName).join(", ")}
-        </span>
+      <ul className="mt-1.5 flex flex-wrap gap-x-1.5 gap-y-1">
+        {session.athletes.map((athlete) => {
+          const isOpen = expandedId === athlete.athleteId
+          return (
+            <li key={athlete.athleteId}>
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedId((cur) =>
+                    cur === athlete.athleteId ? null : athlete.athleteId
+                  )
+                }
+                className="inline-flex items-center gap-1 rounded-md border border-transparent bg-background/60 px-2 py-0.5 text-xs font-medium text-foreground hover:border-blue-300 hover:bg-blue-50"
+                aria-expanded={isOpen}
+                aria-controls={`detail-${session.startTime}-${athlete.athleteId}`}
+              >
+                {isOpen ? (
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                )}
+                {athlete.firstName}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      {expandedId &&
+        (() => {
+          const a = session.athletes.find((x) => x.athleteId === expandedId)
+          if (!a) return null
+          return (
+            <AthleteDetail
+              id={`detail-${session.startTime}-${a.athleteId}`}
+              athlete={a}
+            />
+          )
+        })()}
+    </div>
+  )
+}
+
+function AthleteDetail({ id, athlete }: { id: string; athlete: AthleteSlotInfo }) {
+  const tp = useTranslations("planning")
+  return (
+    <div
+      id={id}
+      className="mt-2 rounded-md border bg-background px-3 py-2 text-xs"
+    >
+      <p className="text-sm font-medium">
+        {athlete.firstName} {athlete.lastName}
+      </p>
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
         <TravelModeBadges
-          walkingMinutes={session.averageWalkingMinutes}
-          drivingMinutes={session.averageDrivingMinutes}
-          fallbackMinutes={
-            session.averageTravelMinutes > 0
-              ? session.averageTravelMinutes
-              : undefined
-          }
+          walkingMinutes={athlete.walkingMinutes}
+          drivingMinutes={athlete.drivingMinutes}
+          fallbackMinutes={athlete.travelMinutes}
         />
+        {athlete.departureAddress && (
+          <span className="text-muted-foreground">
+            {tp("departure")}: {athlete.departureAddress}
+          </span>
+        )}
+        {athlete.departureTime && (
+          <span className="text-muted-foreground">
+            {athlete.departureTime}
+          </span>
+        )}
       </div>
     </div>
   )
