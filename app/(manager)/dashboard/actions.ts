@@ -22,6 +22,31 @@ import {
   deleteIndexesForGroup,
 } from "@/lib/server/indexes"
 import { sendPushToUsers } from "@/lib/server/push"
+import { defaultLocale, locales, type Locale } from "@/lib/i18n/config"
+
+/**
+ * Look up the athletes' preferredLanguage stored on their global profile
+ * (athletes/{uid}.preferredLanguage, written by the language picker). Falls
+ * back to the app default. We resolve this once per email fan-out so each
+ * recipient gets the template in their own language without N extra reads.
+ */
+async function fetchAthleteLocales(uids: string[]): Promise<Map<string, Locale>> {
+  const map = new Map<string, Locale>()
+  if (uids.length === 0) return map
+  const docs = await adminDb.getAll(
+    ...uids.map((uid) => adminDb.collection("athletes").doc(uid))
+  )
+  for (const doc of docs) {
+    const data = doc.data()
+    const candidate = data?.preferredLanguage as string | undefined
+    const locale =
+      candidate && (locales as readonly string[]).includes(candidate)
+        ? (candidate as Locale)
+        : defaultLocale
+    map.set(doc.id, locale)
+  }
+  return map
+}
 import { revalidatePath } from "next/cache"
 import type { Group, GroupAthlete } from "@/lib/types/group"
 import type { Campaign, CampaignResponder, ManagerCampaign } from "@/lib/types/campaign"
@@ -467,18 +492,27 @@ export async function createCampaign(groupId: string, formData: FormData) {
     targetSet ? targetSet.has(doc.id) : true
   )
 
+  // Resolve each athlete's preferred language so the email body lands in
+  // their language. One getAll batch — no per-recipient round-trips.
+  const localesByAthlete = await fetchAthleteLocales(targetedDocs.map((d) => d.id))
+
   await Promise.allSettled(
     targetedDocs.map(async (athleteDoc) => {
       const athlete = athleteDoc.data()
       if (!athlete.email) return
       const responseLink = buildAthleteLink(`/campaign/${campaignRef.id}`)
-      return sendCampaignNotification(athlete.email, athlete.firstName || "Athlete", {
-        trainingLocation: input.trainingLocationFormatted,
-        startDate: input.startDate,
-        endDate: input.endDate,
-        deadline: input.deadline,
-        responseLink,
-      })
+      return sendCampaignNotification(
+        athlete.email,
+        athlete.firstName || "Athlete",
+        localesByAthlete.get(athleteDoc.id),
+        {
+          trainingLocation: input.trainingLocationFormatted,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          deadline: input.deadline,
+          responseLink,
+        }
+      )
     })
   )
 
@@ -607,22 +641,31 @@ export async function updateCampaign(
 
   const existingTargets = snap.data()?.targetAthleteIds as string[] | undefined
   const targetSet = Array.isArray(existingTargets) ? new Set(existingTargets) : null
+  const targetedDocsForUpdate = athletesSnapshot.docs.filter((doc) =>
+    targetSet ? targetSet.has(doc.id) : true
+  )
+  const localesForUpdate = await fetchAthleteLocales(
+    targetedDocsForUpdate.map((d) => d.id)
+  )
 
   await Promise.allSettled(
-    athletesSnapshot.docs
-      .filter((doc) => (targetSet ? targetSet.has(doc.id) : true))
-      .map(async (athleteDoc) => {
-        const athlete = athleteDoc.data()
-        if (!athlete.email) return
-        const responseLink = buildAthleteLink(`/campaign/${parsedCampaignId.data}`)
-        return sendCampaignUpdatedNotification(athlete.email, athlete.firstName || "Athlete", {
+    targetedDocsForUpdate.map(async (athleteDoc) => {
+      const athlete = athleteDoc.data()
+      if (!athlete.email) return
+      const responseLink = buildAthleteLink(`/campaign/${parsedCampaignId.data}`)
+      return sendCampaignUpdatedNotification(
+        athlete.email,
+        athlete.firstName || "Athlete",
+        localesForUpdate.get(athleteDoc.id),
+        {
           trainingLocation: input.trainingLocationFormatted,
           startDate: input.startDate,
           endDate: input.endDate,
           deadline: input.deadline,
           responseLink,
-        })
-      })
+        }
+      )
+    })
   )
 
   revalidatePath("/dashboard")
@@ -660,18 +703,27 @@ export async function deleteCampaign(groupId: string, campaignId: string) {
 
   const existingTargets = data.targetAthleteIds as string[] | undefined
   const targetSet = Array.isArray(existingTargets) ? new Set(existingTargets) : null
+  const targetedDocsForDelete = athletesSnapshot.docs.filter((doc) =>
+    targetSet ? targetSet.has(doc.id) : true
+  )
+  const localesForDelete = await fetchAthleteLocales(
+    targetedDocsForDelete.map((d) => d.id)
+  )
 
   await Promise.allSettled(
-    athletesSnapshot.docs
-      .filter((doc) => (targetSet ? targetSet.has(doc.id) : true))
-      .map((athleteDoc) => {
-        const athlete = athleteDoc.data()
-        if (!athlete.email) return Promise.resolve()
-        return sendCampaignDeletedNotification(athlete.email, athlete.firstName || "Athlete", {
+    targetedDocsForDelete.map((athleteDoc) => {
+      const athlete = athleteDoc.data()
+      if (!athlete.email) return Promise.resolve()
+      return sendCampaignDeletedNotification(
+        athlete.email,
+        athlete.firstName || "Athlete",
+        localesForDelete.get(athleteDoc.id),
+        {
           startDate: data.startDate,
           endDate: data.endDate,
-        })
-      })
+        }
+      )
+    })
   )
 
   // Wipe the campaign tree (responses, travelTimes, the campaign doc itself)
@@ -948,6 +1000,9 @@ export async function validatePlanning(groupId: string, campaignId: string) {
       }
     }
 
+    const localesForPlanning = await fetchAthleteLocales(
+      athletesSnapshot.docs.map((d) => d.id)
+    )
     const tasks: Array<Promise<unknown>> = []
     const pushUids: string[] = []
     for (const athleteDoc of athletesSnapshot.docs) {
@@ -957,11 +1012,16 @@ export async function validatePlanning(groupId: string, campaignId: string) {
       tasks.push(
         (async () => {
           const planningLink = buildAthleteLink(`/campaign/${campaignId}`)
-          return sendPlanningNotification(info.email, info.firstName || "Athlete", {
-            sessions,
-            trainingLocation: campaign.trainingLocation.formatted,
-            planningLink,
-          })
+          return sendPlanningNotification(
+            info.email,
+            info.firstName || "Athlete",
+            localesForPlanning.get(athleteDoc.id),
+            {
+              sessions,
+              trainingLocation: campaign.trainingLocation.formatted,
+              planningLink,
+            }
+          )
         })()
       )
       // Only push to athletes who actually have at least one session — a
@@ -1160,19 +1220,25 @@ export async function runScheduledCampaignTasks() {
           const trainingLocation = (data.trainingLocation?.formatted as string) || ""
           const startDate = (data.startDate as string) || ""
           const endDate = (data.endDate as string) || ""
-          // \`deadline\` is a Firestore Timestamp; format as readable French
-          // datetime for the email body.
-          const deadlineLabel = new Date(deadlineMs).toLocaleString("fr-FR", {
-            dateStyle: "long",
-            timeStyle: "short",
-          })
+          // Resolve recipient locales once. Each athlete gets their reminder
+          // in their preferred language; deadline label is formatted per
+          // locale (Intl.DateTimeFormat handles fr/en/ar correctly).
+          const localesForReminder = await fetchAthleteLocales(
+            recipients.map((d) => d.id)
+          )
 
           await Promise.allSettled(
             recipients.map((d) => {
               const a = athleteById.get(d.id)!
+              const recipientLocale = localesForReminder.get(d.id) ?? defaultLocale
+              const deadlineLabel = new Date(deadlineMs).toLocaleString(
+                recipientLocale,
+                { dateStyle: "long", timeStyle: "short" }
+              )
               return sendCampaignReminderNotification(
                 a.email as string,
                 (a.firstName as string) || "Athlete",
+                recipientLocale,
                 {
                   trainingLocation,
                   startDate,

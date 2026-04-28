@@ -3,11 +3,15 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 function Card({ className, ...props }: React.ComponentProps<"div">) {
+  // Glass surface by default — translucent, blurred backdrop, soft inner
+  // highlight + drop shadow. The `text-card-foreground` is kept so dark
+  // mode still picks up the inverted foreground; `bg-card` is replaced by
+  // the rgba layer in `.glass`.
   return (
     <div
       data-slot="card"
       className={cn(
-        "flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
+        "glass flex flex-col gap-6 rounded-2xl py-6 text-card-foreground",
         className
       )}
       {...props}

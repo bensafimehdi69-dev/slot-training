@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { Plus, Users, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -22,6 +23,8 @@ import { NotificationsToggle } from "@/components/custom/notifications-toggle"
 import type { Group } from "@/lib/types/group"
 
 export default function DashboardPage() {
+  const t = useTranslations("managerDashboard")
+  const tc = useTranslations("common")
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
@@ -57,8 +60,8 @@ export default function DashboardPage() {
       if (closedCount > 0) {
         toast.info(
           closedCount === 1
-            ? "1 campagne finalisée automatiquement (deadline dépassée)."
-            : `${closedCount} campagnes finalisées automatiquement (deadline dépassée).`
+            ? t("autoFinalizedSingle")
+            : t("autoFinalizedMany", { count: closedCount })
         )
         // Refresh so the newly-closed campaigns show their updated status.
         loadGroups()
@@ -66,8 +69,8 @@ export default function DashboardPage() {
       if (remindersSentCount > 0) {
         toast.info(
           remindersSentCount === 1
-            ? "1 rappel envoyé aux athlètes n'ayant pas encore répondu."
-            : `${remindersSentCount} rappels envoyés aux athlètes n'ayant pas encore répondu.`
+            ? t("remindersSentSingle")
+            : t("remindersSentMany", { count: remindersSentCount })
         )
       }
     })
@@ -97,7 +100,7 @@ export default function DashboardPage() {
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success("Groupe créé avec succès.")
+        toast.success(t("groupCreated"))
         setCreateGroupOpen(false)
         loadGroups()
       }
@@ -128,8 +131,8 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Gérez vos groupes, campagnes et plannings.</p>
+          <h1 className="text-2xl font-bold">{t("title")}</h1>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <NotificationsToggle />
@@ -137,27 +140,25 @@ export default function DashboardPage() {
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              Nouveau groupe
+              {t("newGroup")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Créer un groupe</DialogTitle>
-              <DialogDescription>
-                Créez un groupe pour y inviter vos athlètes.
-              </DialogDescription>
+              <DialogTitle>{t("createGroupTitle")}</DialogTitle>
+              <DialogDescription>{t("createGroupDescription")}</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateGroup}>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Nom du groupe</Label>
-                  <Input id="name" name="name" placeholder="Ex: U18 Garçons" required />
+                  <Label htmlFor="name">{t("groupNameLabel")}</Label>
+                  <Input id="name" name="name" placeholder={t("groupNamePlaceholder")} required />
                 </div>
               </div>
               <DialogFooter>
                 <Button type="submit" disabled={creatingGroup}>
                   {creatingGroup && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Créer
+                  {tc("create")}
                 </Button>
               </DialogFooter>
             </form>
@@ -170,9 +171,7 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Users className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground text-center">
-              Aucun groupe pour le moment. Créez votre premier groupe pour commencer.
-            </p>
+            <p className="text-muted-foreground text-center">{t("noGroups")}</p>
           </CardContent>
         </Card>
       ) : (

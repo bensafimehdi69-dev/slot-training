@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import {
   Timer,
   Loader2,
@@ -27,6 +28,7 @@ import { AddressAutocompleteMap } from "@/components/custom/address-autocomplete
 import { AthleteAvailabilityGrid } from "@/components/custom/athlete-availability-grid"
 import { LogoutButton } from "@/components/custom/logout-button"
 import { NotificationsToggle } from "@/components/custom/notifications-toggle"
+import { LanguagePicker } from "@/components/custom/language-picker"
 import { saveAthleteProfile } from "@/lib/actions/profile"
 import type { AddressWithCoords } from "@/lib/types/address"
 import type { ConstraintsGrid } from "@/lib/types/profile"
@@ -44,6 +46,7 @@ interface HomeClientProps {
 }
 
 export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
+  const t = useTranslations("athleteHome")
   const [homeAddress, setHomeAddress] = useState(profile.homeAddress)
   const [schoolAddress, setSchoolAddress] = useState(profile.schoolAddress)
   const [clubAddress, setClubAddress] = useState(profile.clubAddress)
@@ -57,7 +60,7 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
 
   async function handleSave() {
     if (!homeAddress) {
-      toast.error("L'adresse de domicile est requise.")
+      toast.error(t("homeAddressRequired"))
       return
     }
     setSaving(true)
@@ -71,22 +74,23 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success("Profil mis à jour.")
+      toast.success(t("profileSaved"))
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b bg-white">
+    <div className="min-h-screen">
+      <header className="glass glass-sticky sticky top-0 z-40">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2 font-bold text-xl">
             <Timer className="h-6 w-6 text-blue-600" />
             Slot Training
           </div>
           <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-            <span className="max-w-[160px] truncate text-sm text-muted-foreground sm:max-w-none">
+            <span className="hidden max-w-[160px] truncate text-sm text-muted-foreground sm:inline sm:max-w-none">
               {email}
             </span>
+            <LanguagePicker />
             <LogoutButton />
           </div>
         </div>
@@ -100,11 +104,11 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="campaigns" className="flex-1 sm:flex-none">
               <CalendarDays className="mr-2 h-4 w-4" />
-              Mes campagnes
+              {t("myCampaigns")}
             </TabsTrigger>
             <TabsTrigger value="profile" className="flex-1 sm:flex-none">
               <User className="mr-2 h-4 w-4" />
-              Mon profil
+              {t("myProfile")}
             </TabsTrigger>
           </TabsList>
 
@@ -113,23 +117,15 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarDays className="h-5 w-5 text-blue-600" />
-                  Mes campagnes
+                  {t("myCampaigns")}
                 </CardTitle>
-                <CardDescription>
-                  Toutes les campagnes auxquelles vous êtes invité, avec votre
-                  statut de réponse. Cliquez pour répondre, modifier ou voir
-                  votre planning.
-                </CardDescription>
+                <CardDescription>{t("campaignsDescription")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {campaigns.length === 0 ? (
                   <div className="rounded-md border border-dashed p-6 text-center">
                     <Mail className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Vous n&apos;avez pas encore été invité à une campagne.
-                      Vous recevrez un email dès qu&apos;une campagne sera créée
-                      pour votre groupe.
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("noCampaigns")}</p>
                   </div>
                 ) : (
                   <ul className="space-y-3">
@@ -145,37 +141,31 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
           <TabsContent value="profile" className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h1 className="text-2xl font-bold">Mon profil</h1>
-                <p className="text-muted-foreground">
-                  Gérez vos disponibilités et adresses. Ces informations seront
-                  pré-remplies à chaque nouvelle campagne.
-                </p>
+                <h1 className="text-2xl font-bold">{t("profileTitle")}</h1>
+                <p className="text-muted-foreground">{t("profileSubtitle")}</p>
               </div>
               <NotificationsToggle />
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>Mes adresses</CardTitle>
-                <CardDescription>
-                  Utilisées pour calculer vos temps de trajet vers
-                  l&apos;entraînement.
-                </CardDescription>
+                <CardTitle>{t("myAddresses")}</CardTitle>
+                <CardDescription>{t("addressesDescription")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <AddressAutocompleteMap
-                  label="Adresse de domicile"
+                  label={t("homeAddress")}
                   value={homeAddress}
                   onChange={setHomeAddress}
                   required
                 />
                 <AddressAutocompleteMap
-                  label="Adresse du lieu d'études (optionnel)"
+                  label={t("schoolAddress")}
                   value={schoolAddress}
                   onChange={setSchoolAddress}
                 />
                 <AddressAutocompleteMap
-                  label="Adresse du club (optionnel)"
+                  label={t("clubAddress")}
                   value={clubAddress}
                   onChange={setClubAddress}
                 />
@@ -184,12 +174,8 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
 
             <Card>
               <CardHeader>
-                <CardTitle>Mes disponibilités hebdomadaires</CardTitle>
-                <CardDescription>
-                  Touchez les créneaux pour indiquer vos indisponibilités (en
-                  gris). Vous pourrez toujours ajuster ces dispos spécifiquement
-                  pour chaque campagne.
-                </CardDescription>
+                <CardTitle>{t("weeklyAvailability")}</CardTitle>
+                <CardDescription>{t("weeklyAvailabilityDescription")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <AthleteAvailabilityGrid
@@ -206,7 +192,7 @@ export function HomeClient({ email, profile, campaigns }: HomeClientProps) {
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                Enregistrer les modifications
+                {t("saveProfile")}
               </Button>
             </div>
           </TabsContent>

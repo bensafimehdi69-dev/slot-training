@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase/admin"
 import Link from "next/link"
 import { Timer } from "lucide-react"
 import { LogoutButton } from "@/components/custom/logout-button"
+import { LanguagePicker } from "@/components/custom/language-picker"
 
 export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
   // Distinguish "no session" (send to /login) from "session but not a manager"
@@ -23,17 +24,18 @@ export default async function ManagerLayout({ children }: { children: React.Reac
   const managerName = typeof managerData?.name === "string" ? managerData.name : "Manager"
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b bg-white">
+    <div className="min-h-screen">
+      <header className="glass glass-sticky sticky top-0 z-40">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl">
             <Timer className="h-6 w-6 text-blue-600" />
             Slot Training
           </Link>
           <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-            <span className="max-w-[140px] truncate text-sm text-muted-foreground sm:max-w-none">
-              Bonjour, {managerName}
+            <span className="hidden max-w-[140px] truncate text-sm text-muted-foreground sm:inline sm:max-w-none">
+              {managerName}
             </span>
+            <LanguagePicker />
             <LogoutButton />
           </div>
         </div>
