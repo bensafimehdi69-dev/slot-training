@@ -180,7 +180,10 @@
     "unavailable": "غير متاح",
     "individualSlotsTitle": "حصص فردية ({count})",
     "individualReasonMorning": "حصة فردية صباحية",
-    "individualReasonEndOfDay": "حصة فردية نهاية اليوم"
+    "individualReasonEndOfDay": "حصة فردية نهاية اليوم",
+    "trainingVolumeTitle": "حجم التدريب لكل رياضي",
+    "trainingVolumeCollective": "جماعي {attended}/{total}",
+    "trainingVolumeIndividual": "فردي {count}"
   },
   "athleteHome": {
     "myCampaigns": "حملاتي",

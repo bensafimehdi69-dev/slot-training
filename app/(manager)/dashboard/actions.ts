@@ -372,12 +372,16 @@ export async function getCampaigns(groupId: string) {
             calculatedAt:
               (rawResult.calculatedAt as { toDate?: () => Date } | undefined)?.toDate?.() ??
               new Date(),
-            // Pass-through for the morning scheduler diagnostics — the
-            // OptimizationResultView shows them in a collapsible panel so
+            // Pass-through for the optimiser decision trace — the
+            // OptimizationResultView shows it in a collapsible panel so
             // we can inspect the algo's behaviour on real campaigns.
-            debugMorning: Array.isArray(rawResult.debugMorning)
-              ? (rawResult.debugMorning as string[])
-              : undefined,
+            // Falls back to the legacy `debugMorning` field for results
+            // produced before the trace was broadened past the morning.
+            debug: Array.isArray(rawResult.debug)
+              ? (rawResult.debug as string[])
+              : Array.isArray(rawResult.debugMorning)
+                ? (rawResult.debugMorning as string[])
+                : undefined,
           } as Campaign["optimizationResult"])
         : null,
       planningStatus: data.planningStatus ?? "pending",

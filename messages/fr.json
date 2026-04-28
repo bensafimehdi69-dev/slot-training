@@ -180,7 +180,10 @@
     "unavailable": "Indisponible",
     "individualSlotsTitle": "Créneaux individuels ({count})",
     "individualReasonMorning": "Séance individuelle du matin",
-    "individualReasonEndOfDay": "Séance individuelle de fin de journée"
+    "individualReasonEndOfDay": "Séance individuelle de fin de journée",
+    "trainingVolumeTitle": "Volume d'entraînement par athlète",
+    "trainingVolumeCollective": "Coll. {attended}/{total}",
+    "trainingVolumeIndividual": "Indiv. {count}"
   },
   "athleteHome": {
     "myCampaigns": "Mes campagnes",
