@@ -86,4 +86,10 @@ export interface OptimizationResult {
   individualSlots: IndividualSlot[]
   allSlots: SlotResult[]
   calculatedAt: Date
+  // Temporary diagnostic: per-day strings explaining why no morning session
+  // was produced. Populated by the optimizer, displayed by
+  // OptimizationResultView as a small debug panel until we resolve the
+  // "athletes have morning availability but no individual sessions" report.
+  // Safe to drop once the issue is understood.
+  debugMorning?: string[]
 }
