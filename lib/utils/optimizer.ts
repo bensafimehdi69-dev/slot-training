@@ -289,20 +289,11 @@ export async function optimizeSlots(
   }
 
   // Per-day plannings, with ad-hoc duration adjustments: collective sessions
-  // try to extend to 2h, individuals run at 60min (or 45 fallback).
-  const dailyPlannings = await buildDailyPlannings(results, athletes, config)
-
-  // Lightweight telemetry: log a per-day summary when no morning session was
-  // produced. Surfaces in Cloud Run logs and lets us tell apart "the data
-  // genuinely has no morning availability" from "the algo missed a slot".
-  for (const planning of dailyPlannings) {
-    if (planning.morningSessions.length === 0) {
-      console.info(
-        `[OPTIMIZER] ${config.campaignId} ${planning.day}: 0 morning sessions ` +
-          `(end-of-day=${planning.endOfDaySession ? planning.endOfDaySession.startTime : "none"})`
-      )
-    }
-  }
+  // try to extend to 2h, individuals run at 60min (or 45 fallback). The
+  // debug sink collects per-day diagnostic strings so the UI can show why a
+  // morning session was or wasn't produced.
+  const debugMorning: string[] = []
+  const dailyPlannings = await buildDailyPlannings(results, athletes, config, debugMorning)
 
   // Legacy aggregated view, derived from dailyPlannings, kept so the existing
   // dashboard / planning emails keep rendering during the UI migration.
@@ -319,6 +310,7 @@ export async function optimizeSlots(
     individualSlots,
     allSlots: results.slice(0, 5),
     calculatedAt: new Date(),
+    debugMorning,
   }
 }
 
@@ -476,7 +468,8 @@ async function checkAthleteForSlot(
 async function buildDailyPlannings(
   results: SlotResult[],
   athletes: AthleteData[],
-  config: CampaignConfig
+  config: CampaignConfig,
+  debugSink?: string[]
 ): Promise<DailyPlanning[]> {
   const out: DailyPlanning[] = []
   for (const day of dayKeys) {
@@ -543,7 +536,8 @@ async function buildDailyPlannings(
       const individuals = await scheduleMorningIndividualsAtFlexibleDuration(
         day,
         athletes,
-        config
+        config,
+        debugSink
       )
       morningSessions.push(...individuals)
     }
@@ -686,7 +680,8 @@ async function buildIndividualSession(
 async function scheduleMorningIndividualsAtFlexibleDuration(
   day: DayKey,
   athletes: AthleteData[],
-  config: CampaignConfig
+  config: CampaignConfig,
+  debugSink?: string[]
 ): Promise<DailySession[]> {
   type Option = { startTime: string; endTime: string; duration: number; info: AthleteSlotInfo }
 
@@ -730,14 +725,17 @@ async function scheduleMorningIndividualsAtFlexibleDuration(
     const options60 = await findOptions(athlete, INDIVIDUAL_DURATION_MINUTES)
     perAthlete.push({ athlete, options60 })
   }
-  console.info(
-    `[OPTIMIZER] ${config.campaignId} ${day} morning scheduler: ${perAthlete.length} athletes, ` +
-      `options60=[${perAthlete.map((p) => `${p.athlete.firstName}:${p.options60.length}`).join(", ")}], ` +
-      `slotStarts=${slotStarts.length}, window=[${minutesToTime(windowStartMinutes)}-${minutesToTime(windowEndMinutes)}]`
-  )
+  const summary =
+    `${day} window=[${minutesToTime(windowStartMinutes)}-${minutesToTime(windowEndMinutes)}] ` +
+    `slots=${slotStarts.length} options60=[${perAthlete
+      .map((p) => `${p.athlete.firstName}:${p.options60.length}`)
+      .join(", ")}]`
+  console.info(`[OPTIMIZER] ${config.campaignId} ${summary}`)
+  debugSink?.push(summary)
 
-  // For each athlete + slot, dump the first availability check failure so we
-  // can spot whether departure / overlap / travel / return is the blocker.
+  // For each athlete with no 60-min options, capture the reason from the
+  // first 6 slot starts so we can tell whether departure / overlap / travel /
+  // return is the blocker.
   for (const { athlete, options60 } of perAthlete) {
     if (options60.length > 0) continue
     const reasons: string[] = []
@@ -745,13 +743,12 @@ async function scheduleMorningIndividualsAtFlexibleDuration(
       const endStr = minutesToTime(timeToMinutes(startTime) + INDIVIDUAL_DURATION_MINUTES)
       const info = await checkAthleteForSlot(athlete, day, startTime, endStr, config)
       if (!info.available) {
-        reasons.push(`${startTime}: ${info.reason ?? "?"}`)
+        reasons.push(`${startTime}:${info.reason ?? "?"}`)
       }
     }
-    console.info(
-      `[OPTIMIZER] ${config.campaignId} ${day} ${athlete.firstName} no 60-min options. ` +
-        `First reasons: ${reasons.join(" | ")}`
-    )
+    const line = `${day} ${athlete.firstName}: ${reasons.join(" | ")}`
+    console.info(`[OPTIMIZER] ${config.campaignId} ${line}`)
+    debugSink?.push(line)
   }
   // Least flexible first — athletes with fewer 60-min options (0 included)
   // are scheduled before flexible ones so a constrained athlete doesn't
