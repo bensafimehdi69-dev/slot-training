@@ -212,7 +212,10 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
       </CardHeader>
 
       {isExpanded && (
-        <CardContent id={panelId}>
+        // Reduced horizontal padding on mobile so the nested campaign cards
+        // (which carry their own padding) don't compound to a tiny content
+        // area on a phone screen.
+        <CardContent id={panelId} className="px-3 sm:px-6">
           <Tabs defaultValue="athletes" className="w-full">
             <TabsList>
               <TabsTrigger value="athletes">{t("tabAthletes")}</TabsTrigger>

@@ -197,13 +197,18 @@ function ClosedCampaignCard({ campaign }: { campaign: SerializedCampaign }) {
           <CardTitle>{t("campaignClosed")}</CardTitle>
           <CardDescription>{t("campaignClosedDescription")}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            {t("period", { start: campaign.startDate, end: campaign.endDate })}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {t("location", { location: campaign.trainingLocation.formatted })}
-          </p>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              {t("period", { start: campaign.startDate, end: campaign.endDate })}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t("location", { location: campaign.trainingLocation.formatted })}
+            </p>
+          </div>
+          <Button asChild className="w-full">
+            <Link href="/home">{t("backToHome")}</Link>
+          </Button>
         </CardContent>
       </Card>
     </div>

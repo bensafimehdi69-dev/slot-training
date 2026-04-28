@@ -168,7 +168,12 @@ export function CampaignCard({ groupId, campaign, responders = [], onRefresh, on
 
   return (
     <Card>
-      <CardContent className="pt-4">
+      {/* Reduced horizontal padding on mobile so the optimisation result
+          (which is rendered inside this content) gets more usable width.
+          Three nested px-6 paddings (group → campaign → planning) used to
+          eat ~150px on a phone, leaving very little room for the slot
+          cards themselves. */}
+      <CardContent className="px-3 pt-4 sm:px-6">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 space-y-1">
