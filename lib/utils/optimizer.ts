@@ -730,6 +730,29 @@ async function scheduleMorningIndividualsAtFlexibleDuration(
     const options60 = await findOptions(athlete, INDIVIDUAL_DURATION_MINUTES)
     perAthlete.push({ athlete, options60 })
   }
+  console.info(
+    `[OPTIMIZER] ${config.campaignId} ${day} morning scheduler: ${perAthlete.length} athletes, ` +
+      `options60=[${perAthlete.map((p) => `${p.athlete.firstName}:${p.options60.length}`).join(", ")}], ` +
+      `slotStarts=${slotStarts.length}, window=[${minutesToTime(windowStartMinutes)}-${minutesToTime(windowEndMinutes)}]`
+  )
+
+  // For each athlete + slot, dump the first availability check failure so we
+  // can spot whether departure / overlap / travel / return is the blocker.
+  for (const { athlete, options60 } of perAthlete) {
+    if (options60.length > 0) continue
+    const reasons: string[] = []
+    for (const startTime of slotStarts.slice(0, 6)) {
+      const endStr = minutesToTime(timeToMinutes(startTime) + INDIVIDUAL_DURATION_MINUTES)
+      const info = await checkAthleteForSlot(athlete, day, startTime, endStr, config)
+      if (!info.available) {
+        reasons.push(`${startTime}: ${info.reason ?? "?"}`)
+      }
+    }
+    console.info(
+      `[OPTIMIZER] ${config.campaignId} ${day} ${athlete.firstName} no 60-min options. ` +
+        `First reasons: ${reasons.join(" | ")}`
+    )
+  }
   // Least flexible first — athletes with fewer 60-min options (0 included)
   // are scheduled before flexible ones so a constrained athlete doesn't
   // lose their only window to one with many alternatives.
