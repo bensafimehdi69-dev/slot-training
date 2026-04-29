@@ -295,7 +295,11 @@
     "individualReasonEndOfDay": "حصة فردية نهاية اليوم",
     "trainingVolumeTitle": "حجم التدريب لكل رياضي",
     "trainingVolumeCollective": "جماعي {attended}/{total}",
-    "trainingVolumeIndividual": "فردي {count}"
+    "trainingVolumeIndividual": "فردي {count}",
+    "removeFromSession": "إزالة من هذه الحصة",
+    "removeFromSessionTitle": "إزالة الرياضي من هذه الحصة؟",
+    "removeFromSessionDescription": "{name} لن يظهر في حصة {time} بعد الآن. يمكنك دائمًا المصادقة على الجدول بعد ذلك.",
+    "athleteRemovedFromSession": "تمت إزالة الرياضي من الحصة."
   },
   "athleteHome": {
     "myCampaigns": "حملاتي",

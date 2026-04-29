@@ -1444,6 +1444,148 @@ export async function rejectPlanning(groupId: string, campaignId: string) {
   return { success: true }
 }
 
+/**
+ * Remove an athlete from a single proposed session inside an optimisation
+ * result. Lets the manager fine-tune the planning before validating it
+ * (e.g. the athlete just told them they can't make the Wednesday slot).
+ *
+ * Behaviour:
+ *  - Only the *owner* of the group can mutate; viewers get 401.
+ *  - Only allowed while planningStatus is still "pending" — once validated
+ *    the athletes have been notified, dropping them silently would create
+ *    a mismatch between what they received by email and what the manager
+ *    actually has on file.
+ *  - If the session ends up with zero athletes, the session itself is
+ *    removed (a 0-athlete slot serves no purpose and would clutter the
+ *    grid view).
+ *  - bestSlot / individualSlots are *not* recomputed: those are legacy
+ *    projections used only by old campaigns predating dailyPlannings.
+ *    The dashboard, athlete view and planning email all read from
+ *    dailyPlannings, so updating just that field is sufficient.
+ */
+export async function removeAthleteFromSession(
+  groupId: string,
+  campaignId: string,
+  dayKey: string,
+  startTime: string,
+  athleteId: string
+) {
+  const manager = await requireManager()
+  if (!manager) return { error: "Non autorisé." }
+
+  const parsedGroupId = firestoreId.safeParse(groupId)
+  const parsedCampaignId = firestoreId.safeParse(campaignId)
+  if (!parsedGroupId.success || !parsedCampaignId.success) {
+    return { error: "Identifiant invalide." }
+  }
+  // Defensive bounds — the values come from the dailyPlannings document we
+  // just rendered, but a tampered client could ship anything here.
+  if (typeof dayKey !== "string" || dayKey.length === 0 || dayKey.length > 32) {
+    return { error: "Jour invalide." }
+  }
+  if (!/^\d{2}:\d{2}$/.test(startTime)) {
+    return { error: "Horaire invalide." }
+  }
+  if (typeof athleteId !== "string" || athleteId.length === 0 || athleteId.length > 128) {
+    return { error: "Identifiant athlète invalide." }
+  }
+
+  const access = await resolveGroupAccess(manager.uid, parsedGroupId.data)
+  // Viewers can browse the planning but never mutate it — keep the same
+  // owner-only rule as edit / finalize.
+  if (!access || access.role !== "owner") return { error: "Non autorisé." }
+
+  const campaignRef = adminDb
+    .collection("managers").doc(access.ownerUid)
+    .collection("groups").doc(parsedGroupId.data)
+    .collection("campaigns").doc(parsedCampaignId.data)
+
+  const snap = await campaignRef.get()
+  if (!snap.exists) return { error: "Campagne introuvable." }
+  const data = snap.data()!
+  if (data.planningStatus && data.planningStatus !== "pending") {
+    return {
+      error: "Le planning a déjà été validé ou rejeté — relance l'optimisation pour ajuster.",
+    }
+  }
+  const result = data.optimizationResult as
+    | {
+        dailyPlannings?: Array<{
+          dayKey?: string
+          endOfDaySession?: {
+            startTime?: string
+            athletes?: Array<{ athleteId?: string }>
+          } | null
+          morningSessions?: Array<{
+            startTime?: string
+            athletes?: Array<{ athleteId?: string }>
+          }>
+        }>
+      }
+    | null
+    | undefined
+  if (!result || !Array.isArray(result.dailyPlannings)) {
+    return { error: "Aucun planning à modifier." }
+  }
+
+  let mutated = false
+  const nextDailyPlannings = result.dailyPlannings.map((day) => {
+    if (day?.dayKey !== dayKey) return day
+    const next = { ...day }
+    if (
+      day.endOfDaySession &&
+      day.endOfDaySession.startTime === startTime &&
+      Array.isArray(day.endOfDaySession.athletes)
+    ) {
+      const filtered = day.endOfDaySession.athletes.filter(
+        (a) => a?.athleteId !== athleteId
+      )
+      if (filtered.length !== day.endOfDaySession.athletes.length) {
+        mutated = true
+        // Drop the slot entirely once empty — surfacing a "0 athlete"
+        // session in the grid is just visual noise.
+        next.endOfDaySession =
+          filtered.length === 0
+            ? null
+            : { ...day.endOfDaySession, athletes: filtered }
+      }
+    }
+    if (Array.isArray(day.morningSessions)) {
+      const updated: typeof day.morningSessions = []
+      for (const session of day.morningSessions) {
+        if (session?.startTime !== startTime || !Array.isArray(session.athletes)) {
+          updated.push(session)
+          continue
+        }
+        const filtered = session.athletes.filter((a) => a?.athleteId !== athleteId)
+        if (filtered.length === session.athletes.length) {
+          updated.push(session)
+        } else {
+          mutated = true
+          if (filtered.length > 0) {
+            updated.push({ ...session, athletes: filtered })
+          }
+          // else: drop the session
+        }
+      }
+      next.morningSessions = updated
+    }
+    return next
+  })
+
+  if (!mutated) {
+    return { error: "Athlète introuvable dans cette séance." }
+  }
+
+  await campaignRef.update({
+    "optimizationResult.dailyPlannings": nextDailyPlannings,
+    planningStatusUpdatedAt: new Date(),
+  })
+
+  revalidatePath("/dashboard")
+  return { success: true }
+}
+
 export async function getResponseCount(groupId: string, campaignId: string) {
   const manager = await requireManager()
   if (!manager) return { error: "Non autorisé." }

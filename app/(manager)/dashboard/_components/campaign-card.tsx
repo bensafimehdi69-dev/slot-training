@@ -39,6 +39,7 @@ import {
   validatePlanning,
   rejectPlanning,
   deleteCampaign,
+  removeAthleteFromSession,
 } from "../actions"
 import type { Campaign, CampaignResponder } from "@/lib/types/campaign"
 import type { GroupRole } from "@/lib/types/group"
@@ -147,6 +148,25 @@ export function CampaignCard({
       onRefresh()
     } else {
       toast.success(t("campaignDeleted"))
+    }
+  }
+
+  const handleRemoveAthlete = async (
+    ref: { dayKey: string; startTime: string },
+    athleteId: string
+  ) => {
+    const result = await removeAthleteFromSession(
+      groupId,
+      campaign.id,
+      ref.dayKey,
+      ref.startTime,
+      athleteId
+    )
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success(tp("athleteRemovedFromSession"))
+      onRefresh()
     }
   }
 
@@ -437,6 +457,7 @@ export function CampaignCard({
                   isRejecting={rejecting}
                   role={role}
                   campaignId={campaign.id}
+                  onRemoveAthlete={handleRemoveAthlete}
                 />
               </>
             )}

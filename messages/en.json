@@ -299,7 +299,11 @@
     "individualReasonEndOfDay": "End-of-day individual session",
     "trainingVolumeTitle": "Training volume per athlete",
     "trainingVolumeCollective": "Coll. {attended}/{total}",
-    "trainingVolumeIndividual": "Indiv. {count}"
+    "trainingVolumeIndividual": "Indiv. {count}",
+    "removeFromSession": "Remove from this session",
+    "removeFromSessionTitle": "Remove athlete from this session?",
+    "removeFromSessionDescription": "{name} will no longer appear in the {time} session. You can still validate the planning afterwards.",
+    "athleteRemovedFromSession": "Athlete removed from the session."
   },
   "athleteHome": {
     "myCampaigns": "My campaigns",
