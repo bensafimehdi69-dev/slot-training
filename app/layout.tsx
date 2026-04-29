@@ -3,6 +3,7 @@ import { Inter } from "next/font/google"
 import { NextIntlClientProvider } from "next-intl"
 import { getLocale, getMessages } from "next-intl/server"
 import { Toaster } from "sonner"
+import { BadgeClearer } from "@/components/custom/badge-clearer"
 import { isRtl, type Locale } from "@/lib/i18n/config"
 import "./globals.css"
 
@@ -49,6 +50,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={inter.className}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
+          <BadgeClearer />
           <Toaster richColors position="top-right" />
         </NextIntlClientProvider>
       </body>

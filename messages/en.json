@@ -53,6 +53,24 @@
     "expand": "Show details",
     "collapse": "Hide details"
   },
+  "weeklyPlanning": {
+    "openFullScreen": "Open full view",
+    "title": "Weekly planning",
+    "subtitle": "{start} to {end}",
+    "totalSessions": "{count} session(s)",
+    "noSessionDay": "No session this day",
+    "back": "Back to dashboard",
+    "print": "Print",
+    "collectiveBadge": "Collective",
+    "individualBadge": "Individual",
+    "athletes": "Athletes",
+    "trainingLocation": "Training location",
+    "athleteRecapTitle": "Per-athlete recap",
+    "loadFailed": "Unable to load this planning.",
+    "noPlanning": "No planning available yet.",
+    "morningLabel": "Morning",
+    "endOfDayLabel": "End of day"
+  },
   "avatar": {
     "changePhoto": "Change photo",
     "uploadFailed": "Upload failed.",
@@ -405,7 +423,18 @@
     "errAccountFailed": "Unable to create account. Please try again.",
     "errNameRequired": "First and last name are required.",
     "errHomeAddressRequired": "Home address is required.",
-    "successDone": "Registration complete! Redirecting…"
+    "successDone": "Registration complete! Redirecting…",
+    "alreadyAccountTitle": "Already have an account?",
+    "alreadyAccountHint": "If you already use Slot Training in another group, sign in to add this group to your existing account.",
+    "alreadyAccountCta": "Sign in to join this group",
+    "existingSignInTitle": "Sign in to join \"{group}\"",
+    "existingSignInHint": "Use the credentials of your existing Slot Training account.",
+    "backToCreate": "Back to create account",
+    "existingSubmit": "Sign in and join",
+    "existingSubmitting": "Joining…",
+    "existingJoined": "Group joined! Redirecting…",
+    "errSignInFailed": "Wrong email or password.",
+    "errNoExistingProfile": "No profile yet. Use the invite link to sign up first."
   },
   "landing": {
     "title": "Slot Training",

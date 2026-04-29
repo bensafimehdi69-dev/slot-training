@@ -4,7 +4,11 @@ import { z } from "zod"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { createSessionCookie } from "@/lib/firebase/auth"
 import { writeAthleteProfile } from "@/lib/server/profile-service"
-import { readInviteIndex, addAthleteMembership } from "@/lib/server/indexes"
+import {
+  readInviteIndex,
+  addAthleteMembership,
+  readAthleteMemberships,
+} from "@/lib/server/indexes"
 import { addressSchema } from "@/lib/types/address"
 
 const firestoreId = z.string().min(1).max(128).regex(/^[^/]+$/, "Identifiant invalide.")
@@ -127,6 +131,116 @@ export async function completeOnboarding(
     return { success: true }
   } catch (error) {
     console.error("[ONBOARDING] completeOnboarding failed:", error instanceof Error ? error.message : "unknown")
+    return { error: "Une erreur est survenue. Veuillez réessayer." }
+  }
+}
+
+/**
+ * Adds an already-onboarded athlete to a new group via an invite link.
+ *
+ * Used when the recipient's email already has a Firebase Auth account (e.g.
+ * they're a member of another group on the same app). The full onboarding
+ * flow (GDPR consent + name + addresses + schedule) is skipped because
+ * those values already live in the global `athletes/{uid}` profile doc; we
+ * just write a new per-group athlete entry and update the membership index.
+ *
+ * Identity rule: the firstName / lastName / email written to the new
+ * per-group doc are sourced from one of the athlete's *existing* per-group
+ * docs — never from the client. The client only proves possession of the
+ * Firebase Auth account (via idToken) and of the invite token.
+ */
+export async function joinGroupAsExistingAthlete(
+  groupId: string,
+  inviteToken: string,
+  idToken: string
+) {
+  try {
+    const parsedGroupId = firestoreId.safeParse(groupId)
+    if (!parsedGroupId.success) return { error: "Identifiant de groupe invalide." }
+
+    const lookup = await validateInviteToken(parsedGroupId.data, inviteToken)
+    if (lookup.error || !lookup.data) {
+      return { error: lookup.error ?? "Lien d'invitation invalide." }
+    }
+    const managerUid = lookup.data.managerUid
+
+    const decoded = await adminAuth.verifyIdToken(idToken)
+    const uid = decoded.uid
+
+    // Pull the existing identity from the athlete's current memberships.
+    // We need at least one prior group so we can copy email/firstName/
+    // lastName into the new per-group entry — without it we'd write an
+    // incomplete record (the manager's roster would show "—").
+    const memberships = await readAthleteMemberships(uid)
+    if (memberships.length === 0) {
+      return {
+        error:
+          "Compte sans profil. Inscris-toi via le lien d'invitation pour la première fois.",
+      }
+    }
+
+    // Reject duplicate joins early so the manager doesn't see a flicker on
+    // their dashboard. The membership write below is also idempotent.
+    if (
+      memberships.some(
+        (m) => m.managerUid === managerUid && m.groupId === parsedGroupId.data
+      )
+    ) {
+      return { error: "Tu fais déjà partie de ce groupe." }
+    }
+
+    // Read whichever existing per-group doc still exists (the membership
+    // index can outlive a deleted group). Fall back to Firebase Auth email
+    // and a blank display name so the join still succeeds for users whose
+    // first group was hard-deleted.
+    let firstName = ""
+    let lastName = ""
+    let email = ""
+    for (const m of memberships) {
+      const existing = await adminDb
+        .collection("managers").doc(m.managerUid)
+        .collection("groups").doc(m.groupId)
+        .collection("athletes").doc(uid)
+        .get()
+      if (existing.exists) {
+        const data = existing.data() ?? {}
+        firstName = (data.firstName as string) || firstName
+        lastName = (data.lastName as string) || lastName
+        email = (data.email as string) || email
+        if (firstName && email) break
+      }
+    }
+    if (!email) {
+      const userRecord = await adminAuth.getUser(uid).catch(() => null)
+      email = userRecord?.email ?? ""
+    }
+    if (!email) {
+      return { error: "Impossible de récupérer l'email du compte." }
+    }
+
+    await createSessionCookie(idToken)
+
+    await adminDb
+      .collection("managers").doc(managerUid)
+      .collection("groups").doc(parsedGroupId.data)
+      .collection("athletes").doc(uid)
+      .set({
+        email,
+        firstName,
+        lastName,
+        hasProfile: true,
+        gdprConsent: true,
+        createdAt: new Date(),
+      })
+
+    await addAthleteMembership(uid, managerUid, parsedGroupId.data)
+
+    return { success: true }
+  } catch (error) {
+    console.error(
+      "[ONBOARDING] joinGroupAsExistingAthlete failed:",
+      error instanceof Error ? error.message : "unknown"
+    )
     return { error: "Une erreur est survenue. Veuillez réessayer." }
   }
 }

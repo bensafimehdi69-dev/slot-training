@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import Link from "next/link"
 import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { CheckCircle, XCircle, Loader2, Activity } from "lucide-react"
+import { CheckCircle, XCircle, Loader2, Activity, Maximize2 } from "lucide-react"
 import { DailyPlanningView } from "@/components/custom/daily-planning-view"
 import type { OptimizationResult } from "@/lib/types/planning"
 
@@ -96,6 +97,9 @@ interface OptimizationResultViewProps {
   // the view falls back to a status badge so the spectator still sees
   // whether the planning was validated or rejected.
   role?: OptimizationResultRole
+  // Optional: when provided, renders a "Voir en plein écran" link to the
+  // dedicated weekly planning route. Omitted on athlete-side renders.
+  campaignId?: string
 }
 
 export function OptimizationResultView({
@@ -106,11 +110,13 @@ export function OptimizationResultView({
   isValidating,
   isRejecting,
   role = "owner",
+  campaignId,
 }: OptimizationResultViewProps) {
   const isViewer = role === "viewer"
   const tp = useTranslations("planning")
   const tcamp = useTranslations("campaigns")
   const tc = useTranslations("common")
+  const tw = useTranslations("weeklyPlanning")
   // The legacy "best collective slot" summary and the per-bestSlot athletes
   // table were removed: the per-day view below is the source of truth — there
   // is one best slot *per day*, not a single one across the week.
@@ -119,6 +125,17 @@ export function OptimizationResultView({
 
   return (
     <div className="space-y-4">
+      {campaignId && (
+        <div className="flex justify-end">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/dashboard/planning/${campaignId}`}>
+              <Maximize2 className="mr-1 h-4 w-4" />
+              {tw("openFullScreen")}
+            </Link>
+          </Button>
+        </div>
+      )}
+
       {result.dailyPlannings && result.dailyPlannings.length > 0 && (
         <DailyPlanningView dailyPlannings={result.dailyPlannings} />
       )}

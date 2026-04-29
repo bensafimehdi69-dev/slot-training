@@ -49,6 +49,24 @@
     "expand": "عرض التفاصيل",
     "collapse": "إخفاء التفاصيل"
   },
+  "weeklyPlanning": {
+    "openFullScreen": "عرض في وضع ملء الشاشة",
+    "title": "الجدول الأسبوعي",
+    "subtitle": "من {start} إلى {end}",
+    "totalSessions": "{count} حصة",
+    "noSessionDay": "لا توجد حصة في هذا اليوم",
+    "back": "العودة إلى لوحة التحكم",
+    "print": "طباعة",
+    "collectiveBadge": "جماعية",
+    "individualBadge": "فردية",
+    "athletes": "الرياضيون",
+    "trainingLocation": "مكان التدريب",
+    "athleteRecapTitle": "ملخص لكل رياضي",
+    "loadFailed": "تعذر تحميل هذا الجدول.",
+    "noPlanning": "لا يوجد جدول متاح حاليًا.",
+    "morningLabel": "الصباح",
+    "endOfDayLabel": "نهاية اليوم"
+  },
   "avatar": {
     "changePhoto": "تغيير الصورة",
     "uploadFailed": "فشل الرفع.",
@@ -405,7 +423,18 @@
     "errAccountFailed": "تعذر إنشاء الحساب. يرجى المحاولة مرة أخرى.",
     "errNameRequired": "الاسم واللقب مطلوبان.",
     "errHomeAddressRequired": "عنوان المنزل مطلوب.",
-    "successDone": "تم التسجيل! جارٍ التحويل…"
+    "successDone": "تم التسجيل! جارٍ التحويل…",
+    "alreadyAccountTitle": "لديك حساب بالفعل؟",
+    "alreadyAccountHint": "إذا كنت تستخدم Slot Training بالفعل في مجموعة أخرى، سجّل الدخول لإضافة هذه المجموعة إلى حسابك الحالي.",
+    "alreadyAccountCta": "سجّل الدخول للانضمام إلى هذه المجموعة",
+    "existingSignInTitle": "تسجيل الدخول للانضمام إلى « {group} »",
+    "existingSignInHint": "استخدم بيانات حسابك الحالي على Slot Training.",
+    "backToCreate": "العودة إلى إنشاء الحساب",
+    "existingSubmit": "تسجيل الدخول والانضمام",
+    "existingSubmitting": "جارٍ الانضمام…",
+    "existingJoined": "تم الانضمام إلى المجموعة! جارٍ التحويل…",
+    "errSignInFailed": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+    "errNoExistingProfile": "لا يوجد ملف شخصي بعد. استخدم رابط الدعوة للتسجيل أولاً."
   },
   "landing": {
     "title": "Slot Training",
