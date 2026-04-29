@@ -1,6 +1,8 @@
 {
   "common": {
     "appName": "Slot Training",
+    "metaTitle": "Slot Training - Optimisation des créneaux d'entraînement",
+    "metaDescription": "Planifiez vos entraînements sportifs en tenant compte des emplois du temps, trajets et contraintes de chaque athlète.",
     "loading": "Chargement…",
     "save": "Enregistrer",
     "cancel": "Annuler",
@@ -15,7 +17,43 @@
     "yes": "Oui",
     "no": "Non",
     "language": "Langue",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "changePhoto": "Changer la photo",
+    "changeMyPhoto": "Changer ma photo",
+    "groupPhoto": "Photo du groupe",
+    "changeGroupPhoto": "Changer la photo du groupe",
+    "profilePhoto": "Photo de profil",
+    "pickPhoto": "Choisir une photo",
+    "removePhoto": "Retirer la photo",
+    "photoOptional": "Photo (optionnelle)",
+    "uploadFailed": "Envoi échoué.",
+    "imageProcessFailed": "Impossible de traiter cette image.",
+    "genericError": "Une erreur est survenue."
+  },
+  "scheduleGrid": {
+    "available": "Disponible",
+    "atSchool": "À l'école",
+    "atHome": "À la maison",
+    "schoolShort": "École",
+    "homeShort": "Maison",
+    "cycleHint": "Touchez pour cycler : Disponible → École → Maison.",
+    "cellAriaLabel": "{day} {hour} – {state}"
+  },
+  "days": {
+    "dimanche": "Dimanche",
+    "lundi": "Lundi",
+    "mardi": "Mardi",
+    "mercredi": "Mercredi",
+    "jeudi": "Jeudi",
+    "vendredi": "Vendredi",
+    "samedi": "Samedi",
+    "shortDimanche": "Dim",
+    "shortLundi": "Lun",
+    "shortMardi": "Mar",
+    "shortMercredi": "Mer",
+    "shortJeudi": "Jeu",
+    "shortVendredi": "Ven",
+    "shortSamedi": "Sam"
   },
   "auth": {
     "loginTitle": "Connexion",
@@ -60,7 +98,8 @@
     "loginFailed": "Connexion impossible. Veuillez réessayer.",
     "noAccountYet": "Pas encore de compte ? Demandez un lien d'invitation à votre entraîneur.",
     "passwordPlaceholder": "••••••••",
-    "emailPlaceholder": "votre@email.com"
+    "emailPlaceholder": "votre@email.com",
+    "accountCreatedPhotoFailed": "Compte créé mais photo non envoyée : {error}"
   },
   "managerDashboard": {
     "title": "Dashboard",
@@ -86,7 +125,8 @@
     "remindersSentSingle": "1 rappel envoyé aux athlètes n'ayant pas encore répondu.",
     "remindersSentMany": "{count} rappels envoyés aux athlètes n'ayant pas encore répondu.",
     "viewerBadge": "Spectateur",
-    "share": "Partager"
+    "share": "Partager",
+    "groupCreatedPhotoFailed": "Groupe créé mais photo non envoyée : {error}"
   },
   "share": {
     "title": "Partager « {name} »",
@@ -168,7 +208,77 @@
     "responseCountPlural": "{responded} / {target} remplis",
     "finalizeToOptimize": "Finalisez la campagne pour lancer l'optimisation.",
     "allRespondedBanner": "Tous les athlètes ont répondu — vous pouvez finaliser la campagne.",
-    "responderPending": "en attente"
+    "responderPending": "en attente",
+    "viewDetails": "Voir les détails",
+    "hideDetails": "Masquer les détails"
+  },
+  "address": {
+    "placeholder": "Ex : Stade King Abdullah, Jeddah",
+    "placesUnavailable": "API Places (New) indisponible. Vérifiez la configuration.",
+    "cannotLocate": "Impossible de localiser cette adresse.",
+    "geocodingError": "Erreur lors de la localisation. Réessayez.",
+    "tip": "Astuce : déplacez le marqueur ou cliquez sur la carte pour ajuster la position si l'adresse n'est pas exacte."
+  },
+  "inviteStaff": {
+    "invalidTitle": "Invitation invalide",
+    "invalidDescription": "Ce lien d'invitation n'existe pas ou a expiré. Demandez à la personne qui vous a invité de vous envoyer un nouveau lien.",
+    "acceptInvitation": "Accepter l'invitation",
+    "joinGroup": "Rejoindre « {group} »",
+    "loginIntro": "{inviter} vous invite en lecture seule sur le groupe « {group} ». Connectez-vous pour accepter.",
+    "createIntro": "{inviter} vous invite en lecture seule sur le groupe « {group} ». Créez votre compte manager pour accepter.",
+    "fullName": "Nom complet",
+    "email": "Email",
+    "passwordChoose": "Choisissez un mot de passe (min. 8)",
+    "password": "Mot de passe",
+    "loginAndAccept": "Se connecter et accepter",
+    "createMyAccount": "Créer mon compte",
+    "wrongPassword": "Mot de passe incorrect.",
+    "passwordTooShort": "Mot de passe trop court (min. 8 caractères).",
+    "emailAlreadyUsed": "Cet email a déjà un compte. Utilisez plutôt le mot de passe existant.",
+    "loggedInAccessGranted": "Connecté. Accès accordé au groupe.",
+    "accountCreatedAccessGranted": "Compte créé. Accès accordé au groupe.",
+    "photoUploadFailedSuffix": "Compte créé mais photo non envoyée : {error}"
+  },
+  "optimizationView": {
+    "diagTitle": "Diag algo (trace décision)"
+  },
+  "serverErrors": {
+    "unauthorized": "Non autorisé.",
+    "notAuthenticated": "Non authentifié.",
+    "invalidRequest": "Corps de requête invalide.",
+    "invalidToken": "Jeton invalide ou expiré.",
+    "invalidCoordinates": "Coordonnées invalides.",
+    "invalidCampaignId": "Identifiant de campagne invalide.",
+    "campaignNotFound": "Campagne introuvable.",
+    "campaignClosed": "Cette campagne est clôturée.",
+    "uploadFailed": "Envoi échoué.",
+    "genericError": "Une erreur est survenue.",
+    "submitError": "Une erreur est survenue lors de l'envoi.",
+    "deleteError": "Une erreur est survenue lors de la suppression.",
+    "tryAgain": "Une erreur est survenue. Veuillez réessayer.",
+    "endDateAfterStart": "La date de fin doit être postérieure à la date de début.",
+    "endTimeAfterStart": "L'heure de fin doit être postérieure à l'heure de début.",
+    "alreadyOwner": "Vous êtes déjà propriétaire de ce groupe.",
+    "personHasAccess": "Cette personne a déjà accès au groupe.",
+    "invitationPending": "Une invitation est déjà en attente pour cet email.",
+    "invalidSlots": "Créneaux disponibles invalides.",
+    "invalidAthletesList": "Liste d'athlètes invalide.",
+    "noAthleteSelected": "Aucun athlète sélectionné.",
+    "optimizationInProgress": "Une optimisation est déjà en cours pour cette campagne.",
+    "noResponseReceived": "Aucune réponse reçue.",
+    "decryptFailed": "Impossible de déchiffrer les adresses de {count} athlète(s). Profil corrompu ou clé de chiffrement changée.",
+    "groupNotInGroup": "Vous ne faites pas partie de ce groupe.",
+    "invalidIdentifier": "Identifiant invalide.",
+    "invalidTime": "Horaire invalide.",
+    "invalidEmailUsed": "Cet email est déjà utilisé.",
+    "passwordTooShort": "Le mot de passe doit contenir au moins 8 caractères.",
+    "invalidData": "Données invalides.",
+    "inviteNotFound": "Invitation introuvable ou expirée.",
+    "inviteExpired": "Invitation expirée.",
+    "inviteWrongEmail": "Cette invitation a été envoyée à une autre adresse email.",
+    "joinLinkExpired": "Ce lien d'invitation a expiré.",
+    "joinLinkInvalid": "Lien d'invitation invalide.",
+    "invalidGroupId": "Identifiant de groupe invalide."
   },
   "planning": {
     "validate": "Valider le planning",
@@ -327,7 +437,8 @@
     "errAccountFailed": "Impossible de créer le compte. Veuillez réessayer.",
     "errNameRequired": "Le nom et le prénom sont requis.",
     "errHomeAddressRequired": "L'adresse de domicile est requise.",
-    "successDone": "Inscription terminée ! Redirection…"
+    "successDone": "Inscription terminée ! Redirection…",
+    "profileCreatedPhotoFailed": "Profil créé mais photo non envoyée : {error}"
   },
   "landing": {
     "title": "Slot Training",

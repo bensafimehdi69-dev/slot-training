@@ -135,7 +135,7 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
             src={group.avatarUrl}
             name={group.name}
             size={44}
-            ariaLabel="Changer la photo du groupe"
+            ariaLabel={tc("changeGroupPhoto")}
             onUpload={(formData) => setGroupAvatar(group.id, formData)}
             onUploaded={onRefresh}
             readOnly={isViewer}

@@ -1,6 +1,8 @@
 {
   "common": {
     "appName": "Slot Training",
+    "metaTitle": "Slot Training - Optimised training slot planning",
+    "metaDescription": "Plan your sports training while accounting for each athlete's schedule, travel and constraints.",
     "loading": "Loading…",
     "save": "Save",
     "cancel": "Cancel",
@@ -15,7 +17,43 @@
     "yes": "Yes",
     "no": "No",
     "language": "Language",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "changePhoto": "Change photo",
+    "changeMyPhoto": "Change my photo",
+    "groupPhoto": "Group photo",
+    "changeGroupPhoto": "Change group photo",
+    "profilePhoto": "Profile photo",
+    "pickPhoto": "Pick a photo",
+    "removePhoto": "Remove photo",
+    "photoOptional": "Photo (optional)",
+    "uploadFailed": "Upload failed.",
+    "imageProcessFailed": "Unable to process this image.",
+    "genericError": "An error occurred."
+  },
+  "scheduleGrid": {
+    "available": "Available",
+    "atSchool": "At school",
+    "atHome": "At home",
+    "schoolShort": "School",
+    "homeShort": "Home",
+    "cycleHint": "Tap to cycle: Available → School → Home.",
+    "cellAriaLabel": "{day} {hour} – {state}"
+  },
+  "days": {
+    "dimanche": "Sunday",
+    "lundi": "Monday",
+    "mardi": "Tuesday",
+    "mercredi": "Wednesday",
+    "jeudi": "Thursday",
+    "vendredi": "Friday",
+    "samedi": "Saturday",
+    "shortDimanche": "Sun",
+    "shortLundi": "Mon",
+    "shortMardi": "Tue",
+    "shortMercredi": "Wed",
+    "shortJeudi": "Thu",
+    "shortVendredi": "Fri",
+    "shortSamedi": "Sat"
   },
   "auth": {
     "loginTitle": "Sign in",
@@ -60,7 +98,8 @@
     "loginFailed": "Unable to sign in. Please try again.",
     "noAccountYet": "No account yet? Ask your coach for an invite link.",
     "passwordPlaceholder": "••••••••",
-    "emailPlaceholder": "your@email.com"
+    "emailPlaceholder": "your@email.com",
+    "accountCreatedPhotoFailed": "Account created but photo not uploaded: {error}"
   },
   "managerDashboard": {
     "title": "Dashboard",
@@ -86,7 +125,8 @@
     "remindersSentSingle": "1 reminder sent to athletes who haven't replied yet.",
     "remindersSentMany": "{count} reminders sent to athletes who haven't replied yet.",
     "viewerBadge": "Viewer",
-    "share": "Share"
+    "share": "Share",
+    "groupCreatedPhotoFailed": "Group created but photo not uploaded: {error}"
   },
   "share": {
     "title": "Share \"{name}\"",
@@ -168,7 +208,77 @@
     "responseCountPlural": "{responded} / {target} replied",
     "finalizeToOptimize": "Finalize the campaign to launch the optimization.",
     "allRespondedBanner": "All athletes have replied — you can finalize the campaign.",
-    "responderPending": "pending"
+    "responderPending": "pending",
+    "viewDetails": "View details",
+    "hideDetails": "Hide details"
+  },
+  "address": {
+    "placeholder": "e.g. King Abdullah Stadium, Jeddah",
+    "placesUnavailable": "Places API (New) unavailable. Check the configuration.",
+    "cannotLocate": "Unable to locate this address.",
+    "geocodingError": "Geocoding error. Please try again.",
+    "tip": "Tip: drag the marker or tap the map to adjust the position if the address isn't exact."
+  },
+  "inviteStaff": {
+    "invalidTitle": "Invalid invitation",
+    "invalidDescription": "This invitation link doesn't exist or has expired. Ask the person who invited you to send a new link.",
+    "acceptInvitation": "Accept the invitation",
+    "joinGroup": "Join \"{group}\"",
+    "loginIntro": "{inviter} invites you to \"{group}\" as a read-only viewer. Sign in to accept.",
+    "createIntro": "{inviter} invites you to \"{group}\" as a read-only viewer. Create your manager account to accept.",
+    "fullName": "Full name",
+    "email": "Email",
+    "passwordChoose": "Choose a password (min. 8)",
+    "password": "Password",
+    "loginAndAccept": "Sign in and accept",
+    "createMyAccount": "Create my account",
+    "wrongPassword": "Incorrect password.",
+    "passwordTooShort": "Password too short (min. 8 characters).",
+    "emailAlreadyUsed": "An account already exists for this email. Use the existing password instead.",
+    "loggedInAccessGranted": "Signed in. Access granted to the group.",
+    "accountCreatedAccessGranted": "Account created. Access granted to the group.",
+    "photoUploadFailedSuffix": "Account created but photo not uploaded: {error}"
+  },
+  "optimizationView": {
+    "diagTitle": "Algo diag (decision trace)"
+  },
+  "serverErrors": {
+    "unauthorized": "Not authorized.",
+    "notAuthenticated": "Not authenticated.",
+    "invalidRequest": "Invalid request body.",
+    "invalidToken": "Invalid or expired token.",
+    "invalidCoordinates": "Invalid coordinates.",
+    "invalidCampaignId": "Invalid campaign id.",
+    "campaignNotFound": "Campaign not found.",
+    "campaignClosed": "This campaign is closed.",
+    "uploadFailed": "Upload failed.",
+    "genericError": "An error occurred.",
+    "submitError": "An error occurred while submitting.",
+    "deleteError": "An error occurred while deleting.",
+    "tryAgain": "An error occurred. Please try again.",
+    "endDateAfterStart": "End date must be after start date.",
+    "endTimeAfterStart": "End time must be after start time.",
+    "alreadyOwner": "You're already the owner of this group.",
+    "personHasAccess": "This person already has access to the group.",
+    "invitationPending": "An invitation is already pending for this email.",
+    "invalidSlots": "Invalid available slots.",
+    "invalidAthletesList": "Invalid athlete list.",
+    "noAthleteSelected": "No athlete selected.",
+    "optimizationInProgress": "An optimization is already running for this campaign.",
+    "noResponseReceived": "No response received.",
+    "decryptFailed": "Unable to decrypt addresses for {count} athlete(s). Corrupted profile or encryption key changed.",
+    "groupNotInGroup": "You are not part of this group.",
+    "invalidIdentifier": "Invalid identifier.",
+    "invalidTime": "Invalid time.",
+    "invalidEmailUsed": "This email is already in use.",
+    "passwordTooShort": "Password must be at least 8 characters long.",
+    "invalidData": "Invalid data.",
+    "inviteNotFound": "Invitation not found or expired.",
+    "inviteExpired": "Invitation expired.",
+    "inviteWrongEmail": "This invitation was sent to a different email address.",
+    "joinLinkExpired": "This invitation link has expired.",
+    "joinLinkInvalid": "Invalid invitation link.",
+    "invalidGroupId": "Invalid group id."
   },
   "planning": {
     "validate": "Validate planning",
@@ -327,7 +437,8 @@
     "errAccountFailed": "Unable to create account. Please try again.",
     "errNameRequired": "First and last name are required.",
     "errHomeAddressRequired": "Home address is required.",
-    "successDone": "Registration complete! Redirecting…"
+    "successDone": "Registration complete! Redirecting…",
+    "profileCreatedPhotoFailed": "Profile created but photo not uploaded: {error}"
   },
   "landing": {
     "title": "Slot Training",

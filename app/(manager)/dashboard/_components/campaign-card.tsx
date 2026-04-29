@@ -15,7 +15,6 @@ import {
   ChevronRight,
   Check,
   Clock,
-  MoreVertical,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,13 +31,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { OptimizationResultView } from "@/components/custom/optimization-result-view"
 import { CampaignEditDialog } from "./campaign-edit-dialog"
 import {
@@ -179,6 +171,15 @@ export function CampaignCard({
     return <Badge>{t("statusActive")}</Badge>
   }
 
+  // Two-line preview only — keeps the dashboard scannable. Tap anywhere on
+  // the row (except the side icon stack) to expand the full details:
+  // time range, deadline, responders, action buttons, and the validated
+  // planning when present.
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  // Auto-expand when the manager opens a campaign result, so the planning
+  // view doesn't render inside a collapsed shell.
+  const expanded = detailsOpen || showResult
+
   return (
     <Card>
       {/* Reduced horizontal padding on mobile so the optimisation result
@@ -188,21 +189,78 @@ export function CampaignCard({
           cards themselves. */}
       <CardContent className="px-3 pt-4 sm:px-6">
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 space-y-1">
+          {/* Compact 2-line preview. The text column is the click target;
+              the right rail (edit + delete, stacked) keeps secondary
+              actions reachable in one tap without expanding the card. */}
+          <div className="flex items-stretch gap-2">
+            <button
+              type="button"
+              onClick={() => setDetailsOpen((v) => !v)}
+              aria-expanded={expanded}
+              aria-label={expanded ? t("hideDetails") : t("viewDetails")}
+              className="min-w-0 flex-1 rounded-md text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <div className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">
+                <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-sm font-medium">
                   {t("rangeFromTo", { start: campaign.startDate, end: campaign.endDate })}
                 </span>
                 {statusBadge()}
               </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="break-words text-sm text-muted-foreground">
+              <div className="mt-1 flex items-center gap-2">
+                <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-sm text-muted-foreground">
                   {campaign.trainingLocation.formatted}
                 </span>
               </div>
+            </button>
+
+            {!isViewer && (
+              <div className="flex shrink-0 flex-col items-center justify-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setEditOpen(true)
+                  }}
+                  aria-label={tc("edit")}
+                  disabled={deleting}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDeleteConfirmOpen(true)
+                  }}
+                  aria-label={tc("delete")}
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Full-width "all responded" banner stays visible while collapsed
+              so the manager doesn't miss the cue to finalise. */}
+          {allResponded && !expanded && (
+            <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-800">
+              {t("allRespondedBanner")}
+            </div>
+          )}
+
+          {expanded && (
+            <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span>
                   {t("timeRange", { start: campaign.timeRangeStart, end: campaign.timeRangeEnd })}
@@ -239,7 +297,7 @@ export function CampaignCard({
                 </div>
               )}
               {respondersOpen && responders.length > 0 && (
-                <ul className="mt-1 space-y-1 rounded-md border bg-muted/30 p-2">
+                <ul className="space-y-1 rounded-md border bg-muted/30 p-2">
                   {responders.map((r) => {
                     const fullName =
                       `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.athleteId
@@ -264,131 +322,97 @@ export function CampaignCard({
                   })}
                 </ul>
               )}
-            </div>
 
-            {/* Primary action stays visible at all sizes; secondary actions
-                (Modifier / Supprimer) collapse into a kebab so the row fits a
-                360px screen without truncation. */}
-            <div className="flex shrink-0 items-center gap-2">
-              {campaign.optimizationResult && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowResult(!showResult)}
-                >
-                  {showResult ? t("hideResult") : t("viewResult")}
-                </Button>
-              )}
-              {!isViewer && campaign.status === "active" && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      // Default (filled) variant pops once everyone has responded so
-                      // the manager's next action is visually obvious; outline keeps
-                      // the dashboard quiet while replies are still trickling in.
-                      variant={allResponded ? "default" : "outline"}
-                      size="sm"
-                      disabled={closing}
-                      aria-label={t("finalize")}
-                      className={
-                        allResponded
-                          ? "bg-green-600 text-white shadow-sm hover:bg-green-700"
-                          : undefined
-                      }
-                    >
-                      {closing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Lock className="h-4 w-4" />
-                      )}
-                      <span className="ml-1 sm:inline">{t("finalize")}</span>
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>{t("finalizeTitle")}</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {t("finalizeDescription")}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleClose}>{t("finalize")}</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-              {!isViewer && campaign.status === "closed" && !campaign.optimizationResult && (
-                <Button
-                  size="sm"
-                  onClick={handleOptimize}
-                  disabled={optimizing}
-                  aria-label={t("optimize")}
-                >
-                  {optimizing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                  <span className="ml-1 hidden sm:inline">{t("optimize")}</span>
-                </Button>
-              )}
-              {!isViewer && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {campaign.optimizationResult && (
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    aria-label={tc("edit")}
-                    disabled={deleting}
+                    onClick={() => setShowResult(!showResult)}
                   >
-                    {deleting ? (
+                    {showResult ? t("hideResult") : t("viewResult")}
+                  </Button>
+                )}
+                {!isViewer && campaign.status === "active" && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        // Filled green pops once everyone has responded so the
+                        // manager's next action is obvious; outline keeps the
+                        // dashboard quiet while replies are still trickling in.
+                        variant={allResponded ? "default" : "outline"}
+                        size="sm"
+                        disabled={closing}
+                        aria-label={t("finalize")}
+                        className={
+                          allResponded
+                            ? "bg-green-600 text-white shadow-sm hover:bg-green-700"
+                            : undefined
+                        }
+                      >
+                        {closing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Lock className="h-4 w-4" />
+                        )}
+                        <span className="ml-1">{t("finalize")}</span>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t("finalizeTitle")}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t("finalizeDescription")}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleClose}>{t("finalize")}</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                {!isViewer && campaign.status === "closed" && !campaign.optimizationResult && (
+                  <Button
+                    size="sm"
+                    onClick={handleOptimize}
+                    disabled={optimizing}
+                    aria-label={t("optimize")}
+                  >
+                    {optimizing ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <MoreVertical className="h-4 w-4" />
+                      <Play className="h-4 w-4" />
                     )}
+                    <span className="ml-1">{t("optimize")}</span>
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => setEditOpen(true)}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    {tc("edit")}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => setDeleteConfirmOpen(true)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    {tc("delete")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              )}
-              {!isViewer && (
-              <AlertDialog
-                open={deleteConfirmOpen}
-                onOpenChange={setDeleteConfirmOpen}
-              >
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
-                    <AlertDialogDescription>{t("deleteDescription")}</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-destructive text-white hover:bg-destructive/90"
-                    >
-                      {tc("delete")}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {!isViewer && (
+            <AlertDialog
+              open={deleteConfirmOpen}
+              onOpenChange={setDeleteConfirmOpen}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
+                  <AlertDialogDescription>{t("deleteDescription")}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-white hover:bg-destructive/90"
+                  >
+                    {tc("delete")}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
 
           <CampaignEditDialog
             open={editOpen}

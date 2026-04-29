@@ -1,5 +1,6 @@
 "use server"
 
+import { getTranslations } from "next-intl/server"
 import { adminDb } from "@/lib/firebase/admin"
 import { getSession } from "@/lib/firebase/auth"
 import { readAthleteMemberships } from "@/lib/server/indexes"
@@ -29,7 +30,10 @@ export async function getAthleteCampaigns(): Promise<{
 }> {
   try {
     const session = await getSession()
-    if (!session) return { error: "Non authentifié." }
+    if (!session) {
+      const tErr = await getTranslations("serverErrors")
+      return { error: tErr("notAuthenticated") }
+    }
     const uid = session.uid
 
     const memberships = await readAthleteMemberships(uid)

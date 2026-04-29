@@ -1,6 +1,7 @@
 "use server"
 
 import { z } from "zod"
+import { getTranslations } from "next-intl/server"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { getSession } from "@/lib/firebase/auth"
 import { encryptAddress } from "@/lib/utils/encryption"
@@ -8,7 +9,7 @@ import { readAthleteProfile } from "@/lib/server/profile-service"
 import { readCampaignIndex, addAthleteMembership } from "@/lib/server/indexes"
 import { sendDeletionConfirmation } from "@/lib/utils/email"
 import { addressSchema } from "@/lib/types/address"
-import { dayKeys, migrateWeeklySchedule } from "@/lib/types/schedule"
+import { dayKeys, migrateWeeklySchedule, type DayKey } from "@/lib/types/schedule"
 import type { Campaign, CampaignResponse } from "@/lib/types/campaign"
 import type { AthleteProfile } from "@/lib/types/profile"
 import type { OptimizationResult, IndividualSlot } from "@/lib/types/planning"
@@ -43,7 +44,9 @@ const submitResponseSchema = z.object({
 
 export interface AthleteSession {
   type: "collectif" | "individuel"
-  day: string
+  // Raw day key ("lundi", "mardi", …) used by the client to render a
+  // localized label via next-intl. The client never displays this verbatim.
+  dayKey: DayKey
   startTime: string
   endTime: string
   departureTime?: string
@@ -51,6 +54,21 @@ export interface AthleteSession {
   walkingMinutes?: number
   drivingMinutes?: number
   departureAddress?: string
+}
+
+const DAY_LABEL_TO_KEY: Record<string, DayKey> = {
+  Dimanche: "dimanche",
+  Lundi: "lundi",
+  Mardi: "mardi",
+  Mercredi: "mercredi",
+  Jeudi: "jeudi",
+  Vendredi: "vendredi",
+  Samedi: "samedi",
+}
+
+function toDayKey(value: string): DayKey {
+  if ((dayKeys as readonly string[]).includes(value)) return value as DayKey
+  return DAY_LABEL_TO_KEY[value] ?? "lundi"
 }
 
 interface CampaignForAthlete {
@@ -71,17 +89,18 @@ interface CampaignForAthlete {
 export async function getCampaignForAthlete(
   campaignId: string
 ): Promise<{ data?: CampaignForAthlete; error?: string }> {
+  const tErr = await getTranslations("serverErrors")
   try {
     const session = await getSession()
-    if (!session) return { error: "Non authentifié." }
+    if (!session) return { error: tErr("notAuthenticated") }
     const uid = session.uid
 
     const parsedId = firestoreId.safeParse(campaignId)
-    if (!parsedId.success) return { error: "Identifiant de campagne invalide." }
+    if (!parsedId.success) return { error: tErr("invalidCampaignId") }
 
     // O(1) reverse-index lookup instead of scanning every manager.
     const index = await readCampaignIndex(parsedId.data)
-    if (!index) return { error: "Campagne introuvable." }
+    if (!index) return { error: tErr("campaignNotFound") }
 
     const campaignRef = adminDb
       .collection("managers").doc(index.managerUid)
@@ -89,7 +108,7 @@ export async function getCampaignForAthlete(
       .collection("campaigns").doc(parsedId.data)
 
     const campDoc = await campaignRef.get()
-    if (!campDoc.exists) return { error: "Campagne introuvable." }
+    if (!campDoc.exists) return { error: tErr("campaignNotFound") }
 
     const managerUid = index.managerUid
     const groupId = index.groupId
@@ -136,7 +155,7 @@ export async function getCampaignForAthlete(
       .get()
 
     if (!athleteDoc.exists) {
-      return { error: "Vous ne faites pas partie de ce groupe." }
+      return { error: tErr("groupNotInGroup") }
     }
 
     // Self-heal: legacy athletes joined before the membership index existed
@@ -194,7 +213,7 @@ export async function getCampaignForAthlete(
     }
   } catch (error) {
     console.error("[CAMPAIGN] getCampaignForAthlete failed:", error instanceof Error ? error.message : "unknown")
-    return { error: "Une erreur est survenue." }
+    return { error: tErr("genericError") }
   }
 }
 
@@ -202,17 +221,18 @@ export async function submitCampaignResponse(
   campaignId: string,
   data: unknown
 ): Promise<{ success?: boolean; error?: string }> {
+  const tErr = await getTranslations("serverErrors")
   try {
     const session = await getSession()
-    if (!session) return { error: "Non authentifié." }
+    if (!session) return { error: tErr("notAuthenticated") }
     const uid = session.uid
 
     const parsedId = firestoreId.safeParse(campaignId)
-    if (!parsedId.success) return { error: "Identifiant de campagne invalide." }
+    if (!parsedId.success) return { error: tErr("invalidCampaignId") }
 
     const parsed = submitResponseSchema.safeParse(data)
     if (!parsed.success) {
-      return { error: parsed.error.issues[0]?.message ?? "Données invalides." }
+      return { error: parsed.error.issues[0]?.message ?? tErr("invalidData") }
     }
     const body = parsed.data
 
@@ -220,14 +240,14 @@ export async function submitCampaignResponse(
     // guard any authenticated user could inject data into an arbitrary
     // campaign's responses subcollection.
     const index = await readCampaignIndex(parsedId.data)
-    if (!index) return { error: "Campagne introuvable." }
+    if (!index) return { error: tErr("campaignNotFound") }
 
     const campaignRef = adminDb
       .collection("managers").doc(index.managerUid)
       .collection("groups").doc(index.groupId)
       .collection("campaigns").doc(parsedId.data)
     const campDoc = await campaignRef.get()
-    if (!campDoc.exists) return { error: "Campagne introuvable." }
+    if (!campDoc.exists) return { error: tErr("campaignNotFound") }
     const campaignStatus = campDoc.data()!.status as string
     const managerUid = index.managerUid
     const groupId = index.groupId
@@ -240,9 +260,9 @@ export async function submitCampaignResponse(
       .collection("groups").doc(groupId)
       .collection("athletes").doc(uid)
       .get()
-    if (!athleteDoc.exists) return { error: "Campagne introuvable." }
+    if (!athleteDoc.exists) return { error: tErr("campaignNotFound") }
 
-    if (campaignStatus === "closed") return { error: "Cette campagne est clôturée." }
+    if (campaignStatus === "closed") return { error: tErr("campaignClosed") }
 
     const encryptedHome = encryptAddress(body.homeAddress)
     const encryptedSchool = body.schoolAddress ? encryptAddress(body.schoolAddress) : ""
@@ -304,34 +324,35 @@ export async function submitCampaignResponse(
     return { success: true }
   } catch (error) {
     console.error("[CAMPAIGN] submitCampaignResponse failed:", error instanceof Error ? error.message : "unknown")
-    return { error: "Une erreur est survenue lors de l'envoi." }
+    return { error: tErr("submitError") }
   }
 }
 
 export async function deleteAthleteData(
   campaignId: string
 ): Promise<{ success?: boolean; error?: string }> {
+  const tErr = await getTranslations("serverErrors")
   try {
     const session = await getSession()
-    if (!session) return { error: "Non authentifié." }
+    if (!session) return { error: tErr("notAuthenticated") }
 
     const uid = session.uid
     const email = session.email || ""
 
     const parsedId = firestoreId.safeParse(campaignId)
-    if (!parsedId.success) return { error: "Identifiant de campagne invalide." }
+    if (!parsedId.success) return { error: tErr("invalidCampaignId") }
 
     // O(1) reverse-index lookup + ownership check. Without the ownership
     // guard a logged-in user could trigger GDPR delete side-effects (Firebase
     // Auth removal, profile removal) by guessing any valid campaignId.
     const index = await readCampaignIndex(parsedId.data)
-    if (!index) return { error: "Campagne introuvable." }
+    if (!index) return { error: tErr("campaignNotFound") }
 
     const groupRef = adminDb
       .collection("managers").doc(index.managerUid)
       .collection("groups").doc(index.groupId)
     const athleteDoc = await groupRef.collection("athletes").doc(uid).get()
-    if (!athleteDoc.exists) return { error: "Campagne introuvable." }
+    if (!athleteDoc.exists) return { error: tErr("campaignNotFound") }
 
     const managerUid = index.managerUid
     const groupId = index.groupId
@@ -365,7 +386,7 @@ export async function deleteAthleteData(
     return { success: true }
   } catch (error) {
     console.error("[GDPR] deleteAthleteData failed:", error instanceof Error ? error.message : "unknown")
-    return { error: "Une erreur est survenue lors de la suppression." }
+    return { error: tErr("deleteError") }
   }
 }
 
@@ -391,7 +412,7 @@ function findAthleteSessions(
         if (!member) continue
         out.push({
           type: session.type === "collective" ? "collectif" : "individuel",
-          day: planning.day,
+          dayKey: toDayKey(planning.dayKey || planning.day),
           startTime: session.startTime,
           endTime: session.endTime,
           departureTime: member.departureTime,
@@ -414,7 +435,7 @@ function findAthleteSessions(
     if (inCollective) {
       out.push({
         type: "collectif",
-        day: bestSlot.day,
+        dayKey: toDayKey(bestSlot.day),
         startTime: bestSlot.startTime,
         endTime: bestSlot.endTime,
         departureTime: inCollective.departureTime,
@@ -429,7 +450,7 @@ function findAthleteSessions(
     if (slot.athleteId !== athleteId) continue
     out.push({
       type: "individuel",
-      day: slot.day,
+      dayKey: toDayKey(slot.day),
       startTime: slot.startTime,
       endTime: slot.endTime,
       departureTime: slot.departureTime,
@@ -446,7 +467,7 @@ function dedupeSessions(sessions: AthleteSession[]): AthleteSession[] {
   const seen = new Set<string>()
   const out: AthleteSession[] = []
   for (const s of sessions) {
-    const key = `${s.day}|${s.startTime}|${s.endTime}`
+    const key = `${s.dayKey}|${s.startTime}|${s.endTime}`
     if (seen.has(key)) continue
     seen.add(key)
     out.push(s)

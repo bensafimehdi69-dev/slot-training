@@ -1,10 +1,11 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import type { ConstraintCell, ConstraintsGrid } from "@/lib/types/profile"
+import { dayKeys } from "@/lib/types/schedule"
 import React from "react"
 
-const DAYS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"]
 const HOURS = Array.from({ length: 16 }, (_, i) =>
   `${(i + 7).toString().padStart(2, "0")}:00`
 )
@@ -48,20 +49,9 @@ function cellText(state: ConstraintCell): string {
   }
 }
 
-function cellLabel(state: ConstraintCell): string {
-  switch (state) {
-    case "training":
-      return "Disponible"
-    case "school":
-      return "À l'école"
-    case "home":
-      return "À la maison"
-  }
-}
-
 /**
  * Three-state weekly grid for athlete availability. Each tap cycles through:
- * Disponible → À l'école → À la maison → Disponible.
+ * Available → At school → At home → Available.
  *
  * The location ("school" / "home") on busy cells is what the optimiser uses
  * to compute the trip from the actual previous location instead of inferring
@@ -71,13 +61,28 @@ export function AthleteAvailabilityGrid({
   value,
   onChange,
 }: AthleteAvailabilityGridProps) {
+  const tDays = useTranslations("days")
+  const tg = useTranslations("scheduleGrid")
   const grid = value.length === 7 && value[0]?.length === 16 ? value : createDefaultGrid()
+
+  function cellLabel(state: ConstraintCell): string {
+    switch (state) {
+      case "training":
+        return tg("available")
+      case "school":
+        return tg("atSchool")
+      case "home":
+        return tg("atHome")
+    }
+  }
 
   function cycle(day: number, hour: number) {
     const newGrid = grid.map((row) => [...row])
     newGrid[day][hour] = nextState(grid[day][hour])
     onChange(newGrid)
   }
+
+  const cap = (s: string) => (s.charAt(0).toUpperCase() + s.slice(1)) as Capitalize<typeof dayKeys[number]>
 
   return (
     <div>
@@ -87,9 +92,9 @@ export function AthleteAvailabilityGrid({
           16 hours fit without scrolling. */}
       <div className="grid grid-cols-[2rem_repeat(7,minmax(0,1fr))] gap-0.5">
         <div className="text-[10px] font-medium text-muted-foreground" />
-        {DAYS.map((day) => (
+        {dayKeys.map((day) => (
           <div key={day} className="text-center text-[10px] font-medium">
-            {day}
+            {tDays(`short${cap(day)}`)}
           </div>
         ))}
 
@@ -98,14 +103,18 @@ export function AthleteAvailabilityGrid({
             <div className="flex items-center justify-end pr-1 text-[10px] text-muted-foreground">
               {hour}
             </div>
-            {DAYS.map((_, dayIdx) => {
+            {dayKeys.map((day, dayIdx) => {
               const state = grid[dayIdx][hourIdx]
               return (
                 <button
                   key={`${dayIdx}-${hourIdx}`}
                   type="button"
                   onClick={() => cycle(dayIdx, hourIdx)}
-                  aria-label={`${DAYS[dayIdx]} ${hour} – ${cellLabel(state)}`}
+                  aria-label={tg("cellAriaLabel", {
+                    day: tDays(day),
+                    hour,
+                    state: cellLabel(state),
+                  })}
                   className={cn(
                     "flex h-7 items-center justify-center rounded-sm border text-[9px] font-medium transition-colors",
                     cellClass(state)
@@ -122,23 +131,23 @@ export function AthleteAvailabilityGrid({
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1">
           <div className="h-3 w-3 rounded-sm border border-green-300 bg-green-200" />
-          Disponible
+          {tg("available")}
         </div>
         <div className="flex items-center gap-1">
           <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
             s
           </div>
-          École
+          {tg("schoolShort")}
         </div>
         <div className="flex items-center gap-1">
           <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
             h
           </div>
-          Maison
+          {tg("homeShort")}
         </div>
       </div>
       <p className="mt-1.5 text-[11px] text-muted-foreground">
-        Touchez pour cycler : Disponible → École → Maison.
+        {tg("cycleHint")}
       </p>
     </div>
   )

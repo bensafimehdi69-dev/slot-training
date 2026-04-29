@@ -1,6 +1,8 @@
 {
   "common": {
     "appName": "Slot Training",
+    "metaTitle": "Slot Training - تحسين أوقات التدريب",
+    "metaDescription": "خطّط لتدريباتك الرياضية مع مراعاة جداول الرياضيين وتنقلاتهم وقيودهم.",
     "loading": "جارٍ التحميل…",
     "save": "حفظ",
     "cancel": "إلغاء",
@@ -15,7 +17,43 @@
     "yes": "نعم",
     "no": "لا",
     "language": "اللغة",
-    "logout": "تسجيل الخروج"
+    "logout": "تسجيل الخروج",
+    "changePhoto": "تغيير الصورة",
+    "changeMyPhoto": "تغيير صورتي",
+    "groupPhoto": "صورة المجموعة",
+    "changeGroupPhoto": "تغيير صورة المجموعة",
+    "profilePhoto": "صورة الملف الشخصي",
+    "pickPhoto": "اختيار صورة",
+    "removePhoto": "إزالة الصورة",
+    "photoOptional": "صورة (اختياري)",
+    "uploadFailed": "فشل الرفع.",
+    "imageProcessFailed": "تعذرت معالجة هذه الصورة.",
+    "genericError": "حدث خطأ."
+  },
+  "scheduleGrid": {
+    "available": "متاح",
+    "atSchool": "في المدرسة",
+    "atHome": "في المنزل",
+    "schoolShort": "مدرسة",
+    "homeShort": "منزل",
+    "cycleHint": "اضغط للتنقل: متاح ← مدرسة ← منزل.",
+    "cellAriaLabel": "{day} {hour} – {state}"
+  },
+  "days": {
+    "dimanche": "الأحد",
+    "lundi": "الإثنين",
+    "mardi": "الثلاثاء",
+    "mercredi": "الأربعاء",
+    "jeudi": "الخميس",
+    "vendredi": "الجمعة",
+    "samedi": "السبت",
+    "shortDimanche": "أحد",
+    "shortLundi": "إثن",
+    "shortMardi": "ثلا",
+    "shortMercredi": "أرب",
+    "shortJeudi": "خمي",
+    "shortVendredi": "جمع",
+    "shortSamedi": "سبت"
   },
   "auth": {
     "loginTitle": "تسجيل الدخول",
@@ -60,7 +98,8 @@
     "loginFailed": "تعذر تسجيل الدخول. يرجى المحاولة مرة أخرى.",
     "noAccountYet": "ليس لديك حساب بعد؟ اطلب رابط دعوة من مدربك.",
     "passwordPlaceholder": "••••••••",
-    "emailPlaceholder": "your@email.com"
+    "emailPlaceholder": "your@email.com",
+    "accountCreatedPhotoFailed": "تم إنشاء الحساب لكن الصورة لم تُرسل: {error}"
   },
   "managerDashboard": {
     "title": "لوحة التحكم",
@@ -86,7 +125,8 @@
     "remindersSentSingle": "تم إرسال تذكير واحد إلى الرياضيين الذين لم يجيبوا بعد.",
     "remindersSentMany": "تم إرسال {count} تذكيرات إلى الرياضيين الذين لم يجيبوا بعد.",
     "viewerBadge": "مشاهد",
-    "share": "مشاركة"
+    "share": "مشاركة",
+    "groupCreatedPhotoFailed": "تم إنشاء المجموعة لكن الصورة لم تُرسل: {error}"
   },
   "share": {
     "title": "مشاركة « {name} »",
@@ -168,7 +208,77 @@
     "responseCountPlural": "{responded} / {target} أجابوا",
     "finalizeToOptimize": "أنهِ الحملة لإطلاق التحسين.",
     "allRespondedBanner": "أجاب جميع الرياضيين — يمكنك إنهاء الحملة.",
-    "responderPending": "في الانتظار"
+    "responderPending": "في الانتظار",
+    "viewDetails": "عرض التفاصيل",
+    "hideDetails": "إخفاء التفاصيل"
+  },
+  "address": {
+    "placeholder": "مثال: استاد الملك عبدالله، جدة",
+    "placesUnavailable": "واجهة Places (New) غير متاحة. تحقق من الإعدادات.",
+    "cannotLocate": "تعذر تحديد موقع هذا العنوان.",
+    "geocodingError": "خطأ أثناء تحديد الموقع. أعد المحاولة.",
+    "tip": "تلميح: حرّك العلامة أو اضغط على الخريطة لضبط الموقع إذا كان العنوان غير دقيق."
+  },
+  "inviteStaff": {
+    "invalidTitle": "دعوة غير صالحة",
+    "invalidDescription": "رابط الدعوة هذا غير موجود أو انتهت صلاحيته. اطلب من الشخص الذي دعاك إرسال رابط جديد.",
+    "acceptInvitation": "قبول الدعوة",
+    "joinGroup": "الانضمام إلى « {group} »",
+    "loginIntro": "يدعوك {inviter} للقراءة فقط في المجموعة « {group} ». سجّل الدخول للقبول.",
+    "createIntro": "يدعوك {inviter} للقراءة فقط في المجموعة « {group} ». أنشئ حساب مدير للقبول.",
+    "fullName": "الاسم الكامل",
+    "email": "البريد الإلكتروني",
+    "passwordChoose": "اختر كلمة مرور (8 أحرف على الأقل)",
+    "password": "كلمة المرور",
+    "loginAndAccept": "تسجيل الدخول والقبول",
+    "createMyAccount": "إنشاء حسابي",
+    "wrongPassword": "كلمة المرور غير صحيحة.",
+    "passwordTooShort": "كلمة المرور قصيرة جدًا (8 أحرف على الأقل).",
+    "emailAlreadyUsed": "يوجد حساب بهذا البريد بالفعل. استخدم كلمة المرور الحالية بدلًا من ذلك.",
+    "loggedInAccessGranted": "تم تسجيل الدخول. تم منح الوصول إلى المجموعة.",
+    "accountCreatedAccessGranted": "تم إنشاء الحساب. تم منح الوصول إلى المجموعة.",
+    "photoUploadFailedSuffix": "تم إنشاء الحساب لكن الصورة لم تُرسل: {error}"
+  },
+  "optimizationView": {
+    "diagTitle": "تشخيص الخوارزمية (سجل القرار)"
+  },
+  "serverErrors": {
+    "unauthorized": "غير مصرّح به.",
+    "notAuthenticated": "غير مسجل الدخول.",
+    "invalidRequest": "محتوى الطلب غير صالح.",
+    "invalidToken": "رمز غير صالح أو منتهي.",
+    "invalidCoordinates": "إحداثيات غير صالحة.",
+    "invalidCampaignId": "معرّف الحملة غير صالح.",
+    "campaignNotFound": "الحملة غير موجودة.",
+    "campaignClosed": "هذه الحملة منهية.",
+    "uploadFailed": "فشل الرفع.",
+    "genericError": "حدث خطأ.",
+    "submitError": "حدث خطأ أثناء الإرسال.",
+    "deleteError": "حدث خطأ أثناء الحذف.",
+    "tryAgain": "حدث خطأ. يرجى المحاولة مرة أخرى.",
+    "endDateAfterStart": "يجب أن يكون تاريخ الانتهاء بعد تاريخ البدء.",
+    "endTimeAfterStart": "يجب أن يكون وقت الانتهاء بعد وقت البدء.",
+    "alreadyOwner": "أنت مالك هذه المجموعة بالفعل.",
+    "personHasAccess": "هذا الشخص لديه وصول للمجموعة بالفعل.",
+    "invitationPending": "توجد دعوة قيد الانتظار لهذا البريد بالفعل.",
+    "invalidSlots": "الأوقات المتاحة غير صالحة.",
+    "invalidAthletesList": "قائمة الرياضيين غير صالحة.",
+    "noAthleteSelected": "لم يتم اختيار أي رياضي.",
+    "optimizationInProgress": "هناك تحسين جارٍ بالفعل لهذه الحملة.",
+    "noResponseReceived": "لم تُستلم أي إجابة.",
+    "decryptFailed": "تعذر فك تشفير عناوين {count} رياضي. ملف تالف أو مفتاح تشفير تغيّر.",
+    "groupNotInGroup": "أنت لست عضوًا في هذه المجموعة.",
+    "invalidIdentifier": "معرّف غير صالح.",
+    "invalidTime": "وقت غير صالح.",
+    "invalidEmailUsed": "هذا البريد الإلكتروني مستخدم بالفعل.",
+    "passwordTooShort": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.",
+    "invalidData": "بيانات غير صالحة.",
+    "inviteNotFound": "الدعوة غير موجودة أو منتهية الصلاحية.",
+    "inviteExpired": "انتهت صلاحية الدعوة.",
+    "inviteWrongEmail": "أُرسلت هذه الدعوة إلى عنوان بريد إلكتروني مختلف.",
+    "joinLinkExpired": "انتهت صلاحية رابط الدعوة.",
+    "joinLinkInvalid": "رابط الدعوة غير صالح.",
+    "invalidGroupId": "معرّف المجموعة غير صالح."
   },
   "planning": {
     "validate": "المصادقة على الجدول",
@@ -327,7 +437,8 @@
     "errAccountFailed": "تعذر إنشاء الحساب. يرجى المحاولة مرة أخرى.",
     "errNameRequired": "الاسم واللقب مطلوبان.",
     "errHomeAddressRequired": "عنوان المنزل مطلوب.",
-    "successDone": "تم التسجيل! جارٍ التحويل…"
+    "successDone": "تم التسجيل! جارٍ التحويل…",
+    "profileCreatedPhotoFailed": "تم إنشاء الملف لكن الصورة لم تُرسل: {error}"
   },
   "landing": {
     "title": "Slot Training",

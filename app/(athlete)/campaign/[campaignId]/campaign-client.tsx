@@ -113,7 +113,7 @@ interface SerializedProfile {
 
 interface AthleteSession {
   type: "collectif" | "individuel"
-  day: string
+  dayKey: DayKey
   startTime: string
   endTime: string
   departureTime?: string
@@ -262,7 +262,7 @@ function PlanningView({
           ) : (
             athleteSessions.map((session, index) => (
               <SessionCard
-                key={`${session.day}-${session.startTime}-${index}`}
+                key={`${session.dayKey}-${session.startTime}-${index}`}
                 session={session}
               />
             ))
@@ -284,6 +284,7 @@ function PlanningView({
 
 function SessionCard({ session }: { session: AthleteSession }) {
   const t = useTranslations("athleteCampaign")
+  const tDays = useTranslations("days")
   const isCollective = session.type === "collectif"
   const cardClass = isCollective
     ? "border-blue-200 bg-blue-50"
@@ -301,7 +302,7 @@ function SessionCard({ session }: { session: AthleteSession }) {
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
           <p className="text-xs text-muted-foreground">{t("day")}</p>
-          <p className="font-medium">{session.day}</p>
+          <p className="font-medium">{tDays(session.dayKey)}</p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">{t("schedule")}</p>

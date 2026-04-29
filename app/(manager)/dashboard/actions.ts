@@ -34,6 +34,15 @@ import { saveAvatar } from "@/lib/server/avatar-storage"
 import { resolveGroupAccess } from "@/lib/server/group-access"
 import { sendStaffInvitationNotification } from "@/lib/utils/email"
 import { defaultLocale, locales, type Locale } from "@/lib/i18n/config"
+import { getTranslations } from "next-intl/server"
+
+// Server-action error messages flow back to the client as toasts via
+// `result.error`, so they need to land in the caller's locale. This helper
+// resolves the next-intl namespace once and is invoked at the top of each
+// action that surfaces user-facing errors.
+async function getErrorMessages() {
+  return await getTranslations("serverErrors")
+}
 
 /**
  * Look up the athletes' preferredLanguage stored on their global profile
@@ -127,7 +136,7 @@ const campaignSchema = z
 
 export async function getGroups() {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   // Owned groups + shared (read-only) groups, fetched in parallel. The
   // shared list comes from the staffShares reverse index — one read per
@@ -183,7 +192,7 @@ export async function getGroups() {
 
 export async function createGroup(formData: FormData) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsed = groupNameSchema.safeParse(formData.get("name"))
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Nom invalide." }
@@ -215,7 +224,7 @@ export async function createGroup(formData: FormData) {
 
 export async function updateGroup(groupId: string, formData: FormData) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
@@ -242,7 +251,7 @@ export async function setGroupAvatar(
   formData: FormData
 ): Promise<{ avatarUrl?: string; error?: string }> {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
@@ -263,7 +272,7 @@ export async function setGroupAvatar(
     return { avatarUrl }
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : "Upload échoué.",
+      error: error instanceof Error ? error.message : (await getErrorMessages())("uploadFailed"),
     }
   }
 }
@@ -276,7 +285,7 @@ export async function setManagerAvatar(
   formData: FormData
 ): Promise<{ avatarUrl?: string; error?: string }> {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const file = formData.get("file")
   if (!(file instanceof File)) return { error: "Fichier manquant." }
@@ -288,7 +297,7 @@ export async function setManagerAvatar(
     return { avatarUrl }
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : "Upload échoué.",
+      error: error instanceof Error ? error.message : (await getErrorMessages())("uploadFailed"),
     }
   }
 }
@@ -305,7 +314,7 @@ export async function getGroupViewers(
   groupId: string
 ): Promise<{ data?: GroupViewer[]; error?: string }> {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
@@ -354,7 +363,7 @@ export async function addGroupViewer(
   rawEmail: string
 ): Promise<{ added?: boolean; invited?: boolean; error?: string }> {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
@@ -383,12 +392,12 @@ export async function addGroupViewer(
     const targetUid = targetSnap.docs[0].id
 
     if (targetUid === manager.uid) {
-      return { error: "Tu es déjà propriétaire de ce groupe." }
+      return { error: (await getErrorMessages())("alreadyOwner") }
     }
 
     const existing = (groupSnap.data()?.viewerUids as string[] | undefined) ?? []
     if (existing.includes(targetUid)) {
-      return { error: "Cette personne a déjà accès au groupe." }
+      return { error: (await getErrorMessages())("personHasAccess") }
     }
 
     const { FieldValue } = await import("firebase-admin/firestore")
@@ -412,7 +421,7 @@ export async function addGroupViewer(
   // every retry would spam the recipient's inbox.
   const existingInvites = await listPendingInvitesForGroup(manager.uid, parsedId.data)
   if (existingInvites.some((i) => i.email === email)) {
-    return { error: "Une invitation est déjà en attente pour cet email." }
+    return { error: (await getErrorMessages())("invitationPending") }
   }
 
   const token = randomUUID()
@@ -461,7 +470,7 @@ export async function getGroupInvites(
   groupId: string
 ): Promise<{ data?: PendingStaffInvite[]; error?: string }> {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
 
@@ -484,7 +493,7 @@ export async function cancelGroupInvite(
   token: string
 ): Promise<{ success?: boolean; error?: string }> {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
   const parsedToken = z.string().min(20).max(200).safeParse(token)
@@ -508,13 +517,13 @@ export async function removeGroupViewer(
   viewerUid: string
 ): Promise<{ success?: boolean; error?: string }> {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
 
   const parsedViewerUid = firestoreId.safeParse(viewerUid)
-  if (!parsedViewerUid.success) return { error: "Identifiant invalide." }
+  if (!parsedViewerUid.success) return { error: (await getErrorMessages())("invalidIdentifier") }
 
   const groupRef = adminDb
     .collection("managers").doc(manager.uid)
@@ -534,7 +543,7 @@ export async function removeGroupViewer(
 
 export async function deleteGroup(groupId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
@@ -558,7 +567,7 @@ export async function deleteGroup(groupId: string) {
 
 export async function regenerateInviteToken(groupId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
@@ -593,12 +602,12 @@ export async function regenerateInviteToken(groupId: string) {
 
 export async function getGroupAthletes(groupId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   // Resolve the actual owner: viewers also need to read the athletes list,
   // and the doc lives under the owner's manager tree even for shared groups.
   const access = await resolveGroupAccess(manager.uid, groupId)
-  if (!access) return { error: "Non autorisé." }
+  if (!access) return { error: (await getErrorMessages())("unauthorized") }
 
   const snapshot = await adminDb
     .collection("managers").doc(access.ownerUid)
@@ -634,7 +643,7 @@ export async function getGroupAthletes(groupId: string) {
 
 export async function removeAthlete(groupId: string, athleteId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   await adminDb
     .collection("managers").doc(manager.uid)
@@ -650,12 +659,12 @@ export async function removeAthlete(groupId: string, athleteId: string) {
 
 export async function getCampaigns(groupId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   // Owner OR viewer can list campaigns. We resolve the actual owner so the
   // doc path is correct for shared groups.
   const access = await resolveGroupAccess(manager.uid, groupId)
-  if (!access) return { error: "Non autorisé." }
+  if (!access) return { error: (await getErrorMessages())("unauthorized") }
 
   const basePath = adminDb
     .collection("managers").doc(access.ownerUid)
@@ -771,7 +780,7 @@ export async function getCampaigns(groupId: string) {
 
 export async function createCampaign(groupId: string, formData: FormData) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedId = firestoreId.safeParse(groupId)
   if (!parsedId.success) return { error: "Identifiant de groupe invalide." }
@@ -784,7 +793,7 @@ export async function createCampaign(groupId: string, formData: FormData) {
     try {
       availableSlotsRaw = JSON.parse(availableSlotsField)
     } catch {
-      return { error: "Créneaux dispos invalides." }
+      return { error: (await getErrorMessages())("invalidSlots") }
     }
   }
 
@@ -797,7 +806,7 @@ export async function createCampaign(groupId: string, formData: FormData) {
     try {
       targetAthleteIdsRaw = JSON.parse(targetAthleteIdsField)
     } catch {
-      return { error: "Liste d'athlètes invalide." }
+      return { error: (await getErrorMessages())("invalidAthletesList") }
     }
   }
 
@@ -832,7 +841,7 @@ export async function createCampaign(groupId: string, formData: FormData) {
   if (input.targetAthleteIds) {
     targetAthleteIds = input.targetAthleteIds.filter((id) => allAthleteIds.has(id))
     if (targetAthleteIds.length === 0) {
-      return { error: "Aucun athlète sélectionné." }
+      return { error: (await getErrorMessages())("noAthleteSelected") }
     }
   }
 
@@ -918,7 +927,7 @@ export async function createCampaign(groupId: string, formData: FormData) {
 
 export async function closeCampaign(groupId: string, campaignId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   await adminDb
     .collection("managers").doc(manager.uid)
@@ -936,12 +945,12 @@ export async function updateCampaign(
   formData: FormData
 ) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedGroupId = firestoreId.safeParse(groupId)
   const parsedCampaignId = firestoreId.safeParse(campaignId)
   if (!parsedGroupId.success || !parsedCampaignId.success) {
-    return { error: "Identifiant invalide." }
+    return { error: (await getErrorMessages())("invalidIdentifier") }
   }
 
   let availableSlotsRaw: unknown = undefined
@@ -950,7 +959,7 @@ export async function updateCampaign(
     try {
       availableSlotsRaw = JSON.parse(availableSlotsField)
     } catch {
-      return { error: "Créneaux dispos invalides." }
+      return { error: (await getErrorMessages())("invalidSlots") }
     }
   }
 
@@ -976,7 +985,7 @@ export async function updateCampaign(
     .collection("campaigns").doc(parsedCampaignId.data)
 
   const snap = await campaignRef.get()
-  if (!snap.exists) return { error: "Campagne introuvable." }
+  if (!snap.exists) return { error: (await getErrorMessages())("campaignNotFound") }
 
   // Editing parameters invalidates any prior optimisation — Distance Matrix
   // results depend on the training location and the schedule windows. Wipe
@@ -1057,12 +1066,12 @@ export async function updateCampaign(
 
 export async function deleteCampaign(groupId: string, campaignId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedGroupId = firestoreId.safeParse(groupId)
   const parsedCampaignId = firestoreId.safeParse(campaignId)
   if (!parsedGroupId.success || !parsedCampaignId.success) {
-    return { error: "Identifiant invalide." }
+    return { error: (await getErrorMessages())("invalidIdentifier") }
   }
 
   const campaignRef = adminDb
@@ -1071,7 +1080,7 @@ export async function deleteCampaign(groupId: string, campaignId: string) {
     .collection("campaigns").doc(parsedCampaignId.data)
 
   const snap = await campaignRef.get()
-  if (!snap.exists) return { error: "Campagne introuvable." }
+  if (!snap.exists) return { error: (await getErrorMessages())("campaignNotFound") }
   const data = snap.data()!
 
   // Notify athletes BEFORE the data is gone so we can still read their
@@ -1125,12 +1134,12 @@ const OPTIMIZATION_STALE_LOCK_MS = 10 * 60 * 1000
 
 export async function runOptimization(groupId: string, campaignId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedGroupId = firestoreId.safeParse(groupId)
   const parsedCampaignId = firestoreId.safeParse(campaignId)
   if (!parsedGroupId.success || !parsedCampaignId.success) {
-    return { error: "Identifiant invalide." }
+    return { error: (await getErrorMessages())("invalidIdentifier") }
   }
 
   const basePath = adminDb
@@ -1152,7 +1161,7 @@ export async function runOptimization(groupId: string, campaignId: string) {
     const status = data.optimizationStatus as string | undefined
     const startedAtMs = (data.optimizationStartedAt as FirebaseFirestore.Timestamp | undefined)?.toMillis() ?? 0
     if (status === "running" && Date.now() - startedAtMs < OPTIMIZATION_STALE_LOCK_MS) {
-      return { ok: false, reason: "Une optimisation est déjà en cours pour cette campagne." }
+      return { ok: false, reason: (await getErrorMessages())("optimizationInProgress") }
     }
     tx.update(campaignRef, {
       optimizationStatus: "running",
@@ -1168,7 +1177,7 @@ export async function runOptimization(groupId: string, campaignId: string) {
     const responsesSnapshot = await campaignRef.collection("responses").get()
     if (responsesSnapshot.empty) {
       await campaignRef.update({ optimizationStatus: "idle" })
-      return { error: "Aucune réponse reçue." }
+      return { error: (await getErrorMessages())("noResponseReceived") }
     }
 
     const athletesSnapshot = await basePath.collection("athletes").get()
@@ -1202,7 +1211,7 @@ export async function runOptimization(groupId: string, campaignId: string) {
     if (corruptedAthleteIds.length > 0) {
       await campaignRef.update({ optimizationStatus: "idle" })
       return {
-        error: `Impossible de déchiffrer les adresses de ${corruptedAthleteIds.length} athlète(s). Profil corrompu ou clé de chiffrement changée.`,
+        error: (await getErrorMessages())("decryptFailed", { count: corruptedAthleteIds.length }),
       }
     }
 
@@ -1254,7 +1263,7 @@ export async function runOptimization(groupId: string, campaignId: string) {
 
 export async function validatePlanning(groupId: string, campaignId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const basePath = adminDb
     .collection("managers").doc(manager.uid)
@@ -1426,7 +1435,7 @@ export async function validatePlanning(groupId: string, campaignId: string) {
 
 export async function rejectPlanning(groupId: string, campaignId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   await adminDb
     .collection("managers").doc(manager.uid)
@@ -1444,10 +1453,10 @@ export async function rejectPlanning(groupId: string, campaignId: string) {
 
 export async function getResponseCount(groupId: string, campaignId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const access = await resolveGroupAccess(manager.uid, groupId)
-  if (!access) return { error: "Non autorisé." }
+  if (!access) return { error: (await getErrorMessages())("unauthorized") }
 
   const snapshot = await adminDb
     .collection("managers").doc(access.ownerUid)
@@ -1470,16 +1479,16 @@ export async function getResponseCount(groupId: string, campaignId: string) {
  */
 export async function getCampaignResponders(groupId: string, campaignId: string) {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const parsedGroupId = firestoreId.safeParse(groupId)
   const parsedCampaignId = firestoreId.safeParse(campaignId)
   if (!parsedGroupId.success || !parsedCampaignId.success) {
-    return { error: "Identifiant invalide." }
+    return { error: (await getErrorMessages())("invalidIdentifier") }
   }
 
   const access = await resolveGroupAccess(manager.uid, parsedGroupId.data)
-  if (!access) return { error: "Non autorisé." }
+  if (!access) return { error: (await getErrorMessages())("unauthorized") }
 
   const basePath = adminDb
     .collection("managers").doc(access.ownerUid)
@@ -1539,7 +1548,7 @@ const REMINDER_COOLDOWN_HOURS = 20
  */
 export async function runScheduledCampaignTasks() {
   const manager = await requireManager()
-  if (!manager) return { error: "Non autorisé." }
+  if (!manager) return { error: (await getErrorMessages())("unauthorized") }
 
   const groupsSnap = await adminDb
     .collection("managers").doc(manager.uid)

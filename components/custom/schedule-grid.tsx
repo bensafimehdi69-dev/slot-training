@@ -1,10 +1,9 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import {
   dayKeys,
-  dayLabels,
-  dayLabelsShort,
   type DayKey,
   type ScheduleSlot,
   type SlotLocation,
@@ -51,6 +50,8 @@ export function ScheduleGrid({
   timeRangeStart = "07:00",
   timeRangeEnd = "22:00",
 }: ScheduleGridProps) {
+  const tDays = useTranslations("days")
+  const tg = useTranslations("scheduleGrid")
   const hours = generateHours(timeRangeStart, timeRangeEnd)
 
   function cellStateFor(day: DayKey, hour: string): CellState {
@@ -102,7 +103,7 @@ export function ScheduleGrid({
           // 3-letter abbreviation so the 7 column headers don't run into
           // each other on a phone width.
           <div key={day} className="px-0.5 text-center text-[10px] font-medium">
-            {dayLabelsShort[day]}
+            {tDays(`short${(day.charAt(0).toUpperCase() + day.slice(1)) as Capitalize<DayKey>}`)}
           </div>
         ))}
 
@@ -122,7 +123,16 @@ export function ScheduleGrid({
                     "flex h-7 items-center justify-center rounded-sm border text-[9px] font-medium transition-colors",
                     cellClass(state)
                   )}
-                  aria-label={`${dayLabels[day]} ${hour} – ${state === "training" ? "Disponible" : state === "school" ? "À l'école" : "À la maison"}`}
+                  aria-label={tg("cellAriaLabel", {
+                    day: tDays(day),
+                    hour,
+                    state:
+                      state === "training"
+                        ? tg("available")
+                        : state === "school"
+                          ? tg("atSchool")
+                          : tg("atHome"),
+                  })}
                 >
                   {cellText(state)}
                 </button>
@@ -135,23 +145,23 @@ export function ScheduleGrid({
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1">
           <div className="h-3 w-3 rounded-sm border border-green-300 bg-green-100" />
-          Disponible
+          {tg("available")}
         </div>
         <div className="flex items-center gap-1">
           <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
             s
           </div>
-          École
+          {tg("schoolShort")}
         </div>
         <div className="flex items-center gap-1">
           <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
             h
           </div>
-          Maison
+          {tg("homeShort")}
         </div>
       </div>
       <p className="mt-1.5 text-[11px] text-muted-foreground">
-        Touchez pour cycler : Disponible → École → Maison.
+        {tg("cycleHint")}
       </p>
     </div>
   )
