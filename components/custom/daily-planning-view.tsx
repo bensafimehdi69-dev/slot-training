@@ -3,6 +3,18 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import {
   Users,
   User,
@@ -11,6 +23,8 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  Loader2,
+  UserMinus,
 } from "lucide-react"
 import { TravelModeBadges } from "@/components/custom/travel-mode-badges"
 import type {
@@ -20,8 +34,25 @@ import type {
 } from "@/lib/types/planning"
 import type { DayKey } from "@/lib/types/schedule"
 
+// Identifies a session inside the optimisation result. Used by the
+// remove-athlete callback so the parent can target the exact slot the
+// click came from without us re-deriving it from athleteId alone (the
+// same athlete may appear in two slots — morning + end-of-day).
+export interface SessionRef {
+  dayKey: string
+  startTime: string
+}
+
 interface DailyPlanningViewProps {
   dailyPlannings: DailyPlanning[]
+  // Optional: when provided, each athlete chip's expanded detail panel
+  // shows a "Remove from this session" button. The parent is responsible
+  // for confirming the user intent and triggering the server mutation.
+  // Returning a Promise lets us show a loader while it's in flight.
+  onRemoveAthlete?: (
+    ref: SessionRef,
+    athleteId: string
+  ) => Promise<void> | void
 }
 
 /**
@@ -34,7 +65,10 @@ interface DailyPlanningViewProps {
  * Days with no plannable session are still rendered so the manager sees the
  * full week at a glance and can spot empty days that may need a follow-up.
  */
-export function DailyPlanningView({ dailyPlannings }: DailyPlanningViewProps) {
+export function DailyPlanningView({
+  dailyPlannings,
+  onRemoveAthlete,
+}: DailyPlanningViewProps) {
   const tp = useTranslations("planning")
   if (dailyPlannings.length === 0) return null
 
@@ -56,14 +90,24 @@ export function DailyPlanningView({ dailyPlannings }: DailyPlanningViewProps) {
       </h3>
       <div className="space-y-2">
         {dailyPlannings.map((planning) => (
-          <DayBlock key={planning.dayKey} planning={planning} />
+          <DayBlock
+            key={planning.dayKey}
+            planning={planning}
+            onRemoveAthlete={onRemoveAthlete}
+          />
         ))}
       </div>
     </section>
   )
 }
 
-function DayBlock({ planning }: { planning: DailyPlanning }) {
+function DayBlock({
+  planning,
+  onRemoveAthlete,
+}: {
+  planning: DailyPlanning
+  onRemoveAthlete?: DailyPlanningViewProps["onRemoveAthlete"]
+}) {
   const tp = useTranslations("planning")
   const td = useTranslations("days")
   const hasAny =
@@ -93,10 +137,20 @@ function DayBlock({ planning }: { planning: DailyPlanning }) {
             key={`m-${session.startTime}-${session.athletes[0]?.athleteId ?? "x"}`}
             session={session}
             window="morning"
+            sessionRef={{ dayKey: planning.dayKey, startTime: session.startTime }}
+            onRemoveAthlete={onRemoveAthlete}
           />
         ))}
         {planning.endOfDaySession && (
-          <SessionRow session={planning.endOfDaySession} window="end-of-day" />
+          <SessionRow
+            session={planning.endOfDaySession}
+            window="end-of-day"
+            sessionRef={{
+              dayKey: planning.dayKey,
+              startTime: planning.endOfDaySession.startTime,
+            }}
+            onRemoveAthlete={onRemoveAthlete}
+          />
         )}
       </div>
     </div>
@@ -106,9 +160,13 @@ function DayBlock({ planning }: { planning: DailyPlanning }) {
 function SessionRow({
   session,
   window,
+  sessionRef,
+  onRemoveAthlete,
 }: {
   session: DailySession
   window: "morning" | "end-of-day"
+  sessionRef: SessionRef
+  onRemoveAthlete?: DailyPlanningViewProps["onRemoveAthlete"]
 }) {
   const tp = useTranslations("planning")
   const Icon = window === "morning" ? Sunrise : Moon
@@ -179,6 +237,18 @@ function SessionRow({
             <AthleteDetail
               id={`detail-${session.startTime}-${a.athleteId}`}
               athlete={a}
+              sessionRef={sessionRef}
+              onRemove={
+                onRemoveAthlete
+                  ? async () => {
+                      await onRemoveAthlete(sessionRef, a.athleteId)
+                      // Collapse the panel — the chip is about to disappear
+                      // from the parent on refresh, so leaving the panel
+                      // open would briefly point at a stale row.
+                      setExpandedId(null)
+                    }
+                  : undefined
+              }
             />
           )
         })()}
@@ -186,8 +256,33 @@ function SessionRow({
   )
 }
 
-function AthleteDetail({ id, athlete }: { id: string; athlete: AthleteSlotInfo }) {
+function AthleteDetail({
+  id,
+  athlete,
+  sessionRef,
+  onRemove,
+}: {
+  id: string
+  athlete: AthleteSlotInfo
+  sessionRef: SessionRef
+  onRemove?: () => Promise<void>
+}) {
   const tp = useTranslations("planning")
+  const tc = useTranslations("common")
+  const [removing, setRemoving] = useState(false)
+  const fullName =
+    `${athlete.firstName ?? ""} ${athlete.lastName ?? ""}`.trim() || athlete.athleteId
+
+  const handleRemove = async () => {
+    if (!onRemove) return
+    setRemoving(true)
+    try {
+      await onRemove()
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   return (
     <div
       id={id}
@@ -213,6 +308,49 @@ function AthleteDetail({ id, athlete }: { id: string; athlete: AthleteSlotInfo }
           </span>
         )}
       </div>
+      {onRemove && (
+        <div className="mt-2 flex justify-end">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={removing}
+                className="h-7 border-red-200 px-2 text-[11px] text-red-700 hover:bg-red-50 hover:text-red-800"
+              >
+                {removing ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <UserMinus className="mr-1 h-3 w-3" />
+                )}
+                {tp("removeFromSession")}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {tp("removeFromSessionTitle")}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {tp("removeFromSessionDescription", {
+                    name: fullName,
+                    time: sessionRef.startTime,
+                  })}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleRemove}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {tp("removeFromSession")}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
     </div>
   )
 }

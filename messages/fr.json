@@ -295,7 +295,11 @@
     "individualReasonEndOfDay": "Séance individuelle de fin de journée",
     "trainingVolumeTitle": "Volume d'entraînement par athlète",
     "trainingVolumeCollective": "Coll. {attended}/{total}",
-    "trainingVolumeIndividual": "Indiv. {count}"
+    "trainingVolumeIndividual": "Indiv. {count}",
+    "removeFromSession": "Retirer de cette séance",
+    "removeFromSessionTitle": "Retirer l'athlète de cette séance ?",
+    "removeFromSessionDescription": "{name} ne figurera plus dans la séance de {time}. Tu pourras toujours valider le planning ensuite.",
+    "athleteRemovedFromSession": "Athlète retiré de la séance."
   },
   "athleteHome": {
     "myCampaigns": "Mes campagnes",

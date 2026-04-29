@@ -100,6 +100,13 @@ interface OptimizationResultViewProps {
   // Optional: when provided, renders a "Voir en plein écran" link to the
   // dedicated weekly planning route. Omitted on athlete-side renders.
   campaignId?: string
+  // Optional: when provided AND planningStatus is still "pending", each
+  // athlete chip exposes a "Remove from this session" button so the
+  // manager can fine-tune the proposed planning before validating.
+  onRemoveAthlete?: (
+    ref: { dayKey: string; startTime: string },
+    athleteId: string
+  ) => Promise<void> | void
 }
 
 export function OptimizationResultView({
@@ -111,8 +118,15 @@ export function OptimizationResultView({
   isRejecting,
   role = "owner",
   campaignId,
+  onRemoveAthlete,
 }: OptimizationResultViewProps) {
   const isViewer = role === "viewer"
+  // Removing athletes from a slot only makes sense before validation —
+  // once validated, the athletes have been notified by email and a silent
+  // removal would create a mismatch. The owner gate is enforced server-side
+  // too.
+  const canRemoveAthlete =
+    !isViewer && planningStatus === "pending" && Boolean(onRemoveAthlete)
   const tp = useTranslations("planning")
   const tcamp = useTranslations("campaigns")
   const tc = useTranslations("common")
@@ -137,7 +151,10 @@ export function OptimizationResultView({
       )}
 
       {result.dailyPlannings && result.dailyPlannings.length > 0 && (
-        <DailyPlanningView dailyPlannings={result.dailyPlannings} />
+        <DailyPlanningView
+          dailyPlannings={result.dailyPlannings}
+          onRemoveAthlete={canRemoveAthlete ? onRemoveAthlete : undefined}
+        />
       )}
 
       {volume.rows.length > 0 && (
