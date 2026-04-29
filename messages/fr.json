@@ -17,6 +17,81 @@
     "language": "Langue",
     "logout": "Déconnexion"
   },
+  "days": {
+    "dimanche": "Dimanche",
+    "lundi": "Lundi",
+    "mardi": "Mardi",
+    "mercredi": "Mercredi",
+    "jeudi": "Jeudi",
+    "vendredi": "Vendredi",
+    "samedi": "Samedi",
+    "shortDimanche": "Dim",
+    "shortLundi": "Lun",
+    "shortMardi": "Mar",
+    "shortMercredi": "Mer",
+    "shortJeudi": "Jeu",
+    "shortVendredi": "Ven",
+    "shortSamedi": "Sam"
+  },
+  "scheduleCells": {
+    "available": "Disponible",
+    "unavailable": "Indisponible",
+    "atSchool": "À l'école",
+    "atHome": "À la maison",
+    "school": "École",
+    "home": "Maison",
+    "tapHint": "Touchez pour cycler : Disponible → École → Maison.",
+    "schoolShort": "s",
+    "homeShort": "h"
+  },
+  "campaignCardSimple": {
+    "responseShort": "{responded}/{target}",
+    "expand": "Voir le détail",
+    "collapse": "Masquer le détail"
+  },
+  "avatar": {
+    "changePhoto": "Changer la photo",
+    "uploadFailed": "Upload échoué.",
+    "imageProcessFailed": "Impossible de traiter cette image.",
+    "removePhoto": "Retirer la photo",
+    "groupPhoto": "Photo du groupe",
+    "changeGroupPhoto": "Changer la photo du groupe",
+    "profilePhoto": "Photo de profil",
+    "changeMyPhoto": "Changer ma photo",
+    "pickPhoto": "Choisir une photo"
+  },
+  "errors": {
+    "groupPhotoFailed": "Groupe créé mais photo non envoyée : {error}",
+    "accountPhotoFailed": "Compte créé mais photo non envoyée : {error}",
+    "wrongPassword": "Mot de passe incorrect.",
+    "weakPassword": "Mot de passe trop court (min. 8 caractères).",
+    "emailInUse": "Cet email a déjà un compte. Utilise plutôt le mot de passe existant.",
+    "genericError": "Une erreur est survenue."
+  },
+  "inviteStaff": {
+    "acceptInvitation": "Accepter l'invitation",
+    "joinGroup": "Rejoindre « {group} »",
+    "loginPrompt": "{inviter} t'invite en lecture seule sur le groupe « {group} ». Connecte-toi pour accepter.",
+    "createPrompt": "{inviter} t'invite en lecture seule sur le groupe « {group} ». Crée ton compte manager pour accepter.",
+    "photoOptional": "Photo (optionnelle)",
+    "fullName": "Nom complet",
+    "email": "Email",
+    "password": "Mot de passe",
+    "passwordHint": "Choisis un mot de passe (min. 8)",
+    "loginAndAccept": "Se connecter et accepter",
+    "createMyAccount": "Créer mon compte",
+    "connectedSuccess": "Connecté. Accès accordé au groupe.",
+    "createdSuccess": "Compte créé. Accès accordé au groupe.",
+    "invalidTitle": "Invitation invalide",
+    "invalidBody": "Ce lien d'invitation n'existe pas ou a expiré. Demande à la personne qui t'a invité de t'envoyer un nouveau lien."
+  },
+  "addressMap": {
+    "placesUnavailable": "API Places (New) indisponible. Vérifiez la configuration.",
+    "geocodeFailed": "Erreur lors de la localisation. Réessayez.",
+    "geocodeNotFound": "Impossible de localiser cette adresse.",
+    "tip": "Astuce : déplacez le marqueur ou cliquez sur la carte pour ajuster la position si l'adresse n'est pas exacte.",
+    "placeholder": "Ex : Stade King Abdullah, Jeddah"
+  },
   "auth": {
     "loginTitle": "Connexion",
     "managerLogin": "Espace manager",
@@ -286,7 +361,8 @@
     "open": "Ouvrir"
   },
   "travel": {
-    "byCar": "En voiture {minutes} min"
+    "byCar": "En voiture {minutes} min",
+    "byCarLabel": "En voiture : {time}"
   },
   "joinForm": {
     "title": "Rejoindre {group}",
@@ -310,6 +386,8 @@
     "step2Submitting": "Création du compte…",
     "step3FirstName": "Prénom",
     "step3AvatarOptional": "Photo (optionnelle)",
+    "step3AvatarAria": "Photo de profil",
+    "errAvatarUpload": "Profil créé mais photo non envoyée : {error}",
     "step3LastName": "Nom",
     "step4HomeAddress": "Adresse de domicile",
     "step5SchoolAddress": "Adresse du lieu d'études (optionnel)",

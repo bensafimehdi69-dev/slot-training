@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { Camera, Loader2 } from "lucide-react"
 import { Avatar } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
@@ -39,6 +40,7 @@ export function AvatarUpload({
   className,
   readOnly,
 }: AvatarUploadProps) {
+  const t = useTranslations("avatar")
   const inputRef = useRef<HTMLInputElement>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -60,7 +62,7 @@ export function AvatarUpload({
       URL.revokeObjectURL(localUrl)
       if (result.error || !result.avatarUrl) {
         setPreviewUrl(null)
-        toast.error(result.error ?? "Upload échoué.")
+        toast.error(result.error ?? t("uploadFailed"))
         return
       }
       setPreviewUrl(result.avatarUrl)
@@ -68,7 +70,7 @@ export function AvatarUpload({
     } catch (error) {
       setPreviewUrl(null)
       toast.error(
-        error instanceof Error ? error.message : "Impossible de traiter cette image.",
+        error instanceof Error ? error.message : t("imageProcessFailed"),
       )
     } finally {
       setUploading(false)
@@ -92,7 +94,7 @@ export function AvatarUpload({
           interactive && "cursor-pointer",
           uploading && "opacity-70",
         )}
-        aria-label={ariaLabel ?? "Changer la photo"}
+        aria-label={ariaLabel ?? t("changePhoto")}
       >
         <Avatar src={displayedSrc} name={name} size={size} alt={ariaLabel ?? name} />
       </button>

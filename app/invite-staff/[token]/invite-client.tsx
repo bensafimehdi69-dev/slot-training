@@ -7,6 +7,7 @@ import {
   createUserWithEmailAndPassword,
 } from "firebase/auth"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { Loader2, UserPlus, LogIn } from "lucide-react"
 import { auth } from "@/lib/firebase/client"
 import { acceptStaffInvite, type InvitePreview } from "./actions"
@@ -43,6 +44,9 @@ interface InviteClientProps {
  */
 export function InviteClient({ token, preview }: InviteClientProps) {
   const router = useRouter()
+  const t = useTranslations("inviteStaff")
+  const tav = useTranslations("avatar")
+  const terr = useTranslations("errors")
   const isLogin = preview.alreadyHasAccount
   const [password, setPassword] = useState("")
   const [name, setName] = useState("")
@@ -85,7 +89,7 @@ export function InviteClient({ token, preview }: InviteClientProps) {
         avatarFormData.set("file", avatar)
         const avatarResult = await setManagerAvatar(avatarFormData)
         if (avatarResult.error) {
-          toast.error(`Compte créé mais photo non envoyée : ${avatarResult.error}`)
+          toast.error(terr("accountPhotoFailed", { error: avatarResult.error }))
         }
       }
 
@@ -100,9 +104,7 @@ export function InviteClient({ token, preview }: InviteClientProps) {
       }
 
       toast.success(
-        isLogin
-          ? "Connecté. Accès accordé au groupe."
-          : "Compte créé. Accès accordé au groupe.",
+        isLogin ? t("connectedSuccess") : t("createdSuccess"),
       )
       // Full reload so the freshly-set session cookie is picked up by
       // the middleware on /dashboard.
@@ -110,16 +112,14 @@ export function InviteClient({ token, preview }: InviteClientProps) {
     } catch (error: unknown) {
       const code = (error as { code?: string }).code
       if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
-        toast.error("Mot de passe incorrect.")
+        toast.error(terr("wrongPassword"))
       } else if (code === "auth/weak-password") {
-        toast.error("Mot de passe trop court (min. 8 caractères).")
+        toast.error(terr("weakPassword"))
       } else if (code === "auth/email-already-in-use") {
-        toast.error(
-          "Cet email a déjà un compte. Utilise plutôt le mot de passe existant.",
-        )
+        toast.error(terr("emailInUse"))
       } else {
         toast.error(
-          error instanceof Error ? error.message : "Une erreur est survenue.",
+          error instanceof Error ? error.message : terr("genericError"),
         )
       }
     } finally {
@@ -136,13 +136,19 @@ export function InviteClient({ token, preview }: InviteClientProps) {
           </div>
           <CardTitle>
             {isLogin
-              ? `Accepter l'invitation`
-              : `Rejoindre « ${preview.groupName} »`}
+              ? t("acceptInvitation")
+              : t("joinGroup", { group: preview.groupName })}
           </CardTitle>
           <CardDescription>
             {isLogin
-              ? `${preview.inviterName} t'invite en lecture seule sur le groupe « ${preview.groupName} ». Connecte-toi pour accepter.`
-              : `${preview.inviterName} t'invite en lecture seule sur le groupe « ${preview.groupName} ». Crée ton compte manager pour accepter.`}
+              ? t("loginPrompt", {
+                  inviter: preview.inviterName,
+                  group: preview.groupName,
+                })
+              : t("createPrompt", {
+                  inviter: preview.inviterName,
+                  group: preview.groupName,
+                })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -152,15 +158,15 @@ export function InviteClient({ token, preview }: InviteClientProps) {
                 <AvatarPicker
                   name={name}
                   size={72}
-                  ariaLabel="Photo de profil"
+                  ariaLabel={tav("profilePhoto")}
                   onChange={setAvatar}
                 />
-                <p className="text-xs text-muted-foreground">Photo (optionnelle)</p>
+                <p className="text-xs text-muted-foreground">{t("photoOptional")}</p>
               </div>
             )}
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="name">Nom complet</Label>
+                <Label htmlFor="name">{t("fullName")}</Label>
                 <Input
                   id="name"
                   value={name}
@@ -171,12 +177,12 @@ export function InviteClient({ token, preview }: InviteClientProps) {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("email")}</Label>
               <Input id="email" value={preview.email} readOnly disabled />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">
-                {isLogin ? "Mot de passe" : "Choisis un mot de passe (min. 8)"}
+                {isLogin ? t("password") : t("passwordHint")}
               </Label>
               <Input
                 id="password"
@@ -196,7 +202,7 @@ export function InviteClient({ token, preview }: InviteClientProps) {
               ) : (
                 <UserPlus className="mr-2 h-4 w-4" />
               )}
-              {isLogin ? "Se connecter et accepter" : "Créer mon compte"}
+              {isLogin ? t("loginAndAccept") : t("createMyAccount")}
             </Button>
           </form>
         </CardContent>

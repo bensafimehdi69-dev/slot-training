@@ -191,6 +191,9 @@ export async function sendCampaignReminderNotification(
 export interface PlanningSession {
   type: "collectif" | "individuel"
   day: string
+  // Raw weekday key (e.g. "lundi") used to translate the day label in the
+  // recipient's locale. Optional for legacy plannings without this field.
+  dayKey?: string
   startTime: string
   endTime: string
   departureTime?: string
@@ -216,6 +219,11 @@ export async function sendPlanningNotification(
   }
 ) {
   const { t, dir } = await loadTemplate(locale, "planningValidated")
+  // Separate translator scoped to the "days" namespace so we can localise the
+  // weekday label in the planning email body (it was previously baked in
+  // French at optimisation time).
+  const useLocale = locale ?? defaultLocale
+  const tDays = await getTranslations({ locale: useLocale, namespace: "days" })
   try {
     let content: string
     if (planningData.sessions.length === 0) {
@@ -247,9 +255,13 @@ export async function sendPlanningNotification(
           const departureAddress = s.departureAddress
             ? `<li><strong>${esc(t("departureAddress"))} :</strong> ${esc(s.departureAddress)}</li>`
             : ""
+          // Prefer the localised label derived from the raw key; fall back to
+          // whatever the optimiser stored (currently the French label) for
+          // legacy plannings that pre-date dayKey.
+          const dayLabel = s.dayKey ? tDays(s.dayKey) : s.day
           return `
             <li style="margin-bottom:12px">
-              <strong>${esc(s.day)} ${esc(s.startTime)} – ${esc(s.endTime)}</strong>
+              <strong>${esc(dayLabel)} ${esc(s.startTime)} – ${esc(s.endTime)}</strong>
               ${esc(t("sessionType", { type: typeLabel }))}
               <ul>${departure}${travel}${departureAddress}</ul>
             </li>

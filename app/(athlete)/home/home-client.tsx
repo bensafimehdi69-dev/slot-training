@@ -53,6 +53,7 @@ export function HomeClient({ email, firstName, avatarUrl, profile, campaigns }: 
     avatarUrl ?? null,
   )
   const t = useTranslations("athleteHome")
+  const tav = useTranslations("avatar")
   const [homeAddress, setHomeAddress] = useState(profile.homeAddress)
   const [schoolAddress, setSchoolAddress] = useState(profile.schoolAddress)
   const [clubAddress, setClubAddress] = useState(profile.clubAddress)
@@ -151,7 +152,7 @@ export function HomeClient({ email, firstName, avatarUrl, profile, campaigns }: 
                   src={currentAvatarUrl}
                   name={firstName ?? email}
                   size={64}
-                  ariaLabel="Changer ma photo"
+                  ariaLabel={tav("changeMyPhoto")}
                   onUpload={(formData) => setAthleteAvatar(formData)}
                   onUploaded={(url) => setCurrentAvatarUrl(url)}
                 />

@@ -17,6 +17,85 @@
     "language": "Language",
     "logout": "Sign out"
   },
+  "days": {
+    "dimanche": "Sunday",
+    "lundi": "Monday",
+    "mardi": "Tuesday",
+    "mercredi": "Wednesday",
+    "jeudi": "Thursday",
+    "vendredi": "Friday",
+    "samedi": "Saturday",
+    "shortDimanche": "Sun",
+    "shortLundi": "Mon",
+    "shortMardi": "Tue",
+    "shortMercredi": "Wed",
+    "shortJeudi": "Thu",
+    "shortVendredi": "Fri",
+    "shortSamedi": "Sat"
+  },
+  "scheduleCells": {
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "atSchool": "At school",
+    "atHome": "At home",
+    "school": "School",
+    "home": "Home",
+    "tapHint": "Tap to cycle: Available → School → Home.",
+    "schoolShort": "s",
+    "homeShort": "h"
+  },
+  "travel": {
+    "byCar": "By car {minutes} min",
+    "byCarLabel": "By car: {time}"
+  },
+  "campaignCardSimple": {
+    "responseShort": "{responded}/{target}",
+    "expand": "Show details",
+    "collapse": "Hide details"
+  },
+  "avatar": {
+    "changePhoto": "Change photo",
+    "uploadFailed": "Upload failed.",
+    "imageProcessFailed": "Unable to process this image.",
+    "removePhoto": "Remove photo",
+    "groupPhoto": "Group photo",
+    "changeGroupPhoto": "Change group photo",
+    "profilePhoto": "Profile photo",
+    "changeMyPhoto": "Change my photo",
+    "pickPhoto": "Pick a photo"
+  },
+  "errors": {
+    "groupPhotoFailed": "Group created but photo upload failed: {error}",
+    "accountPhotoFailed": "Account created but photo upload failed: {error}",
+    "wrongPassword": "Incorrect password.",
+    "weakPassword": "Password too short (min. 8 characters).",
+    "emailInUse": "This email already has an account. Use the existing password instead.",
+    "genericError": "An error occurred."
+  },
+  "inviteStaff": {
+    "acceptInvitation": "Accept invitation",
+    "joinGroup": "Join \"{group}\"",
+    "loginPrompt": "{inviter} invites you to view \"{group}\" (read-only). Sign in to accept.",
+    "createPrompt": "{inviter} invites you to view \"{group}\" (read-only). Create your manager account to accept.",
+    "photoOptional": "Photo (optional)",
+    "fullName": "Full name",
+    "email": "Email",
+    "password": "Password",
+    "passwordHint": "Pick a password (min. 8)",
+    "loginAndAccept": "Sign in and accept",
+    "createMyAccount": "Create my account",
+    "connectedSuccess": "Signed in. Access granted to the group.",
+    "createdSuccess": "Account created. Access granted to the group.",
+    "invalidTitle": "Invalid invitation",
+    "invalidBody": "This invitation link doesn't exist or has expired. Ask the person who invited you to send a new link."
+  },
+  "addressMap": {
+    "placesUnavailable": "Places API (New) unavailable. Check the configuration.",
+    "geocodeFailed": "Geocoding failed. Try again.",
+    "geocodeNotFound": "Unable to locate this address.",
+    "tip": "Tip: drag the marker or click on the map to adjust the position if the address isn't accurate.",
+    "placeholder": "e.g. King Abdullah Stadium, Jeddah"
+  },
   "auth": {
     "loginTitle": "Sign in",
     "managerLogin": "Manager area",
@@ -285,9 +364,6 @@
     "unsupported": "Notifications are not supported on this browser",
     "open": "Open"
   },
-  "travel": {
-    "byCar": "By car {minutes} min"
-  },
   "joinForm": {
     "title": "Join {group}",
     "subtitle": "Complete your registration in a few minutes",
@@ -310,6 +386,8 @@
     "step2Submitting": "Creating account…",
     "step3FirstName": "First name",
     "step3AvatarOptional": "Photo (optional)",
+    "step3AvatarAria": "Profile photo",
+    "errAvatarUpload": "Profile created but photo upload failed: {error}",
     "step3LastName": "Last name",
     "step4HomeAddress": "Home address",
     "step5SchoolAddress": "School address (optional)",

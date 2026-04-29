@@ -114,6 +114,9 @@ interface SerializedProfile {
 interface AthleteSession {
   type: "collectif" | "individuel"
   day: string
+  // Raw weekday key (e.g. "lundi") used to translate the day label client-side.
+  // Optional for plannings produced before this field existed.
+  dayKey?: string
   startTime: string
   endTime: string
   departureTime?: string
@@ -284,7 +287,12 @@ function PlanningView({
 
 function SessionCard({ session }: { session: AthleteSession }) {
   const t = useTranslations("athleteCampaign")
+  const td = useTranslations("days")
   const isCollective = session.type === "collectif"
+  // Localise the day label whenever the planning carries a dayKey. Older
+  // plannings without dayKey fall back to whatever the optimiser stored
+  // (currently the French label).
+  const dayLabel = session.dayKey ? td(session.dayKey) : session.day
   const cardClass = isCollective
     ? "border-blue-200 bg-blue-50"
     : "border-orange-200 bg-orange-50"
@@ -301,7 +309,7 @@ function SessionCard({ session }: { session: AthleteSession }) {
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
           <p className="text-xs text-muted-foreground">{t("day")}</p>
-          <p className="font-medium">{session.day}</p>
+          <p className="font-medium">{dayLabel}</p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">{t("schedule")}</p>

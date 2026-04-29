@@ -169,7 +169,7 @@ export function JoinForm({
       avatarFormData.set("file", avatar)
       const avatarResult = await setAthleteAvatar(avatarFormData)
       if (avatarResult.error) {
-        toast.error(`Profil créé mais photo non envoyée : ${avatarResult.error}`)
+        toast.error(t("errAvatarUpload", { error: avatarResult.error }))
       }
     }
 
@@ -290,7 +290,7 @@ export function JoinForm({
                 <AvatarPicker
                   name={`${firstName} ${lastName}`}
                   size={72}
-                  ariaLabel="Photo de profil"
+                  ariaLabel={t("step3AvatarAria")}
                   onChange={setAvatar}
                 />
                 <p className="text-xs text-muted-foreground">{t("step3AvatarOptional")}</p>

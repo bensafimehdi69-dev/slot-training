@@ -1,9 +1,10 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { useTranslations } from "next-intl"
+import { dayKeys } from "@/lib/types/schedule"
 import React from "react"
 
-const DAYS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"]
 const HOURS = Array.from({ length: 16 }, (_, i) =>
   `${(i + 7).toString().padStart(2, "0")}:00`
 )
@@ -23,6 +24,8 @@ export function ConstraintsTapGrid({
   value,
   onChange,
 }: ConstraintsTapGridProps) {
+  const td = useTranslations("days")
+  const ts = useTranslations("scheduleCells")
   const grid = value.length === 7 && value[0]?.length === 16 ? value : createDefaultGrid()
 
   function toggle(day: number, hour: number) {
@@ -30,6 +33,9 @@ export function ConstraintsTapGrid({
     newGrid[day][hour] = !newGrid[day][hour]
     onChange(newGrid)
   }
+
+  const shortDayKey = (k: string) =>
+    `short${k.charAt(0).toUpperCase()}${k.slice(1)}`
 
   return (
     <div>
@@ -40,9 +46,9 @@ export function ConstraintsTapGrid({
           days at once. */}
       <div className="grid grid-cols-[2rem_repeat(7,minmax(0,1fr))] gap-0.5">
         <div className="text-[10px] font-medium text-muted-foreground" />
-        {DAYS.map((day) => (
+        {dayKeys.map((day) => (
           <div key={day} className="text-center text-[10px] font-medium">
-            {day}
+            {td(shortDayKey(day))}
           </div>
         ))}
 
@@ -51,7 +57,7 @@ export function ConstraintsTapGrid({
             <div className="flex items-center justify-end pr-1 text-[10px] text-muted-foreground">
               {hour}
             </div>
-            {DAYS.map((_, dayIdx) => (
+            {dayKeys.map((_, dayIdx) => (
               <button
                 key={`${dayIdx}-${hourIdx}`}
                 type="button"
@@ -71,11 +77,11 @@ export function ConstraintsTapGrid({
       <div className="mt-2 flex items-center gap-4 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1">
           <div className="h-3 w-3 rounded-sm border border-green-300 bg-green-200" />
-          Disponible
+          {ts("available")}
         </div>
         <div className="flex items-center gap-1">
           <div className="h-3 w-3 rounded-sm border border-gray-200 bg-gray-100" />
-          Indisponible
+          {ts("unavailable")}
         </div>
       </div>
     </div>

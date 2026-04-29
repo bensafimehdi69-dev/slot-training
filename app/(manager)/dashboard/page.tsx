@@ -26,6 +26,8 @@ import type { Group } from "@/lib/types/group"
 export default function DashboardPage() {
   const t = useTranslations("managerDashboard")
   const tc = useTranslations("common")
+  const tav = useTranslations("avatar")
+  const terr = useTranslations("errors")
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
@@ -122,7 +124,7 @@ export default function DashboardPage() {
         avatarFormData.set("file", newGroupAvatar)
         const avatarResult = await setGroupAvatar(result.data.id, avatarFormData)
         if (avatarResult.error) {
-          toast.error(`Groupe créé mais photo non envoyée : ${avatarResult.error}`)
+          toast.error(terr("groupPhotoFailed", { error: avatarResult.error }))
         }
       }
       toast.success(t("groupCreated"))
@@ -189,7 +191,7 @@ export default function DashboardPage() {
                   <AvatarPicker
                     name={groupNameDraft || undefined}
                     size={64}
-                    ariaLabel="Photo du groupe"
+                    ariaLabel={tav("groupPhoto")}
                     onChange={setNewGroupAvatar}
                   />
                   <div className="flex-1 space-y-2">
