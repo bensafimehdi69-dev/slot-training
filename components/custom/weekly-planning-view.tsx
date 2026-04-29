@@ -124,7 +124,11 @@ export function WeeklyPlanningView({
   }, [result.dailyPlannings])
 
   return (
-    <div className="weekly-planning-print mx-auto max-w-[1400px] space-y-5">
+    // Negative margins escape the manager layout's `<main className="container
+    // mx-auto px-4 py-8">` so the planning takes the full viewport width.
+    // Goal: a screenshot-ready single-screen view with no horizontal scroll
+    // even on a 1024-wide laptop.
+    <div className="weekly-planning-print -mx-4 -my-8 flex min-h-[calc(100dvh-4rem)] flex-col gap-3 px-4 py-3">
       {/* Toolbar — hidden on print so the printed page only carries the
           planning itself. */}
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
@@ -145,19 +149,19 @@ export function WeeklyPlanningView({
         </Button>
       </div>
 
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold sm:text-3xl">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {groupName} · {t("subtitle", { start: startDate, end: endDate })}
-        </p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+      <header className="space-y-0.5">
+        <h1 className="text-xl font-bold sm:text-2xl">{t("title")}</h1>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground sm:text-sm">
+          <span>{groupName}</span>
+          <span>·</span>
+          <span>{t("subtitle", { start: startDate, end: endDate })}</span>
           <span className="inline-flex items-center gap-1">
-            <CalendarDays className="h-4 w-4" />
+            <CalendarDays className="h-3.5 w-3.5" />
             {t("totalSessions", { count: totalSessions })}
           </span>
           <span className="inline-flex items-center gap-1">
-            <MapPin className="h-4 w-4" />
-            {trainingLocation}
+            <MapPin className="h-3.5 w-3.5" />
+            <span className="max-w-[320px] truncate">{trainingLocation}</span>
           </span>
         </div>
       </header>
@@ -167,20 +171,27 @@ export function WeeklyPlanningView({
           {t("noPlanning")}
         </p>
       ) : (
-        // Horizontal scroll on narrow screens — the table needs at least
-        // ~960px to be legible. On print we set a wider container width
-        // via the print stylesheet so it lays out edge-to-edge.
-        <div className="overflow-x-auto rounded-lg border bg-card">
-          <table className="w-full min-w-[920px] border-collapse text-sm">
+        // No min-width / no overflow scroll: the table fills the available
+        // width and the time column gets a fixed narrow width so the 7 day
+        // columns share the rest equally. table-fixed locks the column
+        // widths so cells never push the table past the viewport.
+        <div className="rounded-lg border bg-card">
+          <table className="w-full table-fixed border-collapse text-sm">
+            <colgroup>
+              <col className="w-[64px]" />
+              {dayKeys.map((day) => (
+                <col key={day} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
-                <th className="sticky left-0 z-10 w-[88px] border-b border-r bg-muted/40 p-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <th className="border-b border-r bg-muted/40 p-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   {t("timeColumn")}
                 </th>
                 {dayKeys.map((day) => (
                   <th
                     key={day}
-                    className="border-b border-r bg-slate-900 p-3 text-center text-xs font-bold uppercase tracking-wider text-white last:border-r-0"
+                    className="border-b border-r bg-slate-900 p-2 text-center text-[11px] font-bold uppercase tracking-wider text-white last:border-r-0"
                   >
                     {td(day as DayKey)}
                   </th>
@@ -192,7 +203,7 @@ export function WeeklyPlanningView({
                 <tr key={time}>
                   <th
                     scope="row"
-                    className="sticky left-0 z-10 border-b border-r bg-muted/40 p-2 text-center align-middle text-xs font-semibold text-muted-foreground"
+                    className="border-b border-r bg-muted/40 p-1.5 text-center align-middle text-[11px] font-semibold text-muted-foreground"
                   >
                     {time}
                   </th>
@@ -210,26 +221,26 @@ export function WeeklyPlanningView({
       )}
 
       {athleteRecap.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-lg font-semibold">{t("athleteRecapTitle")}</h2>
-          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="space-y-1.5">
+          <h2 className="text-sm font-semibold">{t("athleteRecapTitle")}</h2>
+          <ul className="grid gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {athleteRecap.map((row) => (
               <li
                 key={row.athleteId}
-                className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm"
+                className="flex items-center justify-between rounded-md border bg-card px-2 py-1 text-xs"
               >
                 <span className="truncate font-medium">{row.name}</span>
-                <span className="ml-2 flex shrink-0 gap-1.5 text-xs">
+                <span className="ml-2 flex shrink-0 gap-1 text-[10px]">
                   <Badge
                     variant="outline"
-                    className="border-blue-200 bg-blue-50 px-1.5 py-0 leading-4 text-blue-700"
+                    className="border-blue-200 bg-blue-50 px-1 py-0 leading-4 text-blue-700"
                   >
                     <Users className="mr-0.5 h-2.5 w-2.5" />
                     {row.collective}
                   </Badge>
                   <Badge
                     variant="outline"
-                    className="border-orange-200 bg-orange-50 px-1.5 py-0 leading-4 text-orange-700"
+                    className="border-orange-200 bg-orange-50 px-1 py-0 leading-4 text-orange-700"
                   >
                     <User className="mr-0.5 h-2.5 w-2.5" />
                     {row.individual}
@@ -246,7 +257,7 @@ export function WeeklyPlanningView({
 
 function Cell({ cell }: { cell: SessionCell | undefined }) {
   if (!cell) {
-    return <td className="border-b border-r p-2 align-top last:border-r-0" />
+    return <td className="border-b border-r p-1.5 align-top last:border-r-0" />
   }
   const isMorning = cell.window === "morning"
   // Morning slots get a warm yellow palette, end-of-day a dark slate one
@@ -259,18 +270,18 @@ function Cell({ cell }: { cell: SessionCell | undefined }) {
 
   return (
     <td
-      className={`border-b border-r p-2 align-top last:border-r-0 ${cellClass}`}
+      className={`border-b border-r p-1.5 align-top last:border-r-0 ${cellClass}`}
     >
-      <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-bold tracking-wide">
+      <div className="flex flex-col gap-0.5">
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[10px] font-bold tracking-tight">
             {cell.session.startTime}–{cell.session.endTime}
           </span>
           <SessionTypeBadge session={cell.session} dark={!isMorning} />
         </div>
-        <ul className="space-y-0.5 text-[12px] font-medium leading-tight">
+        <ul className="space-y-0 text-[11px] font-medium leading-tight">
           {cell.session.athletes.map((a) => (
-            <li key={a.athleteId} className={subClass}>
+            <li key={a.athleteId} className={`${subClass} truncate`}>
               <AthleteName athlete={a} />
             </li>
           ))}
@@ -287,7 +298,10 @@ function SessionTypeBadge({
   session: DailySession
   dark: boolean
 }) {
-  const t = useTranslations("weeklyPlanning")
+  // Short labels ("Coll." / "Indiv.") from the existing planning namespace —
+  // the cells are narrow so the long "Collective" / "Individual" forms used
+  // elsewhere don't fit cleanly alongside the count and time range.
+  const tp = useTranslations("planning")
   const isCollective = session.type === "collective"
   // Two palettes so the badge stays legible on both the warm (morning) and
   // dark (end-of-day) cell backgrounds.
@@ -300,14 +314,14 @@ function SessionTypeBadge({
       : "bg-orange-500 text-white border-transparent"
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-0.5 rounded-sm border px-1 py-0 text-[9px] font-semibold uppercase tracking-wider ${colorClass}`}
+      className={`inline-flex shrink-0 items-center gap-0.5 rounded-sm border px-1 py-0 text-[8px] font-semibold uppercase tracking-tight ${colorClass}`}
     >
       {isCollective ? (
-        <Users className="h-2.5 w-2.5" />
+        <Users className="h-2 w-2" />
       ) : (
-        <User className="h-2.5 w-2.5" />
+        <User className="h-2 w-2" />
       )}
-      {isCollective ? t("collectiveBadge") : t("individualBadge")} ·{" "}
+      {isCollective ? tp("collective") : tp("individual")}·
       {session.athletes.length}
     </span>
   )
