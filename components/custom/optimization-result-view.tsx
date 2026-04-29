@@ -111,6 +111,7 @@ export function OptimizationResultView({
   const tp = useTranslations("planning")
   const tcamp = useTranslations("campaigns")
   const tc = useTranslations("common")
+  const tov = useTranslations("optimizationView")
   // The legacy "best collective slot" summary and the per-bestSlot athletes
   // table were removed: the per-day view below is the source of truth — there
   // is one best slot *per day*, not a single one across the week.
@@ -162,7 +163,7 @@ export function OptimizationResultView({
       {result.debug && result.debug.length > 0 && (
         <details className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs">
           <summary className="cursor-pointer font-medium text-amber-900">
-            Diag algo (trace décision)
+            {tov("diagTitle")}
           </summary>
           <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-amber-900">
             {result.debug.join("\n")}

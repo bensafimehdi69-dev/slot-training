@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { AvatarUpload } from "@/components/custom/avatar-upload"
 import { setManagerAvatar } from "@/app/(manager)/dashboard/actions"
 
@@ -17,6 +18,7 @@ interface ManagerAvatarMenuProps {
  */
 export function ManagerAvatarMenu({ name, avatarUrl }: ManagerAvatarMenuProps) {
   const router = useRouter()
+  const tc = useTranslations("common")
   const [currentUrl, setCurrentUrl] = useState<string | null>(avatarUrl)
 
   return (
@@ -25,7 +27,7 @@ export function ManagerAvatarMenu({ name, avatarUrl }: ManagerAvatarMenuProps) {
         src={currentUrl}
         name={name}
         size={36}
-        ariaLabel="Changer ma photo"
+        ariaLabel={tc("changeMyPhoto")}
         onUpload={(formData) => setManagerAvatar(formData)}
         onUploaded={(url) => {
           setCurrentUrl(url)

@@ -1,29 +1,31 @@
 import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import { NextIntlClientProvider } from "next-intl"
-import { getLocale, getMessages } from "next-intl/server"
+import { getLocale, getMessages, getTranslations } from "next-intl/server"
 import { Toaster } from "sonner"
 import { isRtl, type Locale } from "@/lib/i18n/config"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata: Metadata = {
-  title: "Slot Training - Optimisation des créneaux d'entraînement",
-  description:
-    "Planifiez vos entraînements sportifs en tenant compte des emplois du temps, trajets et contraintes de chaque athlète.",
-  // PWA wiring: manifest declares icons + standalone display, apple-* meta
-  // tags make iOS Add-to-Home-Screen behave like a native app.
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    title: "Slot Training",
-    statusBarStyle: "default",
-  },
-  icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/icon.svg" }],
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("common")
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+    // PWA wiring: manifest declares icons + standalone display, apple-* meta
+    // tags make iOS Add-to-Home-Screen behave like a native app.
+    manifest: "/manifest.json",
+    appleWebApp: {
+      capable: true,
+      title: t("appName"),
+      statusBarStyle: "default",
+    },
+    icons: {
+      icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+      apple: [{ url: "/icon.svg" }],
+    },
+  }
 }
 
 // `themeColor` on metadata triggers a deprecation warning in Next 14+ — it

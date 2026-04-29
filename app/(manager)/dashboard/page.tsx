@@ -122,7 +122,7 @@ export default function DashboardPage() {
         avatarFormData.set("file", newGroupAvatar)
         const avatarResult = await setGroupAvatar(result.data.id, avatarFormData)
         if (avatarResult.error) {
-          toast.error(`Groupe créé mais photo non envoyée : ${avatarResult.error}`)
+          toast.error(t("groupCreatedPhotoFailed", { error: avatarResult.error }))
         }
       }
       toast.success(t("groupCreated"))
@@ -189,7 +189,7 @@ export default function DashboardPage() {
                   <AvatarPicker
                     name={groupNameDraft || undefined}
                     size={64}
-                    ariaLabel="Photo du groupe"
+                    ariaLabel={tc("groupPhoto")}
                     onChange={setNewGroupAvatar}
                   />
                   <div className="flex-1 space-y-2">

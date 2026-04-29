@@ -18,6 +18,7 @@ import { AvatarPicker } from "@/components/custom/avatar-picker"
 
 export default function RegisterPage() {
   const t = useTranslations("auth")
+  const tc = useTranslations("common")
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -60,7 +61,7 @@ export default function RegisterPage() {
         avatarFormData.set("file", avatar)
         const avatarResult = await setManagerAvatar(avatarFormData)
         if (avatarResult.error) {
-          toast.error(`Compte créé mais photo non envoyée : ${avatarResult.error}`)
+          toast.error(t("accountCreatedPhotoFailed", { error: avatarResult.error }))
         }
       }
 
@@ -84,7 +85,7 @@ export default function RegisterPage() {
             <AvatarPicker
               name={name}
               size={72}
-              ariaLabel="Photo de profil"
+              ariaLabel={tc("profilePhoto")}
               onChange={setAvatar}
             />
             <p className="text-xs text-muted-foreground">{t("avatarOptional")}</p>

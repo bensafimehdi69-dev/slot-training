@@ -1,6 +1,7 @@
 "use server"
 
 import { z } from "zod"
+import { getTranslations } from "next-intl/server"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { createSessionCookie } from "@/lib/firebase/auth"
 import { writeAthleteProfile } from "@/lib/server/profile-service"
@@ -30,10 +31,11 @@ const onboardingDataSchema = z.object({
 })
 
 export async function validateInviteToken(groupId: string, token: string) {
+  const tErr = await getTranslations("serverErrors")
   const parsedGroupId = firestoreId.safeParse(groupId)
   const parsedToken = inviteTokenSchema.safeParse(token)
   if (!parsedGroupId.success || !parsedToken.success) {
-    return { error: "Lien d'invitation invalide." }
+    return { error: tErr("joinLinkInvalid") }
   }
 
   // O(1) lookup via the reverse index instead of scanning every manager.
@@ -41,17 +43,17 @@ export async function validateInviteToken(groupId: string, token: string) {
   // Single generic error across all failure modes — never an oracle that
   // distinguishes "token exists, wrong group" from "token unknown".
   if (!index || index.groupId !== parsedGroupId.data) {
-    return { error: "Lien d'invitation invalide." }
+    return { error: tErr("joinLinkInvalid") }
   }
   if (index.expiresAt < new Date()) {
-    return { error: "Ce lien d'invitation a expiré." }
+    return { error: tErr("joinLinkExpired") }
   }
 
   const groupDoc = await adminDb
     .collection("managers").doc(index.managerUid)
     .collection("groups").doc(parsedGroupId.data)
     .get()
-  if (!groupDoc.exists) return { error: "Lien d'invitation invalide." }
+  if (!groupDoc.exists) return { error: tErr("joinLinkInvalid") }
 
   return {
     data: {
@@ -76,20 +78,21 @@ export async function completeOnboarding(
   idToken: string,
   rawData: unknown
 ) {
+  const tErr = await getTranslations("serverErrors")
   try {
     const parsedGroupId = firestoreId.safeParse(groupId)
-    if (!parsedGroupId.success) return { error: "Identifiant de groupe invalide." }
+    if (!parsedGroupId.success) return { error: tErr("invalidGroupId") }
 
     const parsedData = onboardingDataSchema.safeParse(rawData)
     if (!parsedData.success) {
-      return { error: parsedData.error.issues[0]?.message ?? "Données invalides." }
+      return { error: parsedData.error.issues[0]?.message ?? tErr("invalidData") }
     }
     const data = parsedData.data
 
     // Re-validate the invite token server-side before trusting groupId / managerUid.
     const lookup = await validateInviteToken(parsedGroupId.data, inviteToken)
     if (lookup.error || !lookup.data) {
-      return { error: lookup.error ?? "Lien d'invitation invalide." }
+      return { error: lookup.error ?? tErr("joinLinkInvalid") }
     }
     const managerUid = lookup.data.managerUid
 
@@ -127,6 +130,6 @@ export async function completeOnboarding(
     return { success: true }
   } catch (error) {
     console.error("[ONBOARDING] completeOnboarding failed:", error instanceof Error ? error.message : "unknown")
-    return { error: "Une erreur est survenue. Veuillez réessayer." }
+    return { error: tErr("tryAgain") }
   }
 }

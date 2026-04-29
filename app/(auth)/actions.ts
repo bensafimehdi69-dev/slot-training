@@ -1,6 +1,7 @@
 "use server"
 
 import { z } from "zod"
+import { getTranslations } from "next-intl/server"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { clearSession } from "@/lib/firebase/auth"
 import { checkRateLimit, formatRetryAfter, getClientIp } from "@/lib/server/rate-limit"
@@ -13,13 +14,14 @@ const registerSchema = z.object({
 })
 
 export async function registerManager(formData: FormData) {
+  const tErr = await getTranslations("serverErrors")
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
   })
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Champs invalides." }
+    return { error: parsed.error.issues[0]?.message ?? tErr("invalidData") }
   }
   const { name, email, password } = parsed.data
 
@@ -53,9 +55,9 @@ export async function registerManager(formData: FormData) {
   } catch (error: unknown) {
     const firebaseError = error as { code?: string }
     if (firebaseError.code === "auth/email-already-exists") {
-      return { error: "Cet email est déjà utilisé." }
+      return { error: tErr("invalidEmailUsed") }
     }
-    return { error: "Une erreur est survenue. Veuillez réessayer." }
+    return { error: tErr("tryAgain") }
   }
 }
 

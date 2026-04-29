@@ -64,13 +64,21 @@ export function DailyPlanningView({ dailyPlannings }: DailyPlanningViewProps) {
 
 function DayBlock({ planning }: { planning: DailyPlanning }) {
   const tp = useTranslations("planning")
+  const tDays = useTranslations("days")
   const hasAny =
     planning.endOfDaySession !== null || planning.morningSessions.length > 0
+  // Translate via the raw dayKey ("lundi", "mardi"…) so non-French locales
+  // don't see French labels. dayKey is always set by the optimiser; we fall
+  // back to the legacy `day` label only for ancient pre-Lot-3b campaigns.
+  const DAY_KEYS = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"] as const
+  const dayLabel = planning.dayKey && (DAY_KEYS as readonly string[]).includes(planning.dayKey)
+    ? tDays(planning.dayKey as (typeof DAY_KEYS)[number])
+    : planning.day
 
   return (
     <div className="rounded-lg border p-2 sm:p-3">
       <div className="mb-1.5 flex items-center justify-between">
-        <p className="font-medium">{planning.day}</p>
+        <p className="font-medium">{dayLabel}</p>
         {!hasAny && (
           <span className="text-xs italic text-muted-foreground">
             {tp("noSession")}

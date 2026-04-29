@@ -1,6 +1,7 @@
 "use server"
 
 import { z } from "zod"
+import { getTranslations } from "next-intl/server"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { getSession } from "@/lib/firebase/auth"
 import {
@@ -81,16 +82,17 @@ export async function acceptStaffInvite(
   groupId?: string
   error?: string
 }> {
+  const tErr = await getTranslations("serverErrors")
   const session = await getSession()
-  if (!session) return { error: "Non authentifié." }
+  if (!session) return { error: tErr("notAuthenticated") }
 
   const parsed = tokenSchema.safeParse(token)
-  if (!parsed.success) return { error: "Jeton invalide." }
+  if (!parsed.success) return { error: tErr("invalidToken") }
   const invite = await readStaffInvite(parsed.data)
-  if (!invite) return { error: "Invitation introuvable ou expirée." }
+  if (!invite) return { error: tErr("inviteNotFound") }
   if (invite.expiresAt.getTime() < Date.now()) {
     await deleteStaffInvite(parsed.data).catch(() => {})
-    return { error: "Invitation expirée." }
+    return { error: tErr("inviteExpired") }
   }
 
   // Pull the current user's email from Firebase Auth (more reliable than
@@ -99,7 +101,7 @@ export async function acceptStaffInvite(
   const sessionEmail = userRecord.email?.toLowerCase()
   if (!sessionEmail || sessionEmail !== invite.email.toLowerCase()) {
     return {
-      error: "Cette invitation a été envoyée à une autre adresse email.",
+      error: tErr("inviteWrongEmail"),
     }
   }
 
