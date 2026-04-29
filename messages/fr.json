@@ -65,7 +65,8 @@
     "loadFailed": "Impossible de charger ce planning.",
     "noPlanning": "Aucun planning disponible pour le moment.",
     "morningLabel": "Matin",
-    "endOfDayLabel": "Fin de journée"
+    "endOfDayLabel": "Fin de journée",
+    "timeColumn": "Horaire"
   },
   "avatar": {
     "changePhoto": "Changer la photo",

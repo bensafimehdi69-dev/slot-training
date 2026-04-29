@@ -65,7 +65,8 @@
     "loadFailed": "تعذر تحميل هذا الجدول.",
     "noPlanning": "لا يوجد جدول متاح حاليًا.",
     "morningLabel": "الصباح",
-    "endOfDayLabel": "نهاية اليوم"
+    "endOfDayLabel": "نهاية اليوم",
+    "timeColumn": "التوقيت"
   },
   "avatar": {
     "changePhoto": "تغيير الصورة",

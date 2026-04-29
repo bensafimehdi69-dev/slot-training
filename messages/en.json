@@ -69,7 +69,8 @@
     "loadFailed": "Unable to load this planning.",
     "noPlanning": "No planning available yet.",
     "morningLabel": "Morning",
-    "endOfDayLabel": "End of day"
+    "endOfDayLabel": "End of day",
+    "timeColumn": "Time"
   },
   "avatar": {
     "changePhoto": "Change photo",
