@@ -17,6 +17,81 @@
     "language": "اللغة",
     "logout": "تسجيل الخروج"
   },
+  "days": {
+    "dimanche": "الأحد",
+    "lundi": "الإثنين",
+    "mardi": "الثلاثاء",
+    "mercredi": "الأربعاء",
+    "jeudi": "الخميس",
+    "vendredi": "الجمعة",
+    "samedi": "السبت",
+    "shortDimanche": "أحد",
+    "shortLundi": "إثن",
+    "shortMardi": "ثلا",
+    "shortMercredi": "أرب",
+    "shortJeudi": "خمي",
+    "shortVendredi": "جمع",
+    "shortSamedi": "سبت"
+  },
+  "scheduleCells": {
+    "available": "متاح",
+    "unavailable": "غير متاح",
+    "atSchool": "في المدرسة",
+    "atHome": "في المنزل",
+    "school": "المدرسة",
+    "home": "المنزل",
+    "tapHint": "اضغط للتنقل: متاح ← المدرسة ← المنزل.",
+    "schoolShort": "م",
+    "homeShort": "ن"
+  },
+  "campaignCardSimple": {
+    "responseShort": "{responded}/{target}",
+    "expand": "عرض التفاصيل",
+    "collapse": "إخفاء التفاصيل"
+  },
+  "avatar": {
+    "changePhoto": "تغيير الصورة",
+    "uploadFailed": "فشل الرفع.",
+    "imageProcessFailed": "تعذرت معالجة هذه الصورة.",
+    "removePhoto": "إزالة الصورة",
+    "groupPhoto": "صورة المجموعة",
+    "changeGroupPhoto": "تغيير صورة المجموعة",
+    "profilePhoto": "صورة الملف الشخصي",
+    "changeMyPhoto": "تغيير صورتي",
+    "pickPhoto": "اختر صورة"
+  },
+  "errors": {
+    "groupPhotoFailed": "تم إنشاء المجموعة ولكن فشل رفع الصورة: {error}",
+    "accountPhotoFailed": "تم إنشاء الحساب ولكن فشل رفع الصورة: {error}",
+    "wrongPassword": "كلمة المرور غير صحيحة.",
+    "weakPassword": "كلمة المرور قصيرة جدًا (8 أحرف على الأقل).",
+    "emailInUse": "هذا البريد الإلكتروني له حساب بالفعل. استخدم كلمة المرور الموجودة بدلاً من ذلك.",
+    "genericError": "حدث خطأ."
+  },
+  "inviteStaff": {
+    "acceptInvitation": "قبول الدعوة",
+    "joinGroup": "الانضمام إلى « {group} »",
+    "loginPrompt": "{inviter} يدعوك للاطلاع على « {group} » (للقراءة فقط). سجّل الدخول للقبول.",
+    "createPrompt": "{inviter} يدعوك للاطلاع على « {group} » (للقراءة فقط). أنشئ حساب مدير للقبول.",
+    "photoOptional": "صورة (اختياري)",
+    "fullName": "الاسم الكامل",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "passwordHint": "اختر كلمة مرور (8 أحرف على الأقل)",
+    "loginAndAccept": "تسجيل الدخول والقبول",
+    "createMyAccount": "إنشاء حسابي",
+    "connectedSuccess": "تم تسجيل الدخول. تم منح الوصول إلى المجموعة.",
+    "createdSuccess": "تم إنشاء الحساب. تم منح الوصول إلى المجموعة.",
+    "invalidTitle": "دعوة غير صالحة",
+    "invalidBody": "رابط الدعوة هذا غير موجود أو انتهت صلاحيته. اطلب من الشخص الذي دعاك إرسال رابط جديد."
+  },
+  "addressMap": {
+    "placesUnavailable": "Places API (New) غير متاح. تحقق من الإعدادات.",
+    "geocodeFailed": "فشل في تحديد الموقع. حاول مرة أخرى.",
+    "geocodeNotFound": "تعذر العثور على هذا العنوان.",
+    "tip": "نصيحة: حرّك العلامة أو انقر على الخريطة لضبط الموقع إذا كان العنوان غير دقيق.",
+    "placeholder": "مثال: ملعب الملك عبد الله، جدة"
+  },
   "auth": {
     "loginTitle": "تسجيل الدخول",
     "managerLogin": "فضاء المدرب",
@@ -286,7 +361,8 @@
     "open": "فتح"
   },
   "travel": {
-    "byCar": "بالسيارة {minutes} دقيقة"
+    "byCar": "بالسيارة {minutes} دقيقة",
+    "byCarLabel": "بالسيارة: {time}"
   },
   "joinForm": {
     "title": "الانضمام إلى {group}",
@@ -310,6 +386,8 @@
     "step2Submitting": "جارٍ إنشاء الحساب…",
     "step3FirstName": "الاسم",
     "step3AvatarOptional": "صورة (اختياري)",
+    "step3AvatarAria": "صورة الملف الشخصي",
+    "errAvatarUpload": "تم إنشاء الملف الشخصي ولكن فشل رفع الصورة: {error}",
     "step3LastName": "اللقب",
     "step4HomeAddress": "عنوان المنزل",
     "step5SchoolAddress": "عنوان مكان الدراسة (اختياري)",

@@ -66,6 +66,7 @@ interface GroupCardProps {
 export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemove }: GroupCardProps) {
   const t = useTranslations("managerDashboard")
   const tc = useTranslations("common")
+  const tav = useTranslations("avatar")
   const [editOpen, setEditOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -135,7 +136,7 @@ export function GroupCard({ group, isExpanded, onToggle, onRefresh, onLocalRemov
             src={group.avatarUrl}
             name={group.name}
             size={44}
-            ariaLabel="Changer la photo du groupe"
+            ariaLabel={tav("changeGroupPhoto")}
             onUpload={(formData) => setGroupAvatar(group.id, formData)}
             onUploaded={onRefresh}
             readOnly={isViewer}

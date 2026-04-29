@@ -44,6 +44,10 @@ const submitResponseSchema = z.object({
 export interface AthleteSession {
   type: "collectif" | "individuel"
   day: string
+  // Raw weekday key (e.g. "lundi") so the client can localise the label
+  // independently of the language used at optimisation time. Optional only
+  // for legacy plannings that pre-date this field.
+  dayKey?: string
   startTime: string
   endTime: string
   departureTime?: string
@@ -392,6 +396,7 @@ function findAthleteSessions(
         out.push({
           type: session.type === "collective" ? "collectif" : "individuel",
           day: planning.day,
+          dayKey: planning.dayKey,
           startTime: session.startTime,
           endTime: session.endTime,
           departureTime: member.departureTime,

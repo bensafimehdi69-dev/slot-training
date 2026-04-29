@@ -1,10 +1,9 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { useTranslations } from "next-intl"
 import {
   dayKeys,
-  dayLabels,
-  dayLabelsShort,
   type DayKey,
   type ScheduleSlot,
   type SlotLocation,
@@ -40,7 +39,7 @@ function nextState(state: CellState): CellState {
 
 /**
  * Three-state weekly schedule for an athlete's campaign response. Each tap
- * cycles a cell through Disponible → À l'école → À la maison → Disponible.
+ * cycles a cell through Available → At school → At home → Available.
  *
  * The location on busy cells is fed into the optimiser so it knows where the
  * athlete is coming from (or going back to) when scheduling a training slot.
@@ -51,7 +50,12 @@ export function ScheduleGrid({
   timeRangeStart = "07:00",
   timeRangeEnd = "22:00",
 }: ScheduleGridProps) {
+  const td = useTranslations("days")
+  const ts = useTranslations("scheduleCells")
   const hours = generateHours(timeRangeStart, timeRangeEnd)
+
+  const shortDayKey = (k: string) =>
+    `short${k.charAt(0).toUpperCase()}${k.slice(1)}`
 
   function cellStateFor(day: DayKey, hour: string): CellState {
     const slot = (value[day] || []).find((s) => s.hour === hour)
@@ -85,7 +89,13 @@ export function ScheduleGrid({
   }
 
   function cellText(state: CellState): string {
-    return state === "training" ? "" : state
+    if (state === "training") return ""
+    return state === "school" ? ts("schoolShort") : ts("homeShort")
+  }
+
+  function cellAriaState(state: CellState): string {
+    if (state === "training") return ts("available")
+    return state === "school" ? ts("atSchool") : ts("atHome")
   }
 
   return (
@@ -102,7 +112,7 @@ export function ScheduleGrid({
           // 3-letter abbreviation so the 7 column headers don't run into
           // each other on a phone width.
           <div key={day} className="px-0.5 text-center text-[10px] font-medium">
-            {dayLabelsShort[day]}
+            {td(shortDayKey(day))}
           </div>
         ))}
 
@@ -122,7 +132,7 @@ export function ScheduleGrid({
                     "flex h-7 items-center justify-center rounded-sm border text-[9px] font-medium transition-colors",
                     cellClass(state)
                   )}
-                  aria-label={`${dayLabels[day]} ${hour} – ${state === "training" ? "Disponible" : state === "school" ? "À l'école" : "À la maison"}`}
+                  aria-label={`${td(day)} ${hour} – ${cellAriaState(state)}`}
                 >
                   {cellText(state)}
                 </button>
@@ -135,23 +145,23 @@ export function ScheduleGrid({
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1">
           <div className="h-3 w-3 rounded-sm border border-green-300 bg-green-100" />
-          Disponible
+          {ts("available")}
         </div>
         <div className="flex items-center gap-1">
           <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
-            s
+            {ts("schoolShort")}
           </div>
-          École
+          {ts("school")}
         </div>
         <div className="flex items-center gap-1">
           <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
-            h
+            {ts("homeShort")}
           </div>
-          Maison
+          {ts("home")}
         </div>
       </div>
       <p className="mt-1.5 text-[11px] text-muted-foreground">
-        Touchez pour cycler : Disponible → École → Maison.
+        {ts("tapHint")}
       </p>
     </div>
   )

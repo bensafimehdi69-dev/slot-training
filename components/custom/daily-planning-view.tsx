@@ -18,6 +18,7 @@ import type {
   DailyPlanning,
   DailySession,
 } from "@/lib/types/planning"
+import type { DayKey } from "@/lib/types/schedule"
 
 interface DailyPlanningViewProps {
   dailyPlannings: DailyPlanning[]
@@ -64,13 +65,21 @@ export function DailyPlanningView({ dailyPlannings }: DailyPlanningViewProps) {
 
 function DayBlock({ planning }: { planning: DailyPlanning }) {
   const tp = useTranslations("planning")
+  const td = useTranslations("days")
   const hasAny =
     planning.endOfDaySession !== null || planning.morningSessions.length > 0
+  // Stored `planning.day` is the label produced by the optimiser at run-time
+  // (always French at the moment), so we look up the key instead and let
+  // next-intl translate it. Fallback to the raw label for legacy plannings
+  // that pre-date the dayKey field.
+  const dayLabel = planning.dayKey
+    ? td(planning.dayKey as DayKey)
+    : planning.day
 
   return (
     <div className="rounded-lg border p-2 sm:p-3">
       <div className="mb-1.5 flex items-center justify-between">
-        <p className="font-medium">{planning.day}</p>
+        <p className="font-medium">{dayLabel}</p>
         {!hasAny && (
           <span className="text-xs italic text-muted-foreground">
             {tp("noSession")}

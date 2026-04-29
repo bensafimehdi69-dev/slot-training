@@ -1,5 +1,8 @@
+"use client"
+
 import { Badge } from "@/components/ui/badge"
 import { Car, Clock } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 
 interface TravelModeBadgesProps {
@@ -35,12 +38,13 @@ export function TravelModeBadges({
   fallbackMinutes,
   className,
 }: TravelModeBadgesProps) {
+  const t = useTranslations("travel")
   if (typeof drivingMinutes === "number") {
     return (
       <Badge
         variant="outline"
         className={cn(colourFor(drivingMinutes), className)}
-        aria-label={`En voiture : ${format(drivingMinutes)}`}
+        aria-label={t("byCarLabel", { time: format(drivingMinutes) })}
       >
         <Car className="mr-1 h-3 w-3" />
         {format(drivingMinutes)}

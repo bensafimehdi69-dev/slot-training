@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { Camera, Loader2, X } from "lucide-react"
 import { Avatar } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
@@ -32,6 +33,7 @@ export function AvatarPicker({
   className,
   onChange,
 }: AvatarPickerProps) {
+  const t = useTranslations("avatar")
   const inputRef = useRef<HTMLInputElement>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -57,7 +59,7 @@ export function AvatarPicker({
       onChange(resized)
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Impossible de traiter cette image.",
+        error instanceof Error ? error.message : t("imageProcessFailed"),
       )
     } finally {
       setBusy(false)
@@ -79,7 +81,7 @@ export function AvatarPicker({
         disabled={busy}
         onClick={() => inputRef.current?.click()}
         className={cn("block rounded-full", busy && "opacity-70")}
-        aria-label={ariaLabel ?? "Choisir une photo"}
+        aria-label={ariaLabel ?? t("pickPhoto")}
       >
         <Avatar src={previewUrl} name={name} size={size} alt={ariaLabel ?? name} />
       </button>
@@ -101,7 +103,7 @@ export function AvatarPicker({
         <button
           type="button"
           onClick={clear}
-          aria-label="Retirer la photo"
+          aria-label={t("removePhoto")}
           className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border border-white bg-gray-700 text-white shadow hover:bg-gray-800"
         >
           <X className="h-3 w-3" />

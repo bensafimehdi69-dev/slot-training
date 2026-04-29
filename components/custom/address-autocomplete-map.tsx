@@ -8,6 +8,7 @@ import {
   useMapsLibrary,
   useMap,
 } from "@vis.gl/react-google-maps"
+import { useTranslations } from "next-intl"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, MapPin } from "lucide-react"
@@ -70,6 +71,7 @@ function AutocompletePicker({
   onChange,
   required,
 }: AddressAutocompleteMapProps) {
+  const t = useTranslations("addressMap")
   const places = useMapsLibrary("places")
   const geocoding = useMapsLibrary("geocoding")
   const [inputValue, setInputValue] = useState(value?.formatted || "")
@@ -111,7 +113,7 @@ function AutocompletePicker({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { AutocompleteSessionToken, AutocompleteSuggestion } = places as any
         if (!AutocompleteSessionToken || !AutocompleteSuggestion) {
-          setError("API Places (New) indisponible. Vérifiez la configuration.")
+          setError(t("placesUnavailable"))
           return
         }
         if (!sessionTokenRef.current) {
@@ -159,7 +161,7 @@ function AutocompletePicker({
         : await geocoder.geocode({ address: suggestion.fullText })
       const first = response.results?.[0]
       if (!first?.geometry?.location) {
-        setError("Impossible de localiser cette adresse.")
+        setError(t("geocodeNotFound"))
         return
       }
       const lat = first.geometry.location.lat()
@@ -171,7 +173,7 @@ function AutocompletePicker({
       sessionTokenRef.current = null
     } catch (err) {
       console.error("[Address] geocoding failed:", err instanceof Error ? err.message : "unknown")
-      setError("Erreur lors de la localisation. Réessayez.")
+      setError(t("geocodeFailed"))
     } finally {
       setResolving(false)
     }
@@ -200,7 +202,7 @@ function AutocompletePicker({
             value={inputValue}
             onChange={(e) => handleInputChange(e.target.value)}
             onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
-            placeholder="Ex: Stade King Abdullah, Jeddah"
+            placeholder={t("placeholder")}
             disabled={resolving}
             autoComplete="off"
           />
@@ -237,7 +239,7 @@ function AutocompletePicker({
 
       {value && (
         <p className="text-xs text-muted-foreground">
-          Astuce : déplacez le marqueur ou cliquez sur la carte pour ajuster la position si l&apos;adresse n&apos;est pas exacte.
+          {t("tip")}
         </p>
       )}
     </div>

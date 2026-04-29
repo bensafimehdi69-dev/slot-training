@@ -1293,6 +1293,7 @@ export async function validatePlanning(groupId: string, campaignId: string) {
     }
     type RawDayPlanning = {
       day: string
+      dayKey?: string
       endOfDaySession: RawSession | null
       morningSessions: RawSession[]
     }
@@ -1310,6 +1311,7 @@ export async function validatePlanning(groupId: string, campaignId: string) {
             list.push({
               type: session.type === "collective" ? "collectif" : "individuel",
               day: planning.day,
+              dayKey: planning.dayKey,
               startTime: session.startTime,
               endTime: session.endTime,
               departureTime: a.departureTime,
