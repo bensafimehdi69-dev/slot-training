@@ -14,6 +14,7 @@ import {
 import {
   registerFcmToken,
   unregisterFcmToken,
+  clearUnreadCount,
 } from "@/lib/actions/notifications"
 
 // Tracks the current device's FCM token so we can re-send it to the server
@@ -66,6 +67,16 @@ export function NotificationsToggle({ className }: Props) {
             }
           : undefined,
       })
+      // Foreground delivery means the user is actively looking at the app —
+      // the OS-level badge would otherwise stay stuck on the count from the
+      // background path. Clearing it here keeps the badge in sync with what
+      // the user has already seen as a toast.
+      if (typeof navigator !== "undefined" && "clearAppBadge" in navigator) {
+        ;(
+          navigator as Navigator & { clearAppBadge?: () => Promise<void> }
+        ).clearAppBadge?.().catch(() => {})
+      }
+      clearUnreadCount().catch(() => {})
     })
     return unsubscribe
   }, [enabled])

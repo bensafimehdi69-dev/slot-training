@@ -85,7 +85,6 @@ export function CampaignCard({
   const [optimizing, setOptimizing] = useState(false)
   const [validating, setValidating] = useState(false)
   const [rejecting, setRejecting] = useState(false)
-  const [showResult, setShowResult] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   // Controlled state so we can trigger the delete confirm from a separate
@@ -119,7 +118,6 @@ export function CampaignCard({
       toast.error(result.error)
     } else {
       toast.success(t("optimizationDone"))
-      setShowResult(true)
       onRefresh()
     }
   }
@@ -367,15 +365,6 @@ export function CampaignCard({
 
             {/* Primary actions */}
             <div className="flex flex-wrap gap-2">
-              {campaign.optimizationResult && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowResult(!showResult)}
-                >
-                  {showResult ? t("hideResult") : t("viewResult")}
-                </Button>
-              )}
               {!isViewer && campaign.status === "active" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -433,7 +422,10 @@ export function CampaignCard({
                 )}
             </div>
 
-            {showResult && campaign.optimizationResult && (
+            {/* Once an optimisation exists, render the per-day planning
+                inline — the previous "View result / Hide" toggle just
+                added an extra click between the manager and the data. */}
+            {campaign.optimizationResult && (
               <>
                 <Separator />
                 <OptimizationResultView
@@ -444,6 +436,7 @@ export function CampaignCard({
                   isValidating={validating}
                   isRejecting={rejecting}
                   role={role}
+                  campaignId={campaign.id}
                 />
               </>
             )}

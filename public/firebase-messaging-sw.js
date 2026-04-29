@@ -49,6 +49,34 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim())
 })
 
+// Badge handler: read the unread-count value packed inside `data` by the
+// server (lib/server/push.ts) and update the OS-level app-icon badge. The
+// FCM SDK already registered its own `push` listener that auto-displays
+// the visual notification — this listener runs in parallel and only
+// touches the badge counter, so the two don't clash.
+//
+// `setAppBadge` is a no-op outside an installed PWA on iOS Safari and on
+// browsers that haven't shipped the App Badging API. Wrapping the call in
+// a feature-check keeps it safe to ship everywhere.
+self.addEventListener("push", (event) => {
+  if (!event.data) return
+  let payload
+  try {
+    payload = event.data.json()
+  } catch (_err) {
+    return
+  }
+  const raw = payload?.data?.unreadCount
+  if (typeof raw === "undefined") return
+  const count = Number(raw)
+  if (!Number.isFinite(count) || count < 0) return
+  if (typeof self.registration?.setAppBadge === "function") {
+    event.waitUntil(self.registration.setAppBadge(count).catch(() => {}))
+  } else if (typeof self.navigator?.setAppBadge === "function") {
+    event.waitUntil(self.navigator.setAppBadge(count).catch(() => {}))
+  }
+})
+
 // Click handler: bring the app to focus, or open a relevant URL if the
 // payload provides one in `data.url`.
 self.addEventListener("notificationclick", (event) => {

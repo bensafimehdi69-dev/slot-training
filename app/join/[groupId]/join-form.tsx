@@ -1,9 +1,15 @@
 "use client"
 
 import { useState } from "react"
-import { createUserWithEmailAndPassword } from "firebase/auth"
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth"
 import { auth } from "@/lib/firebase/client"
-import { completeOnboarding } from "@/app/join/[groupId]/actions"
+import {
+  completeOnboarding,
+  joinGroupAsExistingAthlete,
+} from "@/app/join/[groupId]/actions"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -41,6 +47,12 @@ export function JoinForm({
   const tc = useTranslations("common")
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  // Two onboarding flows share step 2: first-time signup (default) vs.
+  // sign-in for an athlete who already has an account in another group.
+  // The existing-account branch skips steps 3-6 — name + addresses +
+  // schedule are already in the global profile, we just write a new
+  // per-group entry and update the membership index.
+  const [existingMode, setExistingMode] = useState(false)
 
   // Step 1: GDPR
   const [gdprConsent, setGdprConsent] = useState(false)
@@ -71,6 +83,49 @@ export function JoinForm({
       .fill(null)
       .map(() => Array<ConstraintCell>(16).fill("training"))
   )
+
+  async function handleSignInExisting(): Promise<void> {
+    if (!email || !password) {
+      toast.error(t("errFillAll"))
+      return
+    }
+    setLoading(true)
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password)
+      const freshToken = await credential.user.getIdToken()
+      // Set the session cookie via the same /api/auth/login endpoint the
+      // rest of the app uses, so the redirect to /home picks up the
+      // freshly-authenticated state on the first request.
+      await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: freshToken }),
+      }).catch(() => {})
+
+      const result = await joinGroupAsExistingAthlete(groupId, token, freshToken)
+      if (result.error) {
+        toast.error(result.error)
+        setLoading(false)
+        return
+      }
+      toast.success(t("existingJoined"))
+      window.location.href = "/home"
+    } catch (error: unknown) {
+      const code = (error as { code?: string }).code
+      if (
+        code === "auth/wrong-password" ||
+        code === "auth/invalid-credential" ||
+        code === "auth/user-not-found"
+      ) {
+        toast.error(t("errSignInFailed"))
+      } else if (code === "auth/invalid-email") {
+        toast.error(t("errInvalidEmail"))
+      } else {
+        toast.error(t("errAccountFailed"))
+      }
+      setLoading(false)
+    }
+  }
 
   async function handleCreateAccount(): Promise<void> {
     if (!email || !password || !passwordConfirm) {
@@ -234,7 +289,7 @@ export function JoinForm({
             </div>
           )}
 
-          {step === 2 && (
+          {step === 2 && !existingMode && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">{t("step2Email")}</Label>
@@ -280,6 +335,78 @@ export function JoinForm({
                 disabled={loading || !email || !password || !passwordConfirm || password !== passwordConfirm}
               >
                 {loading ? t("step2Submitting") : t("step2Submit")}
+              </Button>
+
+              <div className="rounded-md border bg-muted/30 p-3 space-y-2 text-sm">
+                <p className="font-medium">{t("alreadyAccountTitle")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("alreadyAccountHint")}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    // Reuse whatever the user already typed in the create
+                    // form so they don't have to re-enter the email.
+                    setPassword("")
+                    setPasswordConfirm("")
+                    setExistingMode(true)
+                  }}
+                >
+                  {t("alreadyAccountCta")}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && existingMode && (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <h3 className="font-semibold">
+                  {t("existingSignInTitle", { group: groupName })}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {t("existingSignInHint")}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="existing-email">{t("step2Email")}</Label>
+                <Input
+                  id="existing-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="votre@email.com"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="existing-password">{t("step2Password")}</Label>
+                <Input
+                  id="existing-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t("step2PasswordPlaceholder")}
+                  required
+                />
+              </div>
+              <Button
+                className="w-full"
+                onClick={handleSignInExisting}
+                disabled={loading || !email || !password}
+              >
+                {loading ? t("existingSubmitting") : t("existingSubmit")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => setExistingMode(false)}
+                disabled={loading}
+              >
+                {t("backToCreate")}
               </Button>
             </div>
           )}

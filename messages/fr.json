@@ -49,6 +49,24 @@
     "expand": "Voir le détail",
     "collapse": "Masquer le détail"
   },
+  "weeklyPlanning": {
+    "openFullScreen": "Voir en plein écran",
+    "title": "Planning hebdomadaire",
+    "subtitle": "Du {start} au {end}",
+    "totalSessions": "{count} séance(s)",
+    "noSessionDay": "Aucune séance ce jour",
+    "back": "Retour au dashboard",
+    "print": "Imprimer",
+    "collectiveBadge": "Collectif",
+    "individualBadge": "Individuel",
+    "athletes": "Athlètes",
+    "trainingLocation": "Lieu d'entraînement",
+    "athleteRecapTitle": "Récap par athlète",
+    "loadFailed": "Impossible de charger ce planning.",
+    "noPlanning": "Aucun planning disponible pour le moment.",
+    "morningLabel": "Matin",
+    "endOfDayLabel": "Fin de journée"
+  },
   "avatar": {
     "changePhoto": "Changer la photo",
     "uploadFailed": "Upload échoué.",
@@ -405,7 +423,18 @@
     "errAccountFailed": "Impossible de créer le compte. Veuillez réessayer.",
     "errNameRequired": "Le nom et le prénom sont requis.",
     "errHomeAddressRequired": "L'adresse de domicile est requise.",
-    "successDone": "Inscription terminée ! Redirection…"
+    "successDone": "Inscription terminée ! Redirection…",
+    "alreadyAccountTitle": "Déjà un compte ?",
+    "alreadyAccountHint": "Si tu utilises déjà Slot Training dans un autre groupe, connecte-toi pour ajouter ce groupe à ton compte existant.",
+    "alreadyAccountCta": "Se connecter pour rejoindre ce groupe",
+    "existingSignInTitle": "Connexion pour rejoindre « {group} »",
+    "existingSignInHint": "Utilise les identifiants de ton compte Slot Training existant.",
+    "backToCreate": "Retour à la création de compte",
+    "existingSubmit": "Se connecter et rejoindre",
+    "existingSubmitting": "Connexion…",
+    "existingJoined": "Groupe rejoint ! Redirection…",
+    "errSignInFailed": "Email ou mot de passe incorrect.",
+    "errNoExistingProfile": "Pas encore de profil. Utilise le lien d'invitation pour t'inscrire d'abord."
   },
   "landing": {
     "title": "Slot Training",

@@ -76,6 +76,34 @@ export async function sendPushToUser(
   const tokens = snap.docs.map((d) => d.id)
   const messaging = getMessaging()
 
+  // Bump the user's unread badge counter atomically, then surface the new
+  // value inside the push payload so the SW can call setAppBadge() the
+  // moment the message arrives. The counter is reset whenever the user
+  // opens the app (clearUnreadCount server action). Failure here mustn't
+  // block the actual push — an inaccurate badge is far less disruptive
+  // than a swallowed notification.
+  let unreadCount = 0
+  try {
+    const userRef =
+      role === "athlete"
+        ? adminDb.collection("athletes").doc(uid)
+        : adminDb.collection("managers").doc(uid)
+    unreadCount = await adminDb.runTransaction(async (tx) => {
+      const userSnap = await tx.get(userRef)
+      const current = userSnap.exists
+        ? Number((userSnap.data() as { unreadCount?: number } | undefined)?.unreadCount ?? 0)
+        : 0
+      const next = (Number.isFinite(current) ? current : 0) + 1
+      tx.set(userRef, { unreadCount: next }, { merge: true })
+      return next
+    })
+  } catch (error) {
+    console.error(
+      "[PUSH] increment unreadCount failed:",
+      error instanceof Error ? error.message : "unknown"
+    )
+  }
+
   // Why we send `notification` AND no `onBackgroundMessage` handler in the SW:
   // FCM duplicates notifications when both the payload has a `notification`
   // field (Chrome auto-displays it) AND our SW registers an
@@ -85,13 +113,18 @@ export async function sendPushToUser(
   // `notification` field to be present, which is why we keep sending it: it
   // makes the legacy SW render the right title/body during the brief window
   // before the new SW activates.
+  // FCM data values must be strings — the SW parses unreadCount back to a
+  // number before calling setAppBadge.
+  const data: Record<string, string> = { unreadCount: String(unreadCount) }
+  if (payload.url) data.url = payload.url
+
   const response = await messaging.sendEachForMulticast({
     tokens,
     notification: {
       title: payload.title,
       body: payload.body,
     },
-    data: payload.url ? { url: payload.url } : undefined,
+    data,
     webpush: {
       fcmOptions: payload.url ? { link: payload.url } : undefined,
       notification: {
@@ -120,6 +153,22 @@ export async function sendPushToUser(
   )
 
   return { sent: response.successCount, pruned }
+}
+
+/**
+ * Resets the user's unread-notification counter. Called from the client when
+ * the app gets focus, so the OS-level app-icon badge clears the moment the
+ * user opens the PWA.
+ */
+export async function clearUnreadCountForUser(
+  uid: string,
+  role: PushUserRole
+): Promise<void> {
+  const userRef =
+    role === "athlete"
+      ? adminDb.collection("athletes").doc(uid)
+      : adminDb.collection("managers").doc(uid)
+  await userRef.set({ unreadCount: 0 }, { merge: true }).catch(() => {})
 }
 
 /**
