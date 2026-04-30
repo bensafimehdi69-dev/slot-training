@@ -70,6 +70,10 @@ export function HomeClient({ email, firstName, avatarUrl, profile, campaigns }: 
       toast.error(t("homeAddressRequired"))
       return
     }
+    if (!schoolAddress) {
+      toast.error(t("schoolAddressRequired"))
+      return
+    }
     setSaving(true)
     const result = await saveAthleteProfile({
       homeAddress,

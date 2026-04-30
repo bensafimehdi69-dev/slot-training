@@ -22,8 +22,11 @@ const constraintsGridSchema = z
   .length(CONSTRAINTS_GRID_DAYS)
 
 const profileInputSchema = z.object({
-  homeAddress: addressSchema.nullable(),
-  schoolAddress: addressSchema.nullable(),
+  // Home + school address are required at registration time and remain
+  // required on every profile update — the optimiser uses both to compute
+  // realistic departure points. Club stays optional.
+  homeAddress: addressSchema,
+  schoolAddress: addressSchema,
   clubAddress: addressSchema.nullable(),
   constraintsGrid: constraintsGridSchema,
 })

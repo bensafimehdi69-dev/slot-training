@@ -328,13 +328,14 @@
     "myAddresses": "My addresses",
     "addressesDescription": "Used to compute your travel times to the training.",
     "homeAddress": "Home address",
-    "schoolAddress": "School address (optional)",
+    "schoolAddress": "School address",
     "clubAddress": "Club address (optional)",
     "weeklyAvailability": "My weekly availability",
     "weeklyAvailabilityDescription": "Tap the cells to mark unavailabilities (in grey). You'll always be able to fine-tune for each campaign.",
     "saveProfile": "Save changes",
     "profileSaved": "Profile updated.",
-    "homeAddressRequired": "Home address is required."
+    "homeAddressRequired": "Home address is required.",
+    "schoolAddressRequired": "School address is required."
   },
   "athleteCampaign": {
     "title": "Training campaign",
@@ -417,7 +418,7 @@
     "errAvatarUpload": "Profile created but photo upload failed: {error}",
     "step3LastName": "Last name",
     "step4HomeAddress": "Home address",
-    "step5SchoolAddress": "School address (optional)",
+    "step5SchoolAddress": "School address",
     "step5Skip": "Skip this step",
     "step6Title": "Your weekly availability",
     "step6Hint": "Tap the cells to mark unavailabilities (in grey).",
@@ -432,6 +433,7 @@
     "errAccountFailed": "Unable to create account. Please try again.",
     "errNameRequired": "First and last name are required.",
     "errHomeAddressRequired": "Home address is required.",
+    "errSchoolAddressRequired": "School address is required.",
     "successDone": "Registration complete! Redirecting…",
     "alreadyAccountTitle": "Already have an account?",
     "alreadyAccountHint": "If you already use Slot Training in another group, sign in to add this group to your existing account.",

@@ -324,13 +324,14 @@
     "myAddresses": "Mes adresses",
     "addressesDescription": "Utilisées pour calculer vos temps de trajet vers l'entraînement.",
     "homeAddress": "Adresse de domicile",
-    "schoolAddress": "Adresse du lieu d'études (optionnel)",
+    "schoolAddress": "Adresse du lieu d'études",
     "clubAddress": "Adresse du club (optionnel)",
     "weeklyAvailability": "Mes disponibilités hebdomadaires",
     "weeklyAvailabilityDescription": "Touchez les créneaux pour indiquer vos indisponibilités (en gris). Vous pourrez toujours ajuster ces dispos spécifiquement pour chaque campagne.",
     "saveProfile": "Enregistrer les modifications",
     "profileSaved": "Profil mis à jour.",
-    "homeAddressRequired": "L'adresse de domicile est requise."
+    "homeAddressRequired": "L'adresse de domicile est requise.",
+    "schoolAddressRequired": "L'adresse du lieu d'études est requise."
   },
   "athleteCampaign": {
     "title": "Campagne d'entraînement",
@@ -417,7 +418,7 @@
     "errAvatarUpload": "Profil créé mais photo non envoyée : {error}",
     "step3LastName": "Nom",
     "step4HomeAddress": "Adresse de domicile",
-    "step5SchoolAddress": "Adresse du lieu d'études (optionnel)",
+    "step5SchoolAddress": "Adresse du lieu d'études",
     "step5Skip": "Passer cette étape",
     "step6Title": "Vos disponibilités hebdomadaires",
     "step6Hint": "Touchez les créneaux pour indiquer vos indisponibilités (en gris).",
@@ -432,6 +433,7 @@
     "errAccountFailed": "Impossible de créer le compte. Veuillez réessayer.",
     "errNameRequired": "Le nom et le prénom sont requis.",
     "errHomeAddressRequired": "L'adresse de domicile est requise.",
+    "errSchoolAddressRequired": "L'adresse du lieu d'études est requise.",
     "successDone": "Inscription terminée ! Redirection…",
     "alreadyAccountTitle": "Déjà un compte ?",
     "alreadyAccountHint": "Si tu utilises déjà Slot Training dans un autre groupe, connecte-toi pour ajouter ce groupe à ton compte existant.",
