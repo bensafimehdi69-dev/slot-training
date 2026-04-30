@@ -28,8 +28,13 @@ const onboardingDataSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
   email: emailSchema,
+  // Home + school address are now both mandatory at registration time
+  // (the optimiser uses both to compute realistic departure points and
+  // travel windows). Club address stays optional — fewer athletes have
+  // a separate club location, and the optimiser falls back to
+  // home → training when it's missing.
   homeAddress: addressSchema,
-  schoolAddress: addressSchema.nullable(),
+  schoolAddress: addressSchema,
   clubAddress: addressSchema.nullable(),
   constraintsGrid: constraintsGridSchema,
 })

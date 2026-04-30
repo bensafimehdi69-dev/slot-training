@@ -175,6 +175,10 @@ export function JoinForm({
       toast.error(t("errHomeAddressRequired"))
       return
     }
+    if (!schoolAddress) {
+      toast.error(t("errSchoolAddressRequired"))
+      return
+    }
 
     setLoading(true)
 
@@ -484,9 +488,20 @@ export function JoinForm({
                 label={t("step5SchoolAddress")}
                 value={schoolAddress}
                 onChange={setSchoolAddress}
+                required
               />
-              <Button className="w-full" onClick={() => setStep(6)}>
-                {schoolAddress ? tc("continue") : t("step5Skip")}
+              <Button
+                className="w-full"
+                onClick={() => {
+                  if (!schoolAddress) {
+                    toast.error(t("errSchoolAddressRequired"))
+                    return
+                  }
+                  setStep(6)
+                }}
+                disabled={!schoolAddress}
+              >
+                {tc("continue")}
               </Button>
             </div>
           )}

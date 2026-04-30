@@ -324,13 +324,14 @@
     "myAddresses": "عناويني",
     "addressesDescription": "تُستخدم لحساب أوقات الانتقال إلى التدريب.",
     "homeAddress": "عنوان المنزل",
-    "schoolAddress": "عنوان مكان الدراسة (اختياري)",
+    "schoolAddress": "عنوان مكان الدراسة",
     "clubAddress": "عنوان النادي (اختياري)",
     "weeklyAvailability": "توفري الأسبوعي",
     "weeklyAvailabilityDescription": "اضغط على الخلايا للإشارة إلى عدم توفرك (بالرمادي). يمكنك دائمًا الضبط لكل حملة على حدة.",
     "saveProfile": "حفظ التعديلات",
     "profileSaved": "تم تحديث الملف.",
-    "homeAddressRequired": "عنوان المنزل مطلوب."
+    "homeAddressRequired": "عنوان المنزل مطلوب.",
+    "schoolAddressRequired": "عنوان مكان الدراسة مطلوب."
   },
   "athleteCampaign": {
     "title": "حملة تدريب",
@@ -417,7 +418,7 @@
     "errAvatarUpload": "تم إنشاء الملف الشخصي ولكن فشل رفع الصورة: {error}",
     "step3LastName": "اللقب",
     "step4HomeAddress": "عنوان المنزل",
-    "step5SchoolAddress": "عنوان مكان الدراسة (اختياري)",
+    "step5SchoolAddress": "عنوان مكان الدراسة",
     "step5Skip": "تخطي هذه الخطوة",
     "step6Title": "توفرك الأسبوعي",
     "step6Hint": "اضغط على الخلايا للإشارة إلى عدم توفرك (بالرمادي).",
@@ -432,6 +433,7 @@
     "errAccountFailed": "تعذر إنشاء الحساب. يرجى المحاولة مرة أخرى.",
     "errNameRequired": "الاسم واللقب مطلوبان.",
     "errHomeAddressRequired": "عنوان المنزل مطلوب.",
+    "errSchoolAddressRequired": "عنوان مكان الدراسة مطلوب.",
     "successDone": "تم التسجيل! جارٍ التحويل…",
     "alreadyAccountTitle": "لديك حساب بالفعل؟",
     "alreadyAccountHint": "إذا كنت تستخدم Slot Training بالفعل في مجموعة أخرى، سجّل الدخول لإضافة هذه المجموعة إلى حسابك الحالي.",
