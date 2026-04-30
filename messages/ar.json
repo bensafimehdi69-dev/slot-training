@@ -85,7 +85,11 @@
     "wrongPassword": "كلمة المرور غير صحيحة.",
     "weakPassword": "كلمة المرور قصيرة جدًا (8 أحرف على الأقل).",
     "emailInUse": "هذا البريد الإلكتروني له حساب بالفعل. استخدم كلمة المرور الموجودة بدلاً من ذلك.",
-    "genericError": "حدث خطأ."
+    "genericError": "حدث خطأ.",
+    "inviteInvalid": "رابط دعوة غير صالح.",
+    "inviteExpired": "انتهت صلاحية رابط الدعوة هذا.",
+    "inviteIncomplete": "رابط الدعوة هذا غير مكتمل.",
+    "invalidLinkTitle": "رابط غير صالح"
   },
   "inviteStaff": {
     "acceptInvitation": "قبول الدعوة",

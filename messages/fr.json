@@ -85,7 +85,11 @@
     "wrongPassword": "Mot de passe incorrect.",
     "weakPassword": "Mot de passe trop court (min. 8 caractères).",
     "emailInUse": "Cet email a déjà un compte. Utilise plutôt le mot de passe existant.",
-    "genericError": "Une erreur est survenue."
+    "genericError": "Une erreur est survenue.",
+    "inviteInvalid": "Lien d'invitation invalide.",
+    "inviteExpired": "Ce lien d'invitation a expiré.",
+    "inviteIncomplete": "Ce lien d'invitation est incomplet.",
+    "invalidLinkTitle": "Lien invalide"
   },
   "inviteStaff": {
     "acceptInvitation": "Accepter l'invitation",

@@ -1,9 +1,12 @@
 // Single source of truth for the app's locales. Used both server-side
 // (next-intl getRequestConfig) and client-side (language picker, date
-// formatters). Keep "fr" first because it's the historical default —
-// matchLocale falls back to it when nothing else is set.
-export const locales = ["fr", "en", "ar"] as const
-export const defaultLocale: Locale = "fr"
+// formatters).
+export const locales = ["en", "fr", "ar"] as const
+// English is the default — the app's primary user base lives in
+// Saudi Arabia and most browsers there ship English as the first
+// accept-language. French (the language this codebase was originally
+// written in) stays available for users who pick it explicitly.
+export const defaultLocale: Locale = "en"
 
 export type Locale = (typeof locales)[number]
 

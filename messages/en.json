@@ -89,7 +89,11 @@
     "wrongPassword": "Incorrect password.",
     "weakPassword": "Password too short (min. 8 characters).",
     "emailInUse": "This email already has an account. Use the existing password instead.",
-    "genericError": "An error occurred."
+    "genericError": "An error occurred.",
+    "inviteInvalid": "Invalid invitation link.",
+    "inviteExpired": "This invitation link has expired.",
+    "inviteIncomplete": "This invitation link is incomplete.",
+    "invalidLinkTitle": "Invalid link"
   },
   "inviteStaff": {
     "acceptInvitation": "Accept invitation",
