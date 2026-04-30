@@ -1,6 +1,7 @@
 "use server"
 
 import { z } from "zod"
+import { getTranslations } from "next-intl/server"
 import { adminAuth, adminDb } from "@/lib/firebase/admin"
 import { createSessionCookie } from "@/lib/firebase/auth"
 import { writeAthleteProfile } from "@/lib/server/profile-service"
@@ -34,10 +35,15 @@ const onboardingDataSchema = z.object({
 })
 
 export async function validateInviteToken(groupId: string, token: string) {
+  // Localised error messages — we resolve via getTranslations so the error
+  // matches the visitor's locale (cookie or Accept-Language fallback) even
+  // before they sign in. The "errors" namespace already covers
+  // inviteInvalid / inviteExpired in fr / en / ar.
+  const t = await getTranslations("errors")
   const parsedGroupId = firestoreId.safeParse(groupId)
   const parsedToken = inviteTokenSchema.safeParse(token)
   if (!parsedGroupId.success || !parsedToken.success) {
-    return { error: "Lien d'invitation invalide." }
+    return { error: t("inviteInvalid") }
   }
 
   // O(1) lookup via the reverse index instead of scanning every manager.
@@ -45,17 +51,17 @@ export async function validateInviteToken(groupId: string, token: string) {
   // Single generic error across all failure modes — never an oracle that
   // distinguishes "token exists, wrong group" from "token unknown".
   if (!index || index.groupId !== parsedGroupId.data) {
-    return { error: "Lien d'invitation invalide." }
+    return { error: t("inviteInvalid") }
   }
   if (index.expiresAt < new Date()) {
-    return { error: "Ce lien d'invitation a expiré." }
+    return { error: t("inviteExpired") }
   }
 
   const groupDoc = await adminDb
     .collection("managers").doc(index.managerUid)
     .collection("groups").doc(parsedGroupId.data)
     .get()
-  if (!groupDoc.exists) return { error: "Lien d'invitation invalide." }
+  if (!groupDoc.exists) return { error: t("inviteInvalid") }
 
   return {
     data: {
