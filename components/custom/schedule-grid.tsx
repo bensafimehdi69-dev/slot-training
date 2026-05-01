@@ -90,7 +90,7 @@ export function ScheduleGrid({
 
   function cellText(state: CellState): string {
     if (state === "training") return ""
-    return state === "school" ? ts("schoolShort") : ts("homeShort")
+    return state === "school" ? ts("school") : ts("home")
   }
 
   function cellAriaState(state: CellState): string {
@@ -129,12 +129,15 @@ export function ScheduleGrid({
                   type="button"
                   onClick={() => cycle(day, hour)}
                   className={cn(
-                    "flex h-7 items-center justify-center rounded-sm border text-[9px] font-medium transition-colors",
+                    // overflow-hidden + leading-none keeps "School" / "Maison"
+                    // inside the 28px cell on a narrow phone — without it the
+                    // descenders would push the word past the rounded corners.
+                    "flex h-7 items-center justify-center overflow-hidden rounded-sm border px-0.5 text-[9px] font-medium leading-none transition-colors",
                     cellClass(state)
                   )}
                   aria-label={`${td(day)} ${hour} – ${cellAriaState(state)}`}
                 >
-                  {cellText(state)}
+                  <span className="truncate">{cellText(state)}</span>
                 </button>
               )
             })}
@@ -148,15 +151,11 @@ export function ScheduleGrid({
           {ts("available")}
         </div>
         <div className="flex items-center gap-1">
-          <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
-            {ts("schoolShort")}
-          </div>
+          <div className="h-3 w-3 rounded-sm border border-gray-300 bg-gray-200" />
           {ts("school")}
         </div>
         <div className="flex items-center gap-1">
-          <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
-            {ts("homeShort")}
-          </div>
+          <div className="h-3 w-3 rounded-sm border border-gray-300 bg-gray-200" />
           {ts("home")}
         </div>
       </div>
