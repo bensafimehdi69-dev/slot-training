@@ -62,9 +62,9 @@ export function AthleteAvailabilityGrid({
       case "training":
         return ""
       case "school":
-        return ts("schoolShort")
+        return ts("school")
       case "home":
-        return ts("homeShort")
+        return ts("home")
     }
   }
 
@@ -113,11 +113,15 @@ export function AthleteAvailabilityGrid({
                   onClick={() => cycle(dayIdx, hourIdx)}
                   aria-label={`${td(shortDayKey(day))} ${hour} – ${cellLabel(state)}`}
                   className={cn(
-                    "flex h-7 items-center justify-center rounded-sm border text-[9px] font-medium transition-colors",
+                    // overflow-hidden + leading-none keeps "School" / "Maison"
+                    // inside the 28px cell on a 360px-wide phone — without it
+                    // the descenders push the word past the rounded corners
+                    // and the right edge clips on the narrowest day column.
+                    "flex h-7 items-center justify-center overflow-hidden rounded-sm border px-0.5 text-[9px] font-medium leading-none transition-colors",
                     cellClass(state)
                   )}
                 >
-                  {cellText(state)}
+                  <span className="truncate">{cellText(state)}</span>
                 </button>
               )
             })}
@@ -131,15 +135,11 @@ export function AthleteAvailabilityGrid({
           {ts("available")}
         </div>
         <div className="flex items-center gap-1">
-          <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
-            {ts("schoolShort")}
-          </div>
+          <div className="h-3 w-3 rounded-sm border border-gray-300 bg-gray-200" />
           {ts("school")}
         </div>
         <div className="flex items-center gap-1">
-          <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-gray-300 bg-gray-200 text-[7px] font-medium">
-            {ts("homeShort")}
-          </div>
+          <div className="h-3 w-3 rounded-sm border border-gray-300 bg-gray-200" />
           {ts("home")}
         </div>
       </div>
